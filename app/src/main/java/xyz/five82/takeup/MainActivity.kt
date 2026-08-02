@@ -1,12 +1,14 @@
 package xyz.five82.takeup
 
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -23,6 +25,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,6 +36,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import xyz.five82.takeup.ui.ConnectScreen
+import xyz.five82.takeup.ui.DetailsScreen
+import xyz.five82.takeup.ui.HomeScreen
 import xyz.five82.takeup.ui.LocalNetworkPermissionScreen
 import xyz.five82.takeup.ui.MainUiState
 import xyz.five82.takeup.ui.MainViewModel
@@ -123,6 +128,18 @@ private fun PermissionAwareApp(viewModel: MainViewModel) {
 @Composable
 private fun TakeupApp(viewModel: MainViewModel) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val activity = LocalActivity.current
+    val isPlaying = state is MainUiState.Playback
+    val saveableStateHolder = rememberSaveableStateHolder()
+
+    LaunchedEffect(activity, isPlaying) {
+        activity?.requestedOrientation = if (isPlaying) {
+            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        } else {
+            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        }
+    }
+
     when (val current = state) {
         MainUiState.Starting -> StartingScreen()
         is MainUiState.Connect -> ConnectScreen(
@@ -130,16 +147,37 @@ private fun TakeupApp(viewModel: MainViewModel) {
             onServerUrlChanged = viewModel::updateServerUrl,
             onConnect = viewModel::connect,
         )
-        is MainUiState.Movies -> MovieListScreen(
+        is MainUiState.Home -> saveableStateHolder.SaveableStateProvider(
+            key = "home:${current.serverUrl}",
+        ) {
+            HomeScreen(
+                state = current,
+                onRetry = viewModel::retryHome,
+                onChangeServer = viewModel::changeServer,
+                onShowMovies = viewModel::showMovies,
+                onItemSelected = viewModel::selectHomeItem,
+            )
+        }
+        is MainUiState.Movies -> saveableStateHolder.SaveableStateProvider(
+            key = "movies:${current.serverUrl}",
+        ) {
+            MovieListScreen(
+                state = current,
+                onRetry = viewModel::retryMovies,
+                onBack = viewModel::backToHome,
+                onMovieSelected = viewModel::selectMovie,
+            )
+        }
+        is MainUiState.Details -> DetailsScreen(
             state = current,
-            onRetry = viewModel::retryMovies,
-            onChangeServer = viewModel::changeServer,
-            onMovieSelected = viewModel::selectMovie,
+            onBack = viewModel::backFromDetails,
+            onRetry = viewModel::retryDetails,
+            onPlay = viewModel::playDetails,
         )
         is MainUiState.Playback -> PlaybackScreen(
             state = current,
             onRetry = viewModel::retryPlayback,
-            onBack = viewModel::backToMovies,
+            onBack = viewModel::backFromPlayback,
             onSaveProgress = { itemId, positionMs, durationMs ->
                 viewModel.saveProgress(
                     serverUrl = current.serverUrl,

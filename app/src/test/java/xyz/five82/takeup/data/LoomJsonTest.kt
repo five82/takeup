@@ -32,6 +32,11 @@ class LoomJsonTest {
                   "title": "Arrival",
                   "year": 2016,
                   "overview": "A linguist works with the military.",
+                  "release_date": "2016-11-11",
+                  "poster_image_id": 7,
+                  "poster_image_tag": "poster-tag",
+                  "backdrop_image_id": 8,
+                  "backdrop_image_tag": "backdrop-tag",
                   "added_at": "2026-01-01T00:00:00Z",
                   "updated_at": "2026-01-01T00:00:00Z"
                 }
@@ -46,6 +51,16 @@ class LoomJsonTest {
         assertEquals(42L, movies.single().id)
         assertEquals("Arrival", movies.single().title)
         assertEquals(2016, movies.single().year)
+        assertEquals("2016-11-11", movies.single().releaseDate)
+        assertEquals(
+            "http://loom.test:8097/api/v1/images/7?tag=poster-tag",
+            movies.single().posterUrl("http://loom.test:8097"),
+        )
+    }
+
+    @Test
+    fun `treats a null item list as empty`() {
+        assertEquals(emptyList<LoomItem>(), LoomJson.items("""{"items":null}"""))
     }
 
     @Test
@@ -54,8 +69,13 @@ class LoomJsonTest {
             """
             {
               "id": 42,
+              "kind": "movie",
               "title": "Arrival",
               "year": 2016,
+              "media": {
+                "id": 7,
+                "duration_ms": 6960000
+              },
               "progress": {
                 "position_ms": 600000,
                 "duration_ms": 6960000,
@@ -67,6 +87,7 @@ class LoomJsonTest {
             """.trimIndent(),
         )
 
+        assertEquals(6_960_000L, item.mediaDurationMs)
         assertEquals(600000L, item.progress?.resumePositionMs)
         assertFalse(item.progress?.played ?: true)
     }

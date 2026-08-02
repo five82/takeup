@@ -13,9 +13,13 @@ internal object LoomJson {
     }
 
     fun items(body: String): List<LoomItem> {
-        val array = objectFrom(body).getAsJsonArray("items")
+        val value = objectFrom(body).get("items")
             ?: throw JsonParseException("Loom response is missing items")
-        return array.map { item(it.asJsonObject) }
+        if (value.isJsonNull) return emptyList()
+        if (!value.isJsonArray) {
+            throw JsonParseException("Loom response items must be an array")
+        }
+        return value.asJsonArray.map { item(it.asJsonObject) }
     }
 
     fun item(body: String): LoomItem = item(objectFrom(body))
@@ -46,9 +50,19 @@ internal object LoomJson {
         }
         return LoomItem(
             id = value.long("id"),
+            kind = value.requiredString("kind"),
             title = value.requiredString("title"),
             year = value.int("year"),
             overview = value.string("overview"),
+            seasonNumber = value.int("season_number"),
+            episodeNumber = value.int("episode_number"),
+            episodeEndNumber = value.int("episode_end_number"),
+            releaseDate = value.string("release_date"),
+            posterImageId = value.long("poster_image_id"),
+            posterImageTag = value.string("poster_image_tag"),
+            backdropImageId = value.long("backdrop_image_id"),
+            backdropImageTag = value.string("backdrop_image_tag"),
+            mediaDurationMs = value.getAsJsonObject("media")?.long("duration_ms") ?: 0L,
             progress = progress,
         )
     }

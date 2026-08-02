@@ -1,22 +1,25 @@
 package xyz.five82.takeup.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -26,7 +29,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import xyz.five82.takeup.R
 import xyz.five82.takeup.data.LoomItem
@@ -36,16 +38,17 @@ import xyz.five82.takeup.data.LoomItem
 internal fun MovieListScreen(
     state: MainUiState.Movies,
     onRetry: () -> Unit,
-    onChangeServer: () -> Unit,
+    onBack: () -> Unit,
     onMovieSelected: (LoomItem) -> Unit,
 ) {
+    BackHandler(onBack = onBack)
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.movies)) },
-                actions = {
-                    TextButton(onClick = onChangeServer) {
-                        Text(stringResource(R.string.change_server))
+                navigationIcon = {
+                    TextButton(onClick = onBack) {
+                        Text(stringResource(R.string.back))
                     }
                 },
             )
@@ -57,10 +60,9 @@ internal fun MovieListScreen(
                 contentPadding = contentPadding,
                 message = state.error,
                 onRetry = onRetry,
-                onChangeServer = onChangeServer,
             )
             state.items.isEmpty() -> EmptyMovieList(contentPadding)
-            else -> MovieList(
+            else -> MovieGrid(
                 contentPadding = contentPadding,
                 state = state,
                 onRetry = onRetry,
@@ -91,7 +93,6 @@ private fun MovieListError(
     contentPadding: PaddingValues,
     message: String,
     onRetry: () -> Unit,
-    onChangeServer: () -> Unit,
 ) {
     Box(
         modifier = Modifier
@@ -107,13 +108,8 @@ private fun MovieListError(
                 style = MaterialTheme.typography.bodyLarge,
             )
             Spacer(Modifier.height(16.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = onRetry) {
-                    Text(stringResource(R.string.retry))
-                }
-                TextButton(onClick = onChangeServer) {
-                    Text(stringResource(R.string.change_server))
-                }
+            Button(onClick = onRetry) {
+                Text(stringResource(R.string.retry))
             }
         }
     }
@@ -133,30 +129,28 @@ private fun EmptyMovieList(contentPadding: PaddingValues) {
 }
 
 @Composable
-private fun MovieList(
+private fun MovieGrid(
     contentPadding: PaddingValues,
     state: MainUiState.Movies,
     onRetry: () -> Unit,
     onMovieSelected: (LoomItem) -> Unit,
 ) {
-    LazyColumn(
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(minSize = 132.dp),
         modifier = Modifier
             .fillMaxSize()
             .padding(contentPadding),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item {
-            Text(
-                text = stringResource(R.string.server_label, state.serverUrl),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.labelMedium,
-            )
+        if (state.isLoading) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                LinearProgressIndicator(Modifier.fillMaxWidth())
+            }
         }
         state.error?.let { error ->
-            item {
+            item(span = { GridItemSpan(maxLineSpan) }) {
                 Card(
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.errorContainer,
@@ -176,39 +170,12 @@ private fun MovieList(
             }
         }
         items(state.items, key = { it.id }) { movie ->
-            MovieCard(movie = movie, onClick = { onMovieSelected(movie) })
-        }
-    }
-}
-
-@Composable
-private fun MovieCard(movie: LoomItem, onClick: () -> Unit) {
-    Card(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-        ),
-    ) {
-        Column(Modifier.padding(16.dp)) {
-            Text(
-                text = if (movie.year > 0) {
-                    stringResource(R.string.year_title, movie.title, movie.year)
-                } else {
-                    movie.title
-                },
-                style = MaterialTheme.typography.titleMedium,
+            MediaCard(
+                serverUrl = state.serverUrl,
+                item = movie,
+                onClick = { onMovieSelected(movie) },
+                modifier = Modifier.fillMaxWidth(),
             )
-            if (movie.overview.isNotBlank()) {
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = movie.overview,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
         }
     }
 }

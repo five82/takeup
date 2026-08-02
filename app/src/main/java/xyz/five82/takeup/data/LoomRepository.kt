@@ -12,8 +12,20 @@ internal class LoomRepository(
         return server.toString().also { preferences.saveServerUrl(it) }
     }
 
+    suspend fun home(serverUrl: String): HomeContent {
+        val server = ServerAddress.parse(serverUrl)
+        return HomeContent(
+            continueWatching = client.continueWatching(server),
+            recentlyAdded = client.recentlyAdded(server),
+            movies = client.movies(server),
+        )
+    }
+
     suspend fun movies(serverUrl: String): List<LoomItem> =
         client.movies(ServerAddress.parse(serverUrl))
+
+    suspend fun item(serverUrl: String, itemId: Long): LoomItem =
+        client.item(ServerAddress.parse(serverUrl), itemId)
 
     suspend fun preparePlayback(serverUrl: String, itemId: Long): PreparedPlayback {
         val server = ServerAddress.parse(serverUrl)

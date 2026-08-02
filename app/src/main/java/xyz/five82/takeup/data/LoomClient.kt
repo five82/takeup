@@ -16,11 +16,26 @@ internal class LoomClient(
     }
 
     suspend fun movies(server: ServerAddress): List<LoomItem> {
-        val body = request(
-            server.api("api/v1/items?library=movies&kind=movie&limit=50&offset=0"),
-        )
-        return LoomJson.items(body)
+        val movies = mutableListOf<LoomItem>()
+        do {
+            val page = LoomJson.items(
+                request(
+                    server.api(
+                        "api/v1/items?library=movies&kind=movie" +
+                            "&limit=$MOVIE_PAGE_SIZE&offset=${movies.size}",
+                    ),
+                ),
+            )
+            movies += page
+        } while (page.size == MOVIE_PAGE_SIZE)
+        return movies
     }
+
+    suspend fun continueWatching(server: ServerAddress): List<LoomItem> =
+        LoomJson.items(request(server.api("api/v1/continue-watching?limit=20")))
+
+    suspend fun recentlyAdded(server: ServerAddress): List<LoomItem> =
+        LoomJson.items(request(server.api("api/v1/recently-added?limit=20")))
 
     suspend fun item(server: ServerAddress, itemId: Long): LoomItem {
         require(itemId > 0)
@@ -59,7 +74,7 @@ internal class LoomClient(
             connection.connectTimeout = connectTimeoutMs
             connection.readTimeout = readTimeoutMs
             connection.setRequestProperty("Accept", "application/json")
-            connection.setRequestProperty("User-Agent", "Takeup/0.1")
+            connection.setRequestProperty("User-Agent", "Takeup/0.2")
             if (requestBody != null) {
                 connection.doOutput = true
                 connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
@@ -81,6 +96,10 @@ internal class LoomClient(
         } finally {
             connection.disconnect()
         }
+    }
+
+    private companion object {
+        const val MOVIE_PAGE_SIZE = 200
     }
 }
 

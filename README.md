@@ -2,9 +2,10 @@
 
 Native Android client for the [Loom](../loom) media server.
 
-Milestone 1 connects to a Loom server, lists the first 50 movies, direct-plays a
-selected movie with Media3, and saves playback progress every 15 seconds and
-when playback stops.
+Takeup connects to a Loom server and provides a phone-focused home screen with
+Continue Watching, Recently Added, poster artwork, the complete movie library,
+and media details. It direct-plays selected media with Media3 and saves playback
+progress every 15 seconds and when playback stops.
 
 ## Requirements
 
@@ -38,12 +39,20 @@ so only use Takeup on a trusted network.
 ./gradlew test lint assembleDebug
 ```
 
-The debug APK is written under `app/build/outputs/apk/debug/`.
+The debug APK is written under `app/build/outputs/apk/debug/`. Install an update
+on a connected phone with:
+
+```bash
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
 
 ## Playback scope
 
 Loom serves original files without transcoding or remuxing. Playback therefore
 depends on the container, codecs, embedded tracks, and decoders available to
-Media3 and the phone. Milestone 1 intentionally exposes Media3's standard player
-controls so seeking, audio tracks, and subtitles can be tested against real
-library files before the browsing UI is expanded.
+Media3 and the phone. Playback switches to immersive, sensor-aware landscape
+and exposes Media3's standard controls for seeking, audio-track selection, and
+embedded subtitles. A Crop/Fit toggle fills the display without distorting the
+video or returns to the complete uncropped frame.
+
+Android TV navigation and TV-specific layouts are intentionally deferred.
