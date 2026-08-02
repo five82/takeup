@@ -50,7 +50,7 @@ internal fun ShowDetailsScreen(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             TopAppBar(
-                title = { MediaOverlayTitle(state.show.title) },
+                title = {},
                 navigationIcon = {
                     MediaOverlayIconButton(
                         iconResource = R.drawable.ic_arrow_back,
@@ -70,7 +70,6 @@ internal fun ShowDetailsScreen(
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color.Transparent,
                     scrolledContainerColor = Color(0xE6000000),
-                    titleContentColor = Color.White,
                 ),
                 scrollBehavior = scrollBehavior,
             )
