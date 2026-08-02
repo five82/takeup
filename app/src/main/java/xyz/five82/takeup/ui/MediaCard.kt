@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+
 package xyz.five82.takeup.ui
 
 import androidx.compose.foundation.layout.Box
@@ -91,6 +93,74 @@ internal fun MediaCard(
                     style = MaterialTheme.typography.labelMedium,
                 )
             }
+        }
+    }
+}
+
+@Composable
+internal fun LandscapeMediaCard(
+    serverUrl: String,
+    item: LoomItem,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val subtitle = item.cardSubtitle()
+    Card(
+        onClick = onClick,
+        modifier = modifier.semantics(mergeDescendants = true) {},
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        ),
+        shape = MaterialTheme.shapes.extraLarge,
+    ) {
+        Column {
+            Box(modifier = Modifier.fillMaxWidth()) {
+                MediaArtwork(
+                    url = item.backdropUrl(serverUrl) ?: item.posterUrl(serverUrl),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(16f / 9f),
+                )
+                val progress = item.progress
+                if (progress?.played == true) {
+                    WatchedBadge(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(8.dp),
+                    )
+                } else if (
+                    progress != null &&
+                    progress.resumePositionMs > 0 &&
+                    progress.durationMs > 0
+                ) {
+                    val fraction = (progress.positionMs.toFloat() / progress.durationMs)
+                        .coerceIn(0f, 1f)
+                    LinearProgressIndicator(
+                        progress = { fraction },
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .height(4.dp)
+                            .progressSemantics(fraction),
+                    )
+                }
+            }
+            Text(
+                text = item.title,
+                modifier = Modifier.padding(start = 12.dp, top = 12.dp, end = 12.dp),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.titleMediumEmphasized,
+            )
+            Text(
+                text = subtitle.orEmpty(),
+                modifier = Modifier.padding(start = 12.dp, top = 2.dp, end = 12.dp, bottom = 12.dp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                minLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.labelMedium,
+            )
         }
     }
 }

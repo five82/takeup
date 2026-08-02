@@ -15,31 +15,30 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Button
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MediumFlexibleTopAppBar
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedListItem
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import xyz.five82.takeup.R
@@ -55,100 +54,43 @@ internal fun SeasonScreen(
     onEpisodeSelected: (LoomItem) -> Unit,
 ) {
     BackHandler(onBack = onBack)
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    UseLightStatusBarIcons()
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            MediumFlexibleTopAppBar(
-                title = {
-                    Text(
-                        text = state.show.title,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+            TopAppBar(
+                title = {},
+                navigationIcon = {
+                    MediaOverlayIconButton(
+                        iconResource = R.drawable.ic_arrow_back,
+                        contentDescription = stringResource(R.string.navigate_back),
+                        onClick = onBack,
                     )
                 },
-                subtitle = { Text(state.season.title) },
-                navigationIcon = { NavigationBackButton(onClick = onBack) },
                 actions = {
                     if (state.show.tmdbId > 0) {
-                        FilledTonalIconButton(
+                        MediaOverlayIconButton(
+                            iconResource = R.drawable.ic_artwork,
+                            contentDescription = stringResource(R.string.artwork),
                             onClick = onEditArtwork,
-                            shapes = IconButtonDefaults.shapes(),
-                        ) {
-                            Icon(
-                                painter = painterResource(R.drawable.ic_artwork),
-                                contentDescription = stringResource(R.string.artwork),
-                            )
-                        }
+                        )
                     }
                 },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.Transparent,
+                    scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                ),
                 scrollBehavior = scrollBehavior,
             )
         },
     ) { contentPadding ->
-        when {
-            state.isLoading && state.episodes.isEmpty() -> LoadingSeason(contentPadding)
-            state.error != null && state.episodes.isEmpty() -> SeasonError(
-                contentPadding = contentPadding,
-                message = state.error,
-                onRetry = onRetry,
-            )
-            else -> EpisodeList(
-                contentPadding = contentPadding,
-                state = state,
-                onRetry = onRetry,
-                onEpisodeSelected = onEpisodeSelected,
-            )
-        }
-    }
-}
-
-@Composable
-private fun LoadingSeason(contentPadding: PaddingValues) {
-    val description = stringResource(R.string.loading_episodes)
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(contentPadding)
-            .semantics { contentDescription = description },
-        contentPadding = PaddingValues(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        items(3) {
-            Card {
-                EpisodeCardPlaceholder()
-            }
-        }
-    }
-}
-
-@Composable
-private fun SeasonError(
-    contentPadding: PaddingValues,
-    message: String,
-    onRetry: () -> Unit,
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(contentPadding)
-            .padding(24.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = message,
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodyLarge,
-            )
-            Button(
-                onClick = onRetry,
-                shapes = ButtonDefaults.shapes(),
-                modifier = Modifier.padding(top = 16.dp),
-            ) {
-                Text(stringResource(R.string.retry))
-            }
-        }
+        EpisodeList(
+            contentPadding = contentPadding,
+            state = state,
+            onRetry = onRetry,
+            onEpisodeSelected = onEpisodeSelected,
+        )
     }
 }
 
@@ -160,35 +102,42 @@ private fun EpisodeList(
     onEpisodeSelected: (LoomItem) -> Unit,
 ) {
     LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(contentPadding),
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(
+            bottom = contentPadding.calculateBottomPadding() + 24.dp,
+        ),
     ) {
+        item {
+            SeasonHero(state)
+        }
         if (state.isLoading) {
-            item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
+            item {
+                LinearProgressIndicator(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp),
+                )
+            }
         }
         item {
             Row(
-                modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, top = 24.dp, end = 16.dp, bottom = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                MediaArtwork(
-                    url = state.season.posterUrl(state.serverUrl),
-                    modifier = Modifier
-                        .width(96.dp)
-                        .aspectRatio(2f / 3f)
-                        .clip(MaterialTheme.shapes.medium),
+                Text(
+                    text = stringResource(R.string.episodes),
+                    style = MaterialTheme.typography.titleLargeEmphasized,
                 )
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (state.episodes.isNotEmpty()) {
                     Text(
-                        text = state.season.title,
-                        style = MaterialTheme.typography.headlineSmall,
-                    )
-                    Text(
-                        text = stringResource(R.string.episodes),
+                        text = pluralStringResource(
+                            R.plurals.episode_count,
+                            state.episodes.size,
+                            state.episodes.size,
+                        ),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.labelLarge,
                     )
@@ -198,6 +147,7 @@ private fun EpisodeList(
         state.error?.let { error ->
             item {
                 Card(
+                    modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.errorContainer,
                     ),
@@ -218,19 +168,25 @@ private fun EpisodeList(
                 }
             }
         }
-        if (state.episodes.isEmpty()) {
+        if (state.isLoading && state.episodes.isEmpty()) {
+            items(3) { index ->
+                LoadingEpisodeListItem(index = index, count = 3)
+            }
+        } else if (state.episodes.isEmpty() && state.error == null) {
             item {
                 Text(
                     text = stringResource(R.string.no_episodes),
-                    modifier = Modifier.padding(12.dp),
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
-        items(state.episodes, key = { it.id }) { episode ->
-            EpisodeCard(
+        itemsIndexed(state.episodes, key = { _, episode -> episode.id }) { index, episode ->
+            EpisodeListItem(
                 serverUrl = state.serverUrl,
                 episode = episode,
+                index = index,
+                count = state.episodes.size,
                 onClick = { onEpisodeSelected(episode) },
             )
         }
@@ -238,32 +194,110 @@ private fun EpisodeList(
 }
 
 @Composable
-private fun EpisodeCard(
-    serverUrl: String,
-    episode: LoomItem,
-    onClick: () -> Unit,
-) {
-    Card(
-        onClick = onClick,
+private fun SeasonHero(state: MainUiState.Season) {
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .semantics(mergeDescendants = true) {},
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-        ),
-        shape = MaterialTheme.shapes.large,
+            .aspectRatio(4f / 3f),
     ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.Top,
+        FadingBackdropArtwork(
+            url = state.show.backdropUrl(state.serverUrl)
+                ?: state.season.backdropUrl(state.serverUrl),
+            modifier = Modifier.fillMaxSize(),
+        )
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            val logoUrl = state.show.logoUrl(state.serverUrl)
+            if (logoUrl != null) {
+                TitleLogo(
+                    url = logoUrl,
+                    title = state.show.title,
+                    modifier = Modifier.fillMaxWidth(0.7f),
+                )
+            } else {
+                Text(
+                    text = state.show.title,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.headlineLargeEmphasized,
+                )
+            }
+            Text(
+                text = state.season.title,
+                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.headlineSmallEmphasized,
+            )
+            if (state.episodes.isNotEmpty()) {
+                Text(
+                    text = pluralStringResource(
+                        R.plurals.episode_count,
+                        state.episodes.size,
+                        state.episodes.size,
+                    ),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LoadingEpisodeListItem(index: Int, count: Int) {
+    val shapes = ListItemDefaults.segmentedShapes(index = index, count = count)
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(
+                start = 12.dp,
+                end = 12.dp,
+                bottom = if (index == count - 1) 0.dp else ListItemDefaults.SegmentedGap,
+            ),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        shape = shapes.shape,
+    ) {
+        EpisodeCardPlaceholder()
+    }
+}
+
+@Composable
+private fun EpisodeListItem(
+    serverUrl: String,
+    episode: LoomItem,
+    index: Int,
+    count: Int,
+    onClick: () -> Unit,
+) {
+    val metadata = listOfNotNull(
+        episode.mediaDurationMs.takeIf { it > 0 }?.let(::formatRuntime),
+        episode.releaseDate.takeIf { it.isNotBlank() }?.let(::formatReleaseDate),
+    ).joinToString(" \u00B7 ")
+    val hasSupportingContent = metadata.isNotBlank() ||
+        episode.overview.isNotBlank() || episode.progress != null
+
+    SegmentedListItem(
+        onClick = onClick,
+        shapes = ListItemDefaults.segmentedShapes(index = index, count = count),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(
+                start = 12.dp,
+                end = 12.dp,
+                bottom = if (index == count - 1) 0.dp else ListItemDefaults.SegmentedGap,
+            ),
+        leadingContent = {
             Box {
                 MediaArtwork(
                     url = episode.backdropUrl(serverUrl),
                     modifier = Modifier
-                        .width(128.dp)
-                        .aspectRatio(16f / 9f),
+                        .width(120.dp)
+                        .aspectRatio(16f / 9f)
+                        .clip(MaterialTheme.shapes.medium),
                 )
                 if (episode.progress?.played == true) {
                     WatchedBadge(
@@ -273,55 +307,49 @@ private fun EpisodeCard(
                     )
                 }
             }
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(5.dp),
-            ) {
-                episode.subtitle()?.let {
-                    Text(
-                        text = it,
-                        color = MaterialTheme.colorScheme.primary,
-                        style = MaterialTheme.typography.labelLarge,
-                    )
-                }
+        },
+        overlineContent = episode.subtitle()?.let { subtitle ->
+            {
                 Text(
-                    text = episode.title,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.titleMedium,
+                    text = subtitle,
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.labelLargeEmphasized,
                 )
-                val metadata = listOfNotNull(
-                    episode.mediaDurationMs.takeIf { it > 0 }?.let(::formatRuntime),
-                    episode.releaseDate.takeIf { it.isNotBlank() }?.let(::formatReleaseDate),
-                ).joinToString(" \u00B7 ")
-                if (metadata.isNotBlank()) {
-                    Text(
-                        text = metadata,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-                episode.progress?.let { PlaybackStatus(it) }
             }
-        }
-        val mediaBadges = episode.mediaBadges()
-        if (mediaBadges.isNotEmpty()) {
-            MediaBadges(
-                labels = mediaBadges,
-                modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
-            )
-        }
-        if (episode.overview.isNotBlank()) {
-            Text(
-                text = episode.overview,
-                modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        }
+        },
+        supportingContent = if (hasSupportingContent) {
+            {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (metadata.isNotBlank()) {
+                        Text(
+                            text = metadata,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    if (episode.overview.isNotBlank()) {
+                        Text(
+                            text = episode.overview,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                    episode.progress?.let { PlaybackStatus(it) }
+                }
+            }
+        } else {
+            null
+        },
+        verticalAlignment = Alignment.Top,
+        contentPadding = PaddingValues(12.dp),
+    ) {
+        Text(
+            text = episode.title,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            style = MaterialTheme.typography.titleMediumEmphasized,
+        )
     }
 }

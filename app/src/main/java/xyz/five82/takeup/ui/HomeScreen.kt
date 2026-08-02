@@ -2,12 +2,14 @@
 
 package xyz.five82.takeup.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -25,19 +27,25 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.MediumFlexibleTopAppBar
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import xyz.five82.takeup.R
@@ -57,12 +65,8 @@ internal fun HomeScreen(
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            LargeFlexibleTopAppBar(
-                title = {
-                    Text(
-                        text = stringResource(R.string.app_name),
-                    )
-                },
+            MediumFlexibleTopAppBar(
+                title = { Text(stringResource(R.string.app_name)) },
                 actions = {
                     FilledTonalIconButton(
                         onClick = onOpenSettings,
@@ -107,15 +111,19 @@ private fun LoadingHome(contentPadding: PaddingValues) {
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .padding(contentPadding),
-        contentPadding = PaddingValues(vertical = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp),
+            .padding(contentPadding)
+            .semantics { contentDescription = description },
+        contentPadding = PaddingValues(top = 12.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(28.dp),
     ) {
         item {
-            Text(
-                text = description,
-                modifier = Modifier.padding(horizontal = 16.dp),
-                style = MaterialTheme.typography.titleLarge,
+            Box(
+                Modifier
+                    .padding(horizontal = 12.dp)
+                    .fillMaxWidth()
+                    .aspectRatio(4f / 3f)
+                    .clip(MaterialTheme.shapes.extraLarge)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
             )
         }
         items(2) {
@@ -179,6 +187,26 @@ private fun HomeList(
     onShowShows: () -> Unit,
     onItemSelected: (LoomItem) -> Unit,
 ) {
+    val content = state.content
+    val featured = content.continueWatching.firstOrNull()
+        ?: content.recentlyAdded.firstOrNull()
+        ?: content.movies.firstOrNull()
+        ?: content.shows.firstOrNull()
+    val featuredIsContinueWatching = featured != null &&
+        content.continueWatching.firstOrNull()?.id == featured.id
+    val featuredIsRecentlyAdded = featured != null && !featuredIsContinueWatching &&
+        content.recentlyAdded.firstOrNull()?.id == featured.id
+    val continueWatching = if (featuredIsContinueWatching) {
+        content.continueWatching.drop(1)
+    } else {
+        content.continueWatching
+    }
+    val recentlyAdded = if (featuredIsRecentlyAdded) {
+        content.recentlyAdded.drop(1)
+    } else {
+        content.recentlyAdded
+    }
+
     PullToRefreshBox(
         isRefreshing = state.isLoading,
         onRefresh = onRetry,
@@ -188,8 +216,8 @@ private fun HomeList(
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp),
+            contentPadding = PaddingValues(top = 12.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(28.dp),
         ) {
             state.error?.let { error ->
                 item {
@@ -215,62 +243,173 @@ private fun HomeList(
                     }
                 }
             }
-            if (state.content.continueWatching.isNotEmpty()) {
+            featured?.let { item ->
+                item {
+                    FeaturedMedia(
+                        serverUrl = state.serverUrl,
+                        item = item,
+                        label = stringResource(
+                            when {
+                                featuredIsContinueWatching -> R.string.continue_watching
+                                featuredIsRecentlyAdded -> R.string.recently_added
+                                item.kind == "show" -> R.string.shows
+                                else -> R.string.movies
+                            },
+                        ),
+                        onClick = { onItemSelected(item) },
+                    )
+                }
+            }
+            if (continueWatching.isNotEmpty()) {
                 item {
                     MediaRow(
                         title = stringResource(R.string.continue_watching),
                         serverUrl = state.serverUrl,
-                        items = state.content.continueWatching,
+                        items = continueWatching,
+                        landscape = true,
                         onItemSelected = onItemSelected,
                     )
                 }
             }
-            if (state.content.recentlyAdded.isNotEmpty()) {
+            if (recentlyAdded.isNotEmpty()) {
                 item {
                     MediaRow(
                         title = stringResource(R.string.recently_added),
                         serverUrl = state.serverUrl,
-                        items = state.content.recentlyAdded,
+                        items = recentlyAdded,
                         onItemSelected = onItemSelected,
                     )
                 }
             }
-            if (state.content.movies.isNotEmpty()) {
+            if (content.movies.isNotEmpty()) {
                 item {
                     MediaRow(
                         title = stringResource(R.string.movies),
                         serverUrl = state.serverUrl,
-                        items = state.content.movies.take(12),
+                        items = content.movies.take(12),
                         actionText = stringResource(R.string.see_all),
                         onAction = onShowMovies,
                         onItemSelected = onItemSelected,
                     )
                 }
             }
-            if (state.content.shows.isNotEmpty()) {
+            if (content.shows.isNotEmpty()) {
                 item {
                     MediaRow(
                         title = stringResource(R.string.shows),
                         serverUrl = state.serverUrl,
-                        items = state.content.shows.take(12),
+                        items = content.shows.take(12),
                         actionText = stringResource(R.string.see_all),
                         onAction = onShowShows,
                         onItemSelected = onItemSelected,
                     )
                 }
             }
-            if (
-                state.content.continueWatching.isEmpty() &&
-                state.content.recentlyAdded.isEmpty() &&
-                state.content.movies.isEmpty() &&
-                state.content.shows.isEmpty()
-            ) {
+            if (featured == null) {
                 item {
                     Text(
                         text = stringResource(R.string.no_home_items),
                         modifier = Modifier.padding(horizontal = 24.dp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FeaturedMedia(
+    serverUrl: String,
+    item: LoomItem,
+    label: String,
+    onClick: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .padding(horizontal = 12.dp)
+            .fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = MaterialTheme.shapes.extraLarge,
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(4f / 3f),
+        ) {
+            MediaArtwork(
+                url = item.backdropUrl(serverUrl) ?: item.posterUrl(serverUrl),
+                modifier = Modifier.fillMaxSize(),
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0f to Color.Transparent,
+                            0.35f to Color.Transparent,
+                            1f to Color.Black.copy(alpha = 0.9f),
+                        ),
+                    ),
+            )
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalAlignment = Alignment.Start,
+            ) {
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    shape = MaterialTheme.shapes.extraLarge,
+                ) {
+                    Text(
+                        text = label,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                        style = MaterialTheme.typography.labelMediumEmphasized,
+                    )
+                }
+                val logoUrl = item.logoUrl(serverUrl)
+                if (logoUrl != null) {
+                    TitleLogo(
+                        url = logoUrl,
+                        title = item.title,
+                        modifier = Modifier.fillMaxWidth(0.72f),
+                    )
+                } else {
+                    Text(
+                        text = item.title,
+                        color = Color.White,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.headlineMediumEmphasized,
+                    )
+                }
+                val metadata = listOfNotNull(
+                    item.cardSubtitle(),
+                    item.mediaDurationMs.takeIf { it > 0 }?.let(::formatRuntime),
+                ).joinToString(" \u00B7 ")
+                if (metadata.isNotBlank()) {
+                    Text(
+                        text = metadata,
+                        color = Color.White.copy(alpha = 0.82f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+                item.progress?.let { PlaybackStatus(it) }
+                Button(
+                    onClick = onClick,
+                    shapes = ButtonDefaults.shapesFor(ButtonDefaults.MediumContainerHeight),
+                    modifier = Modifier.height(ButtonDefaults.MediumContainerHeight),
+                    contentPadding = ButtonDefaults.contentPaddingFor(
+                        ButtonDefaults.MediumContainerHeight,
+                    ),
+                ) {
+                    Text(stringResource(R.string.view_details))
                 }
             }
         }
@@ -285,6 +424,7 @@ private fun MediaRow(
     onItemSelected: (LoomItem) -> Unit,
     actionText: String? = null,
     onAction: (() -> Unit)? = null,
+    landscape: Boolean = false,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(
@@ -314,12 +454,21 @@ private fun MediaRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             items(items, key = { it.id }) { item ->
-                MediaCard(
-                    serverUrl = serverUrl,
-                    item = item,
-                    onClick = { onItemSelected(item) },
-                    modifier = Modifier.width(140.dp),
-                )
+                if (landscape) {
+                    LandscapeMediaCard(
+                        serverUrl = serverUrl,
+                        item = item,
+                        onClick = { onItemSelected(item) },
+                        modifier = Modifier.width(240.dp),
+                    )
+                } else {
+                    MediaCard(
+                        serverUrl = serverUrl,
+                        item = item,
+                        onClick = { onItemSelected(item) },
+                        modifier = Modifier.width(140.dp),
+                    )
+                }
             }
         }
     }
