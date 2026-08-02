@@ -27,13 +27,16 @@ Single-developer hobby project - prefer simple, maintainable solutions over clev
 
 ## Build, Test, Lint
 
-The Android project and its CI workflow have not been established yet. Once the Gradle wrapper and relevant tasks exist, use the applicable project tasks, typically:
+Run the local verification tasks with the Gradle wrapper:
 
 ```bash
-./gradlew assembleDebug   # Build a debug APK
-./gradlew test            # Run local unit tests
-./gradlew lint            # Run Android lint
-./gradlew connectedCheck  # Run device tests when an emulator or device is available
+./gradlew test lint assembleDebug
 ```
 
-Document the canonical local verification command here when CI is defined.
+Run device tests when an emulator or device is available:
+
+```bash
+./gradlew connectedCheck
+```
+
+There is no canonical CI workflow yet; do not invent or assume one.

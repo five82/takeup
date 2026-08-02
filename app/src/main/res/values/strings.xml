@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Takeup</string>
+    <string name="connect_title">Connect to Loom</string>
+    <string name="connect_description">Enter the address of your Loom server on this trusted local network.</string>
+    <string name="server_url_label">Loom server URL</string>
+    <string name="server_url_example">http://192.168.1.20:8097</string>
+    <string name="connect">Connect</string>
+    <string name="connecting">Connecting&#8230;</string>
+    <string name="local_network_title">Allow local network access</string>
+    <string name="local_network_rationale">Takeup needs local network access to connect to Loom and stream media.</string>
+    <string name="local_network_denied">Local network access is required. Enable it in Takeup\'s app settings.</string>
+    <string name="grant_access">Grant access</string>
+    <string name="open_settings">Open settings</string>
+    <string name="movies">Movies</string>
+    <string name="server_label">Server: %1$s</string>
+    <string name="retry">Retry</string>
+    <string name="change_server">Change server</string>
+    <string name="no_movies">Loom did not return any movies.</string>
+    <string name="loading_movies">Loading movies&#8230;</string>
+    <string name="back">Back</string>
+    <string name="loading_playback">Preparing playback&#8230;</string>
+    <string name="playback_failed">Playback failed: %1$s</string>
+    <string name="year_title">%1$s (%2$d)</string>
+</resources>
