@@ -1,5 +1,6 @@
 package xyz.five82.takeup.data
 
+import com.google.gson.JsonObject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.IOException
@@ -40,6 +41,47 @@ internal class LoomClient(
     suspend fun playback(server: ServerAddress, itemId: Long): PlaybackResponse {
         require(itemId > 0)
         return LoomJson.playback(request(server.api("api/v1/items/$itemId/playback")))
+    }
+
+    suspend fun artworkOptions(
+        server: ServerAddress,
+        itemId: Long,
+        kind: ArtworkKind,
+    ): List<ArtworkOption> {
+        require(itemId > 0)
+        return LoomJson.artworkOptions(
+            request(server.api("api/v1/items/$itemId/images/${kind.apiValue}/options")),
+        )
+    }
+
+    suspend fun selectArtwork(
+        server: ServerAddress,
+        itemId: Long,
+        kind: ArtworkKind,
+        option: ArtworkOption,
+    ) {
+        require(itemId > 0)
+        val body = JsonObject().apply {
+            addProperty("provider", option.provider)
+            addProperty("provider_path", option.providerPath)
+        }.toString()
+        request(
+            uri = server.api("api/v1/items/$itemId/images/${kind.apiValue}"),
+            method = "PUT",
+            requestBody = body,
+        )
+    }
+
+    suspend fun resetArtwork(
+        server: ServerAddress,
+        itemId: Long,
+        kind: ArtworkKind,
+    ) {
+        require(itemId > 0)
+        request(
+            uri = server.api("api/v1/items/$itemId/images/${kind.apiValue}/reset"),
+            method = "POST",
+        )
     }
 
     suspend fun saveProgress(
@@ -89,7 +131,7 @@ internal class LoomClient(
             connection.connectTimeout = connectTimeoutMs
             connection.readTimeout = readTimeoutMs
             connection.setRequestProperty("Accept", "application/json")
-            connection.setRequestProperty("User-Agent", "Takeup/0.6.1")
+            connection.setRequestProperty("User-Agent", "Takeup/0.7.0")
             if (requestBody != null) {
                 connection.doOutput = true
                 connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")

@@ -23,6 +23,7 @@ class LoomClientTest {
     private val recentlyAddedQuery = AtomicReference<String>()
     private val progressMethod = AtomicReference<String>()
     private val progressRequest = AtomicReference<String>()
+    private val artworkRequests = CopyOnWriteArrayList<String>()
 
     @Before
     fun setUp() {
@@ -92,6 +93,25 @@ class LoomClientTest {
     }
 
     @Test
+    fun `loads selects and resets artwork`() = runBlocking {
+        val client = LoomClient()
+        val options = client.artworkOptions(address, 42, ArtworkKind.POSTER)
+
+        client.selectArtwork(address, 42, ArtworkKind.POSTER, options.single())
+        client.resetArtwork(address, 42, ArtworkKind.POSTER)
+
+        assertEquals("/alternate.jpg", options.single().providerPath)
+        assertEquals(
+            listOf(
+                "GET /api/v1/items/42/images/poster/options ",
+                "PUT /api/v1/items/42/images/poster {\"provider\":\"tmdb\",\"provider_path\":\"/alternate.jpg\"}",
+                "POST /api/v1/items/42/images/poster/reset ",
+            ),
+            artworkRequests,
+        )
+    }
+
+    @Test
     fun `loads every movie page`() = runBlocking {
         paginateMovies.set(true)
 
@@ -150,6 +170,21 @@ class LoomClientTest {
                 progressMethod.set(exchange.requestMethod)
                 progressRequest.set(exchange.requestBody.bufferedReader().use { it.readText() })
                 """{"position_ms":15000,"duration_ms":120000,"played":false,"resume_position_ms":15000}"""
+            }
+            "/api/v1/items/42/images/poster/options" -> {
+                artworkRequests += "${exchange.requestMethod} ${exchange.requestURI.path} " +
+                    exchange.requestBody.bufferedReader().use { it.readText() }
+                """{"items":[{"provider":"tmdb","provider_path":"/alternate.jpg","width":1000,"height":1500,"thumbnail_url":"https://image.tmdb.org/poster.jpg","selected":false}]}"""
+            }
+            "/api/v1/items/42/images/poster" -> {
+                artworkRequests += "${exchange.requestMethod} ${exchange.requestURI.path} " +
+                    exchange.requestBody.bufferedReader().use { it.readText() }
+                """{"id":7,"item_id":42,"kind":"poster","provider":"tmdb","provider_path":"/alternate.jpg","tag":"tag"}"""
+            }
+            "/api/v1/items/42/images/poster/reset" -> {
+                artworkRequests += "${exchange.requestMethod} ${exchange.requestURI.path} " +
+                    exchange.requestBody.bufferedReader().use { it.readText() }
+                """{"id":7,"item_id":42,"kind":"poster","provider":"tmdb","provider_path":"/default.jpg","tag":"tag"}"""
             }
             else -> {
                 exchange.sendResponseHeaders(404, -1)

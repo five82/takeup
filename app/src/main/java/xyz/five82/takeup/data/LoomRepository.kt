@@ -59,6 +59,33 @@ internal class LoomRepository(
     suspend fun item(serverUrl: String, summary: LoomItem): LoomItem =
         client.item(ServerAddress.parse(serverUrl), summary.id).withContextFrom(summary)
 
+    suspend fun artworkOptions(
+        serverUrl: String,
+        itemId: Long,
+        kind: ArtworkKind,
+    ): List<ArtworkOption> = client.artworkOptions(ServerAddress.parse(serverUrl), itemId, kind)
+
+    suspend fun selectArtwork(
+        serverUrl: String,
+        item: LoomItem,
+        kind: ArtworkKind,
+        option: ArtworkOption,
+    ): LoomItem {
+        val server = ServerAddress.parse(serverUrl)
+        client.selectArtwork(server, item.id, kind, option)
+        return client.item(server, item.id).withContextFrom(item)
+    }
+
+    suspend fun resetArtwork(
+        serverUrl: String,
+        item: LoomItem,
+        kind: ArtworkKind,
+    ): LoomItem {
+        val server = ServerAddress.parse(serverUrl)
+        client.resetArtwork(server, item.id, kind)
+        return client.item(server, item.id).withContextFrom(item)
+    }
+
     suspend fun nextEpisode(serverUrl: String, current: LoomItem): LoomItem? {
         if (current.kind != "episode" || current.parentId <= 0) return null
         val server = ServerAddress.parse(serverUrl)

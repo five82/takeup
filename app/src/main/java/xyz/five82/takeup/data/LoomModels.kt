@@ -8,6 +8,7 @@ data class LoomItem(
     val title: String,
     val year: Int,
     val overview: String,
+    val tmdbId: Long = 0,
     val parentId: Long = 0,
     val seasonNumber: Int = 0,
     val episodeNumber: Int = 0,
@@ -84,6 +85,22 @@ enum class MediaDynamicRange {
     HDR,
     DOLBY_VISION,
 }
+
+enum class ArtworkKind(val apiValue: String) {
+    POSTER("poster"),
+    BACKDROP("backdrop"),
+    LOGO("logo"),
+}
+
+data class ArtworkOption(
+    val provider: String,
+    val providerPath: String,
+    val language: String = "",
+    val width: Int = 0,
+    val height: Int = 0,
+    val thumbnailUrl: String,
+    val selected: Boolean = false,
+)
 
 data class PlaybackProgress(
     val positionMs: Long,

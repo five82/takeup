@@ -11,6 +11,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import xyz.five82.takeup.data.ArtworkKind
+import xyz.five82.takeup.data.ArtworkOption
 import xyz.five82.takeup.data.HomeContent
 import xyz.five82.takeup.data.LoomHttpException
 import xyz.five82.takeup.data.LoomItem
@@ -84,6 +86,16 @@ internal sealed interface MainUiState {
         val error: String? = null,
     ) : MainUiState
 
+    data class Artwork(
+        val serverUrl: String,
+        val item: LoomItem,
+        val kind: ArtworkKind = ArtworkKind.POSTER,
+        val options: List<ArtworkOption> = emptyList(),
+        val isLoading: Boolean = false,
+        val isSaving: Boolean = false,
+        val error: String? = null,
+    ) : MainUiState
+
     data class Playback(
         val serverUrl: String,
         val item: LoomItem,
@@ -132,6 +144,7 @@ internal class MainViewModel(
     private var homeContent = EMPTY_HOME_CONTENT
     private var showContent: ShowContent? = null
     private var seasonContent: SeasonContent? = null
+    private var artworkReturnState: MainUiState? = null
 
     fun start() {
         if (started) return
@@ -306,6 +319,98 @@ internal class MainViewModel(
             _uiState.value = state.copy(isLoading = true, error = null)
             loadDetails(state.serverUrl, state.item, state.origin)
         }
+    }
+
+    fun editArtwork() {
+        val source = _uiState.value
+        val item = when (source) {
+            is MainUiState.Details -> source.item.takeIf {
+                it.kind == "movie" && it.tmdbId > 0
+            }
+            is MainUiState.ShowDetails -> source.show.takeIf { it.tmdbId > 0 }
+            is MainUiState.Season -> source.season.takeIf { source.show.tmdbId > 0 }
+            else -> null
+        } ?: return
+        val serverUrl = currentServerUrl() ?: return
+        activeJob?.cancel()
+        artworkReturnState = source
+        activeJob = viewModelScope.launch {
+            _uiState.value = MainUiState.Artwork(
+                serverUrl = serverUrl,
+                item = item,
+                isLoading = true,
+            )
+            loadArtworkOptions(serverUrl, item, ArtworkKind.POSTER)
+        }
+    }
+
+    fun selectArtworkKind(kind: ArtworkKind) {
+        val state = _uiState.value as? MainUiState.Artwork ?: return
+        if (state.isSaving || kind == state.kind || kind !in state.item.artworkKinds()) return
+        activeJob?.cancel()
+        activeJob = viewModelScope.launch {
+            _uiState.value = state.copy(
+                kind = kind,
+                options = emptyList(),
+                isLoading = true,
+                error = null,
+            )
+            loadArtworkOptions(state.serverUrl, state.item, kind)
+        }
+    }
+
+    fun retryArtwork() {
+        val state = _uiState.value as? MainUiState.Artwork ?: return
+        activeJob?.cancel()
+        activeJob = viewModelScope.launch {
+            _uiState.value = state.copy(isLoading = true, error = null)
+            loadArtworkOptions(state.serverUrl, state.item, state.kind)
+        }
+    }
+
+    fun selectArtwork(option: ArtworkOption) {
+        val state = _uiState.value as? MainUiState.Artwork ?: return
+        if (state.isLoading || state.isSaving || option.selected) return
+        activeJob?.cancel()
+        activeJob = viewModelScope.launch {
+            _uiState.value = state.copy(isSaving = true, error = null)
+            runCatching {
+                repository.selectArtwork(state.serverUrl, state.item, state.kind, option)
+            }.onSuccess { updated ->
+                artworkChanged(updated)
+                loadArtworkOptions(state.serverUrl, updated, state.kind)
+            }.onFailure {
+                if (isCurrentArtwork(state.item.id, state.kind)) {
+                    _uiState.value = state.copy(isSaving = false, error = readableError(it))
+                }
+            }
+        }
+    }
+
+    fun resetArtwork() {
+        val state = _uiState.value as? MainUiState.Artwork ?: return
+        if (state.isLoading || state.isSaving) return
+        activeJob?.cancel()
+        activeJob = viewModelScope.launch {
+            _uiState.value = state.copy(isSaving = true, error = null)
+            runCatching {
+                repository.resetArtwork(state.serverUrl, state.item, state.kind)
+            }.onSuccess { updated ->
+                artworkChanged(updated)
+                loadArtworkOptions(state.serverUrl, updated, state.kind)
+            }.onFailure {
+                if (isCurrentArtwork(state.item.id, state.kind)) {
+                    _uiState.value = state.copy(isSaving = false, error = readableError(it))
+                }
+            }
+        }
+    }
+
+    fun backFromArtwork() {
+        if (_uiState.value !is MainUiState.Artwork) return
+        activeJob?.cancel()
+        artworkReturnState?.let { _uiState.value = it }
+        artworkReturnState = null
     }
 
     fun playDetails() {
@@ -539,6 +644,47 @@ internal class MainViewModel(
             }
     }
 
+    private suspend fun loadArtworkOptions(
+        serverUrl: String,
+        item: LoomItem,
+        kind: ArtworkKind,
+    ) {
+        runCatching { repository.artworkOptions(serverUrl, item.id, kind) }
+            .onSuccess { options ->
+                if (!isCurrentArtwork(item.id, kind)) return@onSuccess
+                _uiState.value = MainUiState.Artwork(
+                    serverUrl = serverUrl,
+                    item = item,
+                    kind = kind,
+                    options = options,
+                )
+            }
+            .onFailure {
+                if (!isCurrentArtwork(item.id, kind)) return@onFailure
+                _uiState.value = MainUiState.Artwork(
+                    serverUrl = serverUrl,
+                    item = item,
+                    kind = kind,
+                    error = readableError(it),
+                )
+            }
+    }
+
+    private fun isCurrentArtwork(itemId: Long, kind: ArtworkKind): Boolean {
+        val current = _uiState.value as? MainUiState.Artwork ?: return false
+        return current.item.id == itemId && current.kind == kind
+    }
+
+    private fun artworkChanged(updated: LoomItem) {
+        updateCachedItem(updated)
+        artworkReturnState = when (val source = artworkReturnState) {
+            is MainUiState.Details -> source.copy(item = updated)
+            is MainUiState.ShowDetails -> source.copy(show = updated)
+            is MainUiState.Season -> source.copy(season = updated)
+            else -> source
+        }
+    }
+
     private suspend fun loadPlayback(
         serverUrl: String,
         item: LoomItem,
@@ -672,8 +818,15 @@ internal class MainViewModel(
         is MainUiState.ShowDetails -> state.serverUrl
         is MainUiState.Season -> state.serverUrl
         is MainUiState.Details -> state.serverUrl
+        is MainUiState.Artwork -> state.serverUrl
         is MainUiState.Playback -> state.serverUrl
         else -> null
+    }
+
+    private fun LoomItem.artworkKinds(): Set<ArtworkKind> = when (kind) {
+        "season" -> setOf(ArtworkKind.POSTER)
+        "movie", "show" -> ArtworkKind.entries.toSet()
+        else -> emptySet()
     }
 
     private fun playbackProgress(positionMs: Long, durationMs: Long): PlaybackProgress {

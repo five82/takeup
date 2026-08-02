@@ -43,6 +43,7 @@ internal fun DetailsScreen(
     state: MainUiState.Details,
     onBack: () -> Unit,
     onRetry: () -> Unit,
+    onEditArtwork: () -> Unit,
     onPlay: () -> Unit,
 ) {
     BackHandler(onBack = onBack)
@@ -57,6 +58,13 @@ internal fun DetailsScreen(
                     )
                 },
                 navigationIcon = { NavigationBackButton(onClick = onBack) },
+                actions = {
+                    if (state.item.kind == "movie" && state.item.tmdbId > 0) {
+                        TextButton(onClick = onEditArtwork) {
+                            Text(stringResource(R.string.artwork))
+                        }
+                    }
+                },
             )
         },
     ) { contentPadding ->

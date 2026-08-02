@@ -39,6 +39,17 @@
     <string name="finished">Finished</string>
     <string name="resume">Resume</string>
     <string name="overview">Overview</string>
+    <string name="artwork">Artwork</string>
+    <string name="artwork_title">%1$s artwork</string>
+    <string name="poster">Poster</string>
+    <string name="backdrop">Backdrop</string>
+    <string name="logo">Logo</string>
+    <string name="poster_artwork">Poster artwork</string>
+    <string name="backdrop_artwork">Backdrop artwork</string>
+    <string name="logo_artwork">Logo artwork</string>
+    <string name="selected_artwork">Selected artwork</string>
+    <string name="reset_artwork">Reset</string>
+    <string name="no_artwork_options">TMDB did not return any artwork options.</string>
     <string name="watched">Watched</string>
     <string name="crop_video">Crop</string>
     <string name="fit_video">Fit</string>

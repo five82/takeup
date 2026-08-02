@@ -31,6 +31,7 @@ class LoomJsonTest {
                   "kind": "movie",
                   "title": "Arrival",
                   "year": 2016,
+                  "tmdb_id": 329865,
                   "overview": "A linguist works with the military.",
                   "release_date": "2016-11-11",
                   "poster_image_id": 7,
@@ -53,6 +54,7 @@ class LoomJsonTest {
         assertEquals(42L, movies.single().id)
         assertEquals("Arrival", movies.single().title)
         assertEquals(2016, movies.single().year)
+        assertEquals(329865L, movies.single().tmdbId)
         assertEquals("2016-11-11", movies.single().releaseDate)
         assertEquals(
             "http://loom.test:8097/api/v1/images/7?tag=poster-tag",
@@ -195,6 +197,33 @@ class LoomJsonTest {
         assertEquals(1, episode.episodeNumber)
         assertEquals(2, episode.episodeEndNumber)
         assertEquals("2026-08-02", episode.releaseDate)
+    }
+
+    @Test
+    fun `parses artwork options`() {
+        val options = LoomJson.artworkOptions(
+            """
+            {
+              "items": [
+                {
+                  "provider": "tmdb",
+                  "provider_path": "/poster.jpg",
+                  "language": "en",
+                  "width": 1000,
+                  "height": 1500,
+                  "thumbnail_url": "https://image.tmdb.org/t/p/w342/poster.jpg",
+                  "selected": true
+                }
+              ]
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals(1, options.size)
+        assertEquals("/poster.jpg", options.single().providerPath)
+        assertEquals("en", options.single().language)
+        assertEquals(1000, options.single().width)
+        assertEquals(true, options.single().selected)
     }
 
     @Test

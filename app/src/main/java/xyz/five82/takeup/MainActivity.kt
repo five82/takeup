@@ -35,6 +35,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import xyz.five82.takeup.ui.ArtworkScreen
 import xyz.five82.takeup.ui.ConnectScreen
 import xyz.five82.takeup.ui.DetailsScreen
 import xyz.five82.takeup.ui.HomeScreen
@@ -178,6 +179,7 @@ private fun TakeupApp(viewModel: MainViewModel) {
                 state = current,
                 onBack = viewModel::backFromShowDetails,
                 onRetry = viewModel::retryShowDetails,
+                onEditArtwork = viewModel::editArtwork,
                 onSeasonSelected = viewModel::selectSeason,
             )
         }
@@ -188,6 +190,7 @@ private fun TakeupApp(viewModel: MainViewModel) {
                 state = current,
                 onBack = viewModel::backFromSeason,
                 onRetry = viewModel::retrySeason,
+                onEditArtwork = viewModel::editArtwork,
                 onEpisodeSelected = viewModel::selectEpisode,
             )
         }
@@ -195,7 +198,16 @@ private fun TakeupApp(viewModel: MainViewModel) {
             state = current,
             onBack = viewModel::backFromDetails,
             onRetry = viewModel::retryDetails,
+            onEditArtwork = viewModel::editArtwork,
             onPlay = viewModel::playDetails,
+        )
+        is MainUiState.Artwork -> ArtworkScreen(
+            state = current,
+            onBack = viewModel::backFromArtwork,
+            onKindSelected = viewModel::selectArtworkKind,
+            onOptionSelected = viewModel::selectArtwork,
+            onReset = viewModel::resetArtwork,
+            onRetry = viewModel::retryArtwork,
         )
         is MainUiState.Playback -> PlaybackScreen(
             state = current,

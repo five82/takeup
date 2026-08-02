@@ -42,6 +42,7 @@ internal fun SeasonScreen(
     state: MainUiState.Season,
     onBack: () -> Unit,
     onRetry: () -> Unit,
+    onEditArtwork: () -> Unit,
     onEpisodeSelected: (LoomItem) -> Unit,
 ) {
     BackHandler(onBack = onBack)
@@ -56,6 +57,13 @@ internal fun SeasonScreen(
                     )
                 },
                 navigationIcon = { NavigationBackButton(onClick = onBack) },
+                actions = {
+                    if (state.show.tmdbId > 0) {
+                        TextButton(onClick = onEditArtwork) {
+                            Text(stringResource(R.string.artwork))
+                        }
+                    }
+                },
             )
         },
     ) { contentPadding ->

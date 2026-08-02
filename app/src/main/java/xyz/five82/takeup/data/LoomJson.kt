@@ -24,6 +24,27 @@ internal object LoomJson {
 
     fun item(body: String): LoomItem = item(objectFrom(body))
 
+    fun artworkOptions(body: String): List<ArtworkOption> {
+        val value = objectFrom(body).get("items")
+            ?: throw JsonParseException("Loom response is missing items")
+        if (value.isJsonNull) return emptyList()
+        if (!value.isJsonArray) {
+            throw JsonParseException("Loom response items must be an array")
+        }
+        return value.asJsonArray.map { element ->
+            val option = element.asJsonObject
+            ArtworkOption(
+                provider = option.requiredString("provider"),
+                providerPath = option.requiredString("provider_path"),
+                language = option.string("language"),
+                width = option.int("width"),
+                height = option.int("height"),
+                thumbnailUrl = option.requiredString("thumbnail_url"),
+                selected = option.boolean("selected"),
+            )
+        }
+    }
+
     fun playback(body: String): PlaybackResponse {
         val root = objectFrom(body)
         val media = root.getAsJsonObject("media")
@@ -65,6 +86,7 @@ internal object LoomJson {
             title = value.requiredString("title"),
             year = value.int("year"),
             overview = value.string("overview"),
+            tmdbId = value.long("tmdb_id"),
             parentId = value.long("parent_id"),
             seasonNumber = value.int("season_number"),
             episodeNumber = value.int("episode_number"),
