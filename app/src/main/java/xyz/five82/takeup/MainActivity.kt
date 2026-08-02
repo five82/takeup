@@ -37,7 +37,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import xyz.five82.takeup.ui.ArtworkScreen
-import xyz.five82.takeup.ui.ConnectScreen
+import xyz.five82.takeup.ui.SettingsScreen
 import xyz.five82.takeup.ui.DetailsScreen
 import xyz.five82.takeup.ui.HomeScreen
 import xyz.five82.takeup.ui.LibraryListScreen
@@ -149,10 +149,11 @@ private fun TakeupApp(viewModel: MainViewModel) {
 
     when (val current = state) {
         MainUiState.Starting -> StartingScreen()
-        is MainUiState.Connect -> ConnectScreen(
+        is MainUiState.Connect -> SettingsScreen(
             state = current,
             onServerUrlChanged = viewModel::updateServerUrl,
             onConnect = viewModel::connect,
+            onBack = viewModel::backFromSettings,
         )
         is MainUiState.Home -> saveableStateHolder.SaveableStateProvider(
             key = "home:${current.serverUrl}",
@@ -160,7 +161,7 @@ private fun TakeupApp(viewModel: MainViewModel) {
             HomeScreen(
                 state = current,
                 onRetry = viewModel::retryHome,
-                onChangeServer = viewModel::changeServer,
+                onOpenSettings = viewModel::openSettings,
                 onShowMovies = viewModel::showMovies,
                 onShowShows = viewModel::showShows,
                 onItemSelected = viewModel::selectHomeItem,

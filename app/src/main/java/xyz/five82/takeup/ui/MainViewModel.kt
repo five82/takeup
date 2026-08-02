@@ -43,6 +43,7 @@ internal sealed interface MainUiState {
         val serverUrl: String = "",
         val isConnecting: Boolean = false,
         val error: String? = null,
+        val canNavigateBack: Boolean = false,
     ) : MainUiState
 
     data class Home(
@@ -145,6 +146,7 @@ internal class MainViewModel(
     private var showContent: ShowContent? = null
     private var seasonContent: SeasonContent? = null
     private var artworkReturnState: MainUiState? = null
+    private var settingsReturnState: MainUiState.Home? = null
 
     fun start() {
         if (started) return
@@ -176,6 +178,7 @@ internal class MainViewModel(
             _uiState.value = state.copy(isConnecting = true, error = null)
             runCatching { repository.connect(state.serverUrl) }
                 .onSuccess {
+                    settingsReturnState = null
                     homeContent = EMPTY_HOME_CONTENT
                     showContent = null
                     seasonContent = null
@@ -232,10 +235,23 @@ internal class MainViewModel(
         _uiState.value = MainUiState.Home(serverUrl = state.serverUrl, content = homeContent)
     }
 
-    fun changeServer() {
-        val serverUrl = currentServerUrl().orEmpty()
+    fun openSettings() {
+        val state = _uiState.value as? MainUiState.Home ?: return
         activeJob?.cancel()
-        _uiState.value = MainUiState.Connect(serverUrl = serverUrl)
+        settingsReturnState = state.copy(isLoading = false)
+        _uiState.value = MainUiState.Connect(
+            serverUrl = state.serverUrl,
+            canNavigateBack = true,
+        )
+    }
+
+    fun backFromSettings() {
+        val state = _uiState.value as? MainUiState.Connect ?: return
+        if (!state.canNavigateBack) return
+        val returnState = settingsReturnState ?: return
+        activeJob?.cancel()
+        settingsReturnState = null
+        _uiState.value = returnState
     }
 
     fun selectHomeItem(item: LoomItem) {

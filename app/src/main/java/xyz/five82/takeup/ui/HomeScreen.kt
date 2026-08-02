@@ -18,6 +18,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Scaffold
@@ -27,6 +29,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -38,7 +41,7 @@ import xyz.five82.takeup.data.LoomItem
 internal fun HomeScreen(
     state: MainUiState.Home,
     onRetry: () -> Unit,
-    onChangeServer: () -> Unit,
+    onOpenSettings: () -> Unit,
     onShowMovies: () -> Unit,
     onShowShows: () -> Unit,
     onItemSelected: (LoomItem) -> Unit,
@@ -48,8 +51,11 @@ internal fun HomeScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.app_name)) },
                 actions = {
-                    TextButton(onClick = onChangeServer) {
-                        Text(stringResource(R.string.change_server))
+                    IconButton(onClick = onOpenSettings) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_settings),
+                            contentDescription = stringResource(R.string.settings),
+                        )
                     }
                 },
             )
@@ -64,7 +70,7 @@ internal fun HomeScreen(
                 contentPadding = contentPadding,
                 message = state.error,
                 onRetry = onRetry,
-                onChangeServer = onChangeServer,
+                onOpenSettings = onOpenSettings,
             )
             else -> HomeList(
                 contentPadding = contentPadding,
@@ -113,7 +119,7 @@ private fun HomeError(
     contentPadding: PaddingValues,
     message: String,
     onRetry: () -> Unit,
-    onChangeServer: () -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     Box(
         modifier = Modifier
@@ -133,8 +139,8 @@ private fun HomeError(
                 Button(onClick = onRetry) {
                     Text(stringResource(R.string.retry))
                 }
-                TextButton(onClick = onChangeServer) {
-                    Text(stringResource(R.string.change_server))
+                TextButton(onClick = onOpenSettings) {
+                    Text(stringResource(R.string.settings))
                 }
             }
         }
