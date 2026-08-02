@@ -71,7 +71,7 @@ internal fun ArtworkScreen(
                 actions = {
                     TextButton(
                         onClick = onReset,
-                        enabled = !state.isLoading && !state.isSaving,
+                        enabled = state.options.isNotEmpty() && !state.isLoading && !state.isSaving,
                     ) {
                         Text(stringResource(R.string.reset_artwork))
                     }

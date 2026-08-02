@@ -13,6 +13,8 @@ Takeup is an Android media player for Loom.
 
 Single-developer hobby project - prefer simple, maintainable solutions over clever abstractions.
 
+Loom and Takeup are developed and deployed together for one user. Do not preserve compatibility with older versions of either application; make coordinated changes in both repositories instead of adding compatibility shims.
+
 ## Critical Expectations
 
 - Apply YAGNI ("You Aren't Gonna Need It") and KISS ("Keep It Simple, Stupid"). Build only what the current task requires; do not add abstractions, generality, or future-proofing for needs that do not yet exist. When two approaches work, take the simpler one.
