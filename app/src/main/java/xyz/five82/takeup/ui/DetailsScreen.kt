@@ -70,7 +70,7 @@ internal fun DetailsScreen(
                 item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
             }
             item {
-                MediaArtwork(
+                FadingBackdropArtwork(
                     url = state.item.backdropUrl(state.serverUrl),
                     modifier = Modifier
                         .fillMaxWidth()

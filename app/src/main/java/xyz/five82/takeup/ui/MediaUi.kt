@@ -25,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -81,6 +82,32 @@ internal fun MediaArtwork(
             contentDescription = contentDescription,
             contentScale = contentScale,
             modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+@Composable
+internal fun FadingBackdropArtwork(
+    url: String?,
+    modifier: Modifier = Modifier,
+) {
+    Box(modifier = modifier) {
+        MediaArtwork(
+            url = url,
+            modifier = Modifier.fillMaxSize(),
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            Color.Transparent,
+                            MaterialTheme.colorScheme.background,
+                        ),
+                    ),
+                ),
         )
     }
 }
