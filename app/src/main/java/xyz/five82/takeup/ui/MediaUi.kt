@@ -1,5 +1,6 @@
 package xyz.five82.takeup.ui
 
+import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,6 +23,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -34,6 +36,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
@@ -54,6 +57,24 @@ internal fun NavigationBackButton(
             contentDescription = stringResource(R.string.navigate_back),
             tint = tint,
         )
+    }
+}
+
+@Composable
+internal fun UseLightStatusBarIcons() {
+    val activity = LocalActivity.current
+    DisposableEffect(activity) {
+        val window = activity?.window
+        if (window == null) {
+            onDispose { }
+        } else {
+            val controller = WindowCompat.getInsetsController(window, window.decorView)
+            val previousAppearance = controller.isAppearanceLightStatusBars
+            controller.isAppearanceLightStatusBars = false
+            onDispose {
+                controller.isAppearanceLightStatusBars = previousAppearance
+            }
+        }
     }
 }
 
@@ -101,7 +122,8 @@ internal fun FadingBackdropArtwork(
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        0f to Color.Transparent,
+                        0f to Color.Black.copy(alpha = 0.65f),
+                        0.28f to Color.Transparent,
                         0.35f to Color.Transparent,
                         1f to MaterialTheme.colorScheme.background,
                     ),

@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,10 +24,13 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -47,7 +51,10 @@ internal fun DetailsScreen(
     onPlay: () -> Unit,
 ) {
     BackHandler(onBack = onBack)
+    UseLightStatusBarIcons()
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             TopAppBar(
                 title = {
@@ -57,26 +64,32 @@ internal fun DetailsScreen(
                         overflow = TextOverflow.Ellipsis,
                     )
                 },
-                navigationIcon = { NavigationBackButton(onClick = onBack) },
+                navigationIcon = {
+                    NavigationBackButton(onClick = onBack, tint = Color.White)
+                },
                 actions = {
                     if (state.item.kind == "movie" && state.item.tmdbId > 0) {
                         TextButton(onClick = onEditArtwork) {
-                            Text(stringResource(R.string.artwork))
+                            Text(stringResource(R.string.artwork), color = Color.White)
                         }
                     }
                 },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.Transparent,
+                    scrolledContainerColor = Color(0xE6000000),
+                    titleContentColor = Color.White,
+                ),
+                scrollBehavior = scrollBehavior,
             )
         },
     ) { contentPadding ->
         LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(contentPadding),
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                bottom = contentPadding.calculateBottomPadding(),
+            ),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
-            if (state.isLoading) {
-                item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
-            }
             item {
                 FadingBackdropArtwork(
                     url = state.item.backdropUrl(state.serverUrl),
@@ -84,6 +97,9 @@ internal fun DetailsScreen(
                         .fillMaxWidth()
                         .aspectRatio(16f / 9f),
                 )
+            }
+            if (state.isLoading) {
+                item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
             }
             state.error?.let { error ->
                 item {
