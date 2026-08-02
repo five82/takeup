@@ -111,10 +111,19 @@ internal fun ShowDetailsScreen(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Text(
-                            text = state.show.title,
-                            style = MaterialTheme.typography.headlineSmall,
-                        )
+                        val logoUrl = state.show.logoUrl(state.serverUrl)
+                        if (logoUrl != null) {
+                            TitleLogo(
+                                url = logoUrl,
+                                title = state.show.title,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        } else {
+                            Text(
+                                text = state.show.title,
+                                style = MaterialTheme.typography.headlineSmall,
+                            )
+                        }
                         state.show.subtitle()?.let {
                             Text(
                                 text = it,

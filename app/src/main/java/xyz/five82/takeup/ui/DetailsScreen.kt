@@ -115,10 +115,23 @@ internal fun DetailsScreen(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Text(
-                            text = state.item.title,
-                            style = MaterialTheme.typography.headlineSmall,
-                        )
+                        val logoUrl = if (state.item.kind == "movie") {
+                            state.item.logoUrl(state.serverUrl)
+                        } else {
+                            null
+                        }
+                        if (logoUrl != null) {
+                            TitleLogo(
+                                url = logoUrl,
+                                title = state.item.title,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        } else {
+                            Text(
+                                text = state.item.title,
+                                style = MaterialTheme.typography.headlineSmall,
+                            )
+                        }
                         val seriesContext = listOf(
                             state.item.seriesTitle,
                             state.item.seasonTitle,

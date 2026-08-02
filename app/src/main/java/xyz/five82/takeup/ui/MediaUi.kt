@@ -86,6 +86,24 @@ internal fun MediaArtwork(
 }
 
 @Composable
+internal fun TitleLogo(
+    url: String,
+    title: String,
+    modifier: Modifier = Modifier,
+) {
+    AsyncImage(
+        model = ImageRequest.Builder(LocalContext.current)
+            .data(url)
+            .crossfade(true)
+            .build(),
+        contentDescription = title,
+        contentScale = ContentScale.Fit,
+        alignment = Alignment.CenterStart,
+        modifier = modifier.height(64.dp),
+    )
+}
+
+@Composable
 internal fun WatchedBadge(modifier: Modifier = Modifier) {
     val description = stringResource(R.string.watched)
     Surface(

@@ -17,6 +17,8 @@ data class LoomItem(
     val posterImageTag: String = "",
     val backdropImageId: Long = 0,
     val backdropImageTag: String = "",
+    val logoImageId: Long = 0,
+    val logoImageTag: String = "",
     val mediaDurationMs: Long = 0,
     val mediaStreams: List<MediaStream> = emptyList(),
     val progress: PlaybackProgress? = null,
@@ -28,6 +30,9 @@ data class LoomItem(
 
     fun backdropUrl(serverUrl: String): String? =
         imageUrl(serverUrl, backdropImageId, backdropImageTag)
+
+    fun logoUrl(serverUrl: String): String? =
+        imageUrl(serverUrl, logoImageId, logoImageTag)
 
     fun episodeLabel(): String? {
         if (kind != "episode" || episodeNumber <= 0) return null

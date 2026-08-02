@@ -37,6 +37,8 @@ class LoomJsonTest {
                   "poster_image_tag": "poster-tag",
                   "backdrop_image_id": 8,
                   "backdrop_image_tag": "backdrop-tag",
+                  "logo_image_id": 9,
+                  "logo_image_tag": "logo-tag",
                   "added_at": "2026-01-01T00:00:00Z",
                   "updated_at": "2026-01-01T00:00:00Z"
                 }
@@ -55,6 +57,10 @@ class LoomJsonTest {
         assertEquals(
             "http://loom.test:8097/api/v1/images/7?tag=poster-tag",
             movies.single().posterUrl("http://loom.test:8097"),
+        )
+        assertEquals(
+            "http://loom.test:8097/api/v1/images/9?tag=logo-tag",
+            movies.single().logoUrl("http://loom.test:8097"),
         )
     }
 

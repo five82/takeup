@@ -74,6 +74,8 @@ internal object LoomJson {
             posterImageTag = value.string("poster_image_tag"),
             backdropImageId = value.long("backdrop_image_id"),
             backdropImageTag = value.string("backdrop_image_tag"),
+            logoImageId = value.long("logo_image_id"),
+            logoImageTag = value.string("logo_image_tag"),
             mediaDurationMs = media?.long("duration_ms") ?: 0L,
             mediaStreams = streams,
             progress = progress,
