@@ -59,9 +59,11 @@ internal fun SeasonScreen(
                 navigationIcon = { NavigationBackButton(onClick = onBack) },
                 actions = {
                     if (state.show.tmdbId > 0) {
-                        TextButton(onClick = onEditArtwork) {
-                            Text(stringResource(R.string.artwork))
-                        }
+                        MediaOverlayIconButton(
+                            iconResource = R.drawable.ic_artwork,
+                            contentDescription = stringResource(R.string.artwork),
+                            onClick = onEditArtwork,
+                        )
                     }
                 },
             )
