@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -44,6 +45,7 @@ import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.FilledTonalIconToggleButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.ListItem
@@ -53,9 +55,11 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.ProvideTextStyle
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -77,6 +81,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.zIndex
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -388,15 +393,7 @@ private fun VideoPlayer(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
-            .pointerInput(playback.streamUrl, playbackEnded, playerError) {
-                detectTapGestures {
-                    if (!playbackEnded && playerError == null) {
-                        controlsVisible = !controlsVisible
-                        controlsInteraction++
-                    }
-                }
-            },
+            .background(Color.Black),
     ) {
         AndroidView(
             factory = { viewContext ->
@@ -418,11 +415,25 @@ private fun VideoPlayer(
             },
             modifier = Modifier.fillMaxSize(),
         )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .zIndex(0f)
+                .pointerInput(playback.streamUrl, playbackEnded, playerError) {
+                    detectTapGestures {
+                        if (!playbackEnded && playerError == null) {
+                            controlsVisible = !controlsVisible
+                            controlsInteraction++
+                        }
+                    }
+                },
+        )
         if (isBuffering && !controlsVisible && playerError == null) {
             ContainedLoadingIndicator(modifier = Modifier.align(Alignment.Center))
         }
         AnimatedVisibility(
             visible = controlsVisible && !playbackEnded && playerError == null,
+            modifier = Modifier.zIndex(1f),
             enter = fadeIn(),
             exit = fadeOut(),
         ) {
@@ -475,22 +486,23 @@ private fun VideoPlayer(
                 tracks = currentTracks,
                 onDismiss = { showPlaybackOptions = false },
                 onSelectTrack = { group, trackIndex ->
+                    showPlaybackOptions = false
                     player.trackSelectionParameters = player.trackSelectionParameters
                         .buildUpon()
+                        .clearOverridesOfType(group.type)
                         .setTrackTypeDisabled(group.type, false)
                         .setOverrideForType(
                             TrackSelectionOverride(group.mediaTrackGroup, trackIndex),
                         )
                         .build()
-                    showPlaybackOptions = false
                 },
                 onDisableSubtitles = {
+                    showPlaybackOptions = false
                     player.trackSelectionParameters = player.trackSelectionParameters
                         .buildUpon()
                         .clearOverridesOfType(C.TRACK_TYPE_TEXT)
                         .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
                         .build()
-                    showPlaybackOptions = false
                 },
             )
         }
@@ -538,10 +550,8 @@ private fun PlaybackControls(
             title = title,
             supportingText = supportingText,
             onBack = onBack,
-            actionText = stringResource(
-                if (cropToFill) R.string.fit_video else R.string.crop_video,
-            ),
-            onAction = onToggleCrop,
+            cropToFill = cropToFill,
+            onToggleCrop = onToggleCrop,
             onOptions = onShowOptions,
         )
         if (isBuffering) {
@@ -708,8 +718,17 @@ private fun PlaybackOptionsSheet(
 ) {
     val audioOptions = tracks.optionsFor(C.TRACK_TYPE_AUDIO)
     val subtitleOptions = tracks.optionsFor(C.TRACK_TYPE_TEXT)
+    val sheetState = rememberBottomSheetState(
+        SheetValue.Hidden,
+        setOf(SheetValue.Hidden, SheetValue.Expanded),
+    )
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.zIndex(2f),
+        sheetState = sheetState,
+        sheetGesturesEnabled = false,
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -765,11 +784,13 @@ private fun PlaybackTrackRow(
     onClick: () -> Unit,
 ) {
     ListItem(
-        modifier = Modifier.clickable(onClick = onClick),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         trailingContent = {
             RadioButton(
                 selected = selected,
-                onClick = null,
+                onClick = onClick,
             )
         },
     ) {
@@ -786,6 +807,7 @@ private fun PlaybackFailureOverlay(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .zIndex(2f)
             .windowInsetsPadding(WindowInsets.safeDrawing)
             .padding(24.dp),
         contentAlignment = Alignment.Center,
@@ -845,6 +867,7 @@ private fun EndOfPlaybackOverlay(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .zIndex(2f)
             .windowInsetsPadding(WindowInsets.safeDrawing)
             .padding(24.dp),
         contentAlignment = Alignment.Center,
@@ -978,10 +1001,17 @@ private fun PlaybackHeader(
     title: String,
     onBack: () -> Unit,
     supportingText: String = "",
-    actionText: String? = null,
-    onAction: (() -> Unit)? = null,
+    cropToFill: Boolean? = null,
+    onToggleCrop: (() -> Unit)? = null,
     onOptions: (() -> Unit)? = null,
 ) {
+    val mediumContainerSize = IconButtonDefaults.mediumContainerSize()
+    val mediumIconSize = IconButtonDefaults.mediumIconSize
+    val mediumShapes = IconButtonDefaults.shapes(
+        shape = IconButtonDefaults.mediumRoundShape,
+        pressedShape = IconButtonDefaults.mediumPressedShape,
+    )
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -991,7 +1021,8 @@ private fun PlaybackHeader(
                     WindowInsetsSides.Top + WindowInsetsSides.Horizontal,
                 ),
             )
-            .padding(horizontal = 8.dp),
+            .heightIn(min = 72.dp)
+            .padding(start = 8.dp, top = 4.dp, end = 56.dp, bottom = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -1002,7 +1033,7 @@ private fun PlaybackHeader(
                 color = Color.White,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleMediumEmphasized,
             )
             if (supportingText.isNotBlank()) {
                 Text(
@@ -1010,27 +1041,36 @@ private fun PlaybackHeader(
                     color = Color.White.copy(alpha = 0.8f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.labelMedium,
+                    style = MaterialTheme.typography.labelLarge,
                 )
             }
         }
-        if (actionText != null && onAction != null) {
-            TextButton(
-                onClick = onAction,
-                shapes = ButtonDefaults.shapes(),
-                colors = ButtonDefaults.textButtonColors(contentColor = Color.White),
+        if (cropToFill != null && onToggleCrop != null) {
+            FilledTonalIconToggleButton(
+                checked = cropToFill,
+                onCheckedChange = { onToggleCrop() },
+                shapes = IconButtonDefaults.toggleableShapes(),
+                modifier = Modifier.size(mediumContainerSize),
             ) {
-                Text(actionText)
+                Icon(
+                    painter = painterResource(R.drawable.ic_crop),
+                    contentDescription = stringResource(
+                        if (cropToFill) R.string.fit_video else R.string.crop_video,
+                    ),
+                    modifier = Modifier.size(mediumIconSize),
+                )
             }
         }
         if (onOptions != null) {
             FilledTonalIconButton(
                 onClick = onOptions,
-                shapes = IconButtonDefaults.shapes(),
+                shapes = mediumShapes,
+                modifier = Modifier.size(mediumContainerSize),
             ) {
                 Icon(
                     painter = painterResource(R.drawable.ic_settings),
                     contentDescription = stringResource(R.string.playback_options),
+                    modifier = Modifier.size(mediumIconSize),
                 )
             }
         }
