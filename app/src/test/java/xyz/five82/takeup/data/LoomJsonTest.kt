@@ -150,6 +150,30 @@ class LoomJsonTest {
     }
 
     @Test
+    fun `parses season poster artwork`() {
+        val season = LoomJson.item(
+            """
+            {
+              "id": 266,
+              "kind": "season",
+              "title": "Season 1",
+              "parent_id": 265,
+              "season_number": 1,
+              "poster_image_id": 861,
+              "poster_image_tag": "season-poster-tag"
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals(861L, season.posterImageId)
+        assertEquals("season-poster-tag", season.posterImageTag)
+        assertEquals(
+            "http://loom.test:8097/api/v1/images/861?tag=season-poster-tag",
+            season.posterUrl("http://loom.test:8097"),
+        )
+    }
+
+    @Test
     fun `parses episode hierarchy metadata`() {
         val episode = LoomJson.item(
             """

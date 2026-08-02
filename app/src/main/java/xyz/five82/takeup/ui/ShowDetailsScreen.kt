@@ -167,11 +167,21 @@ internal fun ShowDetailsScreen(
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp),
                     ) {
-                        Text(
-                            text = season.title,
-                            modifier = Modifier.padding(18.dp),
-                            style = MaterialTheme.typography.titleMedium,
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            MediaArtwork(
+                                url = season.posterUrl(state.serverUrl),
+                                modifier = Modifier
+                                    .width(72.dp)
+                                    .aspectRatio(2f / 3f),
+                            )
+                            Text(
+                                text = season.title,
+                                modifier = Modifier.padding(18.dp),
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                        }
                     }
                 }
             } else if (!state.isLoading && state.error == null) {
