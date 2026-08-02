@@ -1,6 +1,7 @@
 package xyz.five82.takeup.ui
 
 import androidx.lifecycle.ViewModel
+import com.google.gson.JsonParseException
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
@@ -16,6 +17,7 @@ import xyz.five82.takeup.data.LoomItem
 import xyz.five82.takeup.data.LoomRepository
 import xyz.five82.takeup.data.PlaybackProgress
 import xyz.five82.takeup.data.PreparedPlayback
+import java.io.IOException
 import java.net.ConnectException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
@@ -86,6 +88,7 @@ internal sealed interface MainUiState {
         val serverUrl: String,
         val item: LoomItem,
         val origin: BrowseOrigin,
+        val nextEpisode: LoomItem? = null,
         val prepared: PreparedPlayback? = null,
         val isLoading: Boolean = false,
         val error: String? = null,
@@ -98,6 +101,12 @@ internal val EMPTY_HOME_CONTENT = HomeContent(
     movies = emptyList(),
     shows = emptyList(),
 )
+
+internal fun nextEpisodeAfter(episodes: List<LoomItem>, itemId: Long): LoomItem? {
+    val index = episodes.indexOfFirst { it.id == itemId }
+    if (index < 0) return null
+    return episodes.getOrNull(index + 1)
+}
 
 private data class ShowContent(
     val show: LoomItem,
@@ -301,16 +310,13 @@ internal class MainViewModel(
 
     fun playDetails() {
         val state = _uiState.value as? MainUiState.Details ?: return
-        activeJob?.cancel()
-        activeJob = viewModelScope.launch {
-            _uiState.value = MainUiState.Playback(
-                serverUrl = state.serverUrl,
-                item = state.item,
-                origin = state.origin,
-                isLoading = true,
-            )
-            loadPlayback(state.serverUrl, state.item, state.origin)
-        }
+        startPlayback(state.serverUrl, state.item, state.origin)
+    }
+
+    fun playNextEpisode() {
+        val state = _uiState.value as? MainUiState.Playback ?: return
+        val nextEpisode = state.nextEpisode ?: return
+        startPlayback(state.serverUrl, nextEpisode, state.origin)
     }
 
     fun retryPlayback() {
@@ -336,6 +342,16 @@ internal class MainViewModel(
             item = state.item,
             origin = state.origin,
         )
+    }
+
+    fun backToSeasonFromPlayback() {
+        val state = _uiState.value as? MainUiState.Playback ?: return
+        activeJob?.cancel()
+        if (state.origin == BrowseOrigin.Season) {
+            showBrowseState(state.serverUrl, BrowseOrigin.Season)
+        } else {
+            backFromPlayback()
+        }
     }
 
     fun saveProgress(
@@ -401,6 +417,24 @@ internal class MainViewModel(
         }
     }
 
+    private fun startPlayback(
+        serverUrl: String,
+        item: LoomItem,
+        origin: BrowseOrigin,
+    ) {
+        activeJob?.cancel()
+        activeJob = viewModelScope.launch {
+            _uiState.value = MainUiState.Playback(
+                serverUrl = serverUrl,
+                item = item,
+                origin = origin,
+                nextEpisode = nextEpisodeFor(item),
+                isLoading = true,
+            )
+            loadPlayback(serverUrl, item, origin)
+        }
+    }
+
     private suspend fun loadHome(serverUrl: String) {
         _uiState.value = MainUiState.Home(
             serverUrl = serverUrl,
@@ -427,10 +461,10 @@ internal class MainViewModel(
         origin: BrowseOrigin,
     ) {
         runCatching {
-            val detailedShow = repository.item(serverUrl, show.id)
+            val detailedShow = repository.item(serverUrl, show)
             ShowContent(
                 show = detailedShow,
-                seasons = repository.seasons(serverUrl, show.id),
+                seasons = repository.seasons(serverUrl, detailedShow),
                 origin = origin,
             )
         }.onSuccess {
@@ -443,9 +477,11 @@ internal class MainViewModel(
                 origin = origin,
             )
         }.onFailure {
+            val cached = showContent?.takeIf { it.show.id == show.id }
             _uiState.value = MainUiState.ShowDetails(
                 serverUrl = serverUrl,
-                show = show,
+                show = cached?.show ?: show,
+                seasons = cached?.seasons.orEmpty(),
                 origin = origin,
                 error = readableError(it),
             )
@@ -457,7 +493,7 @@ internal class MainViewModel(
         show: LoomItem,
         season: LoomItem,
     ) {
-        runCatching { repository.episodes(serverUrl, season.id) }
+        runCatching { repository.episodes(serverUrl, show, season) }
             .onSuccess { episodes ->
                 seasonContent = SeasonContent(show, season, episodes)
                 _uiState.value = MainUiState.Season(
@@ -468,10 +504,12 @@ internal class MainViewModel(
                 )
             }
             .onFailure {
+                val cached = seasonContent?.takeIf { it.season.id == season.id }
                 _uiState.value = MainUiState.Season(
                     serverUrl = serverUrl,
-                    show = show,
-                    season = season,
+                    show = cached?.show ?: show,
+                    season = cached?.season ?: season,
+                    episodes = cached?.episodes.orEmpty(),
                     error = readableError(it),
                 )
             }
@@ -482,7 +520,7 @@ internal class MainViewModel(
         item: LoomItem,
         origin: BrowseOrigin,
     ) {
-        runCatching { repository.item(serverUrl, item.id) }
+        runCatching { repository.item(serverUrl, item) }
             .onSuccess {
                 updateCachedItem(it)
                 _uiState.value = MainUiState.Details(
@@ -506,23 +544,33 @@ internal class MainViewModel(
         item: LoomItem,
         origin: BrowseOrigin,
     ) {
-        runCatching { repository.preparePlayback(serverUrl, item.id) }
-            .onSuccess {
+        val cachedNextEpisode = nextEpisodeFor(item)
+        val prepared = runCatching { repository.preparePlayback(serverUrl, item) }
+            .getOrElse {
                 _uiState.value = MainUiState.Playback(
                     serverUrl = serverUrl,
                     item = item,
                     origin = origin,
-                    prepared = it,
-                )
-            }
-            .onFailure {
-                _uiState.value = MainUiState.Playback(
-                    serverUrl = serverUrl,
-                    item = item,
-                    origin = origin,
+                    nextEpisode = cachedNextEpisode,
                     error = readableError(it),
                 )
+                return
             }
+        _uiState.value = MainUiState.Playback(
+            serverUrl = serverUrl,
+            item = item,
+            origin = origin,
+            nextEpisode = cachedNextEpisode,
+            prepared = prepared,
+        )
+
+        if (cachedNextEpisode == null && item.kind == "episode") {
+            val nextEpisode = runCatching { repository.nextEpisode(serverUrl, item) }.getOrNull()
+            val current = _uiState.value as? MainUiState.Playback
+            if (nextEpisode != null && current?.item?.id == item.id) {
+                _uiState.value = current.copy(nextEpisode = nextEpisode)
+            }
+        }
     }
 
     private fun showBrowseState(serverUrl: String, origin: BrowseOrigin) {
@@ -615,6 +663,9 @@ internal class MainViewModel(
         LibraryKind.Shows -> shows
     }
 
+    private fun nextEpisodeFor(item: LoomItem): LoomItem? =
+        seasonContent?.episodes?.let { nextEpisodeAfter(it, item.id) }
+
     private fun currentServerUrl(): String? = when (val state = _uiState.value) {
         is MainUiState.Home -> state.serverUrl
         is MainUiState.Library -> state.serverUrl
@@ -646,6 +697,8 @@ internal class MainViewModel(
         is ConnectException -> "Takeup could not connect to Loom. Check the address and server."
         is SocketTimeoutException -> "The Loom server did not respond in time."
         is LoomHttpException -> error.message ?: "Loom rejected the request."
+        is JsonParseException -> "Loom returned data that Takeup could not read."
+        is IOException -> "The connection to Loom was interrupted. Try again."
         is SecurityException -> "Local network access is not available."
         is IllegalArgumentException -> error.message ?: "The server address is invalid."
         else -> error.message ?: "An unexpected error occurred."

@@ -54,6 +54,7 @@ internal object LoomJson {
             title = value.requiredString("title"),
             year = value.int("year"),
             overview = value.string("overview"),
+            parentId = value.long("parent_id"),
             seasonNumber = value.int("season_number"),
             episodeNumber = value.int("episode_number"),
             episodeEndNumber = value.int("episode_end_number"),

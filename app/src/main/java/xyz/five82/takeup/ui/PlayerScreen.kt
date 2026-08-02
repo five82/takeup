@@ -5,6 +5,8 @@ import android.view.ViewGroup
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,11 +20,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -65,13 +69,17 @@ import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import xyz.five82.takeup.R
+import xyz.five82.takeup.data.LoomItem
 import xyz.five82.takeup.data.PreparedPlayback
+import java.util.Locale
 
 @Composable
 internal fun PlaybackScreen(
     state: MainUiState.Playback,
     onRetry: () -> Unit,
     onBack: () -> Unit,
+    onPlayNext: () -> Unit,
+    onBackToSeason: () -> Unit,
     onSaveProgress: (itemId: Long, positionMs: Long, durationMs: Long) -> Unit,
 ) {
     BackHandler(onBack = onBack)
@@ -90,7 +98,11 @@ internal fun PlaybackScreen(
             )
             state.prepared != null -> VideoPlayer(
                 playback = state.prepared,
+                nextEpisode = state.nextEpisode,
+                canReturnToSeason = state.origin == BrowseOrigin.Season,
                 onBack = onBack,
+                onPlayNext = onPlayNext,
+                onBackToSeason = onBackToSeason,
                 onSaveProgress = onSaveProgress,
             )
         }
@@ -161,7 +173,11 @@ private fun PlaybackError(
 @Composable
 private fun VideoPlayer(
     playback: PreparedPlayback,
+    nextEpisode: LoomItem?,
+    canReturnToSeason: Boolean,
     onBack: () -> Unit,
+    onPlayNext: () -> Unit,
+    onBackToSeason: () -> Unit,
     onSaveProgress: (itemId: Long, positionMs: Long, durationMs: Long) -> Unit,
 ) {
     val context = LocalContext.current
@@ -173,6 +189,9 @@ private fun VideoPlayer(
     var hdr10Detected by remember(playback.streamUrl) { mutableStateOf(false) }
     var firstFrameRendered by remember(playback.streamUrl) { mutableStateOf(false) }
     var showHdrBadge by remember(playback.streamUrl) { mutableStateOf(false) }
+    var playbackEnded by remember(playback.streamUrl) { mutableStateOf(false) }
+    var selectedAudioLabel by remember(playback.streamUrl) { mutableStateOf<String?>(null) }
+    var selectedSubtitleLabel by remember(playback.streamUrl) { mutableStateOf<String?>(null) }
     val resizeMode = if (cropToFill) {
         AspectRatioFrameLayout.RESIZE_MODE_ZOOM
     } else {
@@ -237,7 +256,14 @@ private fun VideoPlayer(
     DisposableEffect(player, lifecycleOwner) {
         val playerListener = object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
-                if (playbackState == Player.STATE_ENDED) saveProgress()
+                if (playbackState == Player.STATE_ENDED) {
+                    saveProgress()
+                    playbackEnded = true
+                }
+            }
+
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                if (isPlaying) playbackEnded = false
             }
 
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
@@ -245,6 +271,7 @@ private fun VideoPlayer(
             }
 
             override fun onPlayerError(error: PlaybackException) {
+                playbackEnded = false
                 playerError = buildString {
                     append(error.errorCodeName)
                     error.cause?.message?.takeIf { it.isNotBlank() }?.let {
@@ -258,6 +285,8 @@ private fun VideoPlayer(
                 if (!hdr10Detected && tracks.hasSelectedHdr10Track()) {
                     hdr10Detected = true
                 }
+                selectedAudioLabel = tracks.selectedTrackLabel(C.TRACK_TYPE_AUDIO)
+                selectedSubtitleLabel = tracks.selectedTrackLabel(C.TRACK_TYPE_TEXT)
             }
 
             override fun onRenderedFirstFrame() {
@@ -281,6 +310,13 @@ private fun VideoPlayer(
         }
     }
 
+    val audioText = selectedAudioLabel?.let { stringResource(R.string.audio_track, it) }
+    val subtitleText = selectedSubtitleLabel?.let { stringResource(R.string.subtitle_track, it) }
+    val supportingText = listOfNotNull(
+        playback.contextTitle.takeIf { it.isNotBlank() },
+        listOfNotNull(audioText, subtitleText).joinToString(" \u00B7 ").ifBlank { null },
+    ).joinToString("  |  ")
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -299,6 +335,7 @@ private fun VideoPlayer(
                     useController = true
                     controllerAutoShow = true
                     setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
+                    setShowSubtitleButton(true)
                     setControllerVisibilityListener(
                         PlayerView.ControllerVisibilityListener { visibility ->
                             controlsVisible = visibility == View.VISIBLE
@@ -313,28 +350,40 @@ private fun VideoPlayer(
             modifier = Modifier.fillMaxSize(),
         )
         playerError?.let { error ->
-            Text(
-                text = stringResource(R.string.playback_failed, error),
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .windowInsetsPadding(
-                        WindowInsets.safeDrawing.only(
-                            WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom,
-                        ),
-                    )
-                    .background(Color(0xCC000000))
-                    .padding(16.dp),
-                color = MaterialTheme.colorScheme.error,
+            PlaybackFailureOverlay(
+                message = error,
+                onRetry = {
+                    playerError = null
+                    player.prepare()
+                    player.play()
+                },
+                onBack = onBack,
             )
         }
-        if (controlsVisible) {
+        if (controlsVisible || playbackEnded || playerError != null) {
             PlaybackHeader(
                 title = playback.title,
+                supportingText = supportingText,
                 onBack = onBack,
                 actionText = stringResource(
                     if (cropToFill) R.string.fit_video else R.string.crop_video,
                 ),
                 onAction = { cropToFill = !cropToFill },
+            )
+        }
+        if (playbackEnded) {
+            EndOfPlaybackOverlay(
+                itemTitle = playback.title,
+                nextEpisode = nextEpisode,
+                canReturnToSeason = canReturnToSeason,
+                onPlayNext = onPlayNext,
+                onReplay = {
+                    playbackEnded = false
+                    playerError = null
+                    player.seekTo(0)
+                    player.play()
+                },
+                onBack = if (canReturnToSeason) onBackToSeason else onBack,
             )
         }
         if (showHdrBadge) {
@@ -364,6 +413,142 @@ private fun VideoPlayer(
     }
 }
 
+@Composable
+private fun PlaybackFailureOverlay(
+    message: String,
+    onRetry: () -> Unit,
+    onBack: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .padding(24.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Surface(
+            color = Color(0xF21A181C),
+            shape = MaterialTheme.shapes.large,
+            shadowElevation = 8.dp,
+        ) {
+            Column(
+                modifier = Modifier
+                    .widthIn(max = 480.dp)
+                    .verticalScroll(rememberScrollState())
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.playback_failed_title),
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleLarge,
+                )
+                Text(
+                    text = message,
+                    color = Color.White.copy(alpha = 0.8f),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = onRetry) {
+                        Text(stringResource(R.string.retry))
+                    }
+                    TextButton(
+                        onClick = onBack,
+                        colors = ButtonDefaults.textButtonColors(contentColor = Color.White),
+                    ) {
+                        Text(stringResource(R.string.back_to_details))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EndOfPlaybackOverlay(
+    itemTitle: String,
+    nextEpisode: LoomItem?,
+    canReturnToSeason: Boolean,
+    onPlayNext: () -> Unit,
+    onReplay: () -> Unit,
+    onBack: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .padding(24.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Surface(
+            color = Color(0xF21A181C),
+            shape = MaterialTheme.shapes.large,
+            shadowElevation = 8.dp,
+        ) {
+            Column(
+                modifier = Modifier
+                    .widthIn(max = 480.dp)
+                    .verticalScroll(rememberScrollState())
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.finished),
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleLarge,
+                )
+                Text(
+                    text = itemTitle,
+                    color = Color.White.copy(alpha = 0.8f),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                if (nextEpisode != null) {
+                    Text(
+                        text = listOfNotNull(
+                            nextEpisode.episodeLabel(),
+                            nextEpisode.title,
+                        ).joinToString(" \u00B7 "),
+                        color = Color.White,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Button(
+                        onClick = onPlayNext,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(R.string.play_next))
+                    }
+                }
+                OutlinedButton(
+                    onClick = onReplay,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(R.string.replay))
+                }
+                TextButton(
+                    onClick = onBack,
+                    colors = ButtonDefaults.textButtonColors(contentColor = Color.White),
+                ) {
+                    Text(
+                        stringResource(
+                            if (canReturnToSeason) {
+                                R.string.back_to_season
+                            } else {
+                                R.string.back_to_details
+                            },
+                        ),
+                    )
+                }
+            }
+        }
+    }
+}
+
 @androidx.annotation.OptIn(markerClass = [UnstableApi::class])
 internal fun isHdr10Track(format: Format): Boolean =
     format.sampleMimeType != MimeTypes.VIDEO_DOLBY_VISION &&
@@ -376,10 +561,42 @@ private fun Tracks.hasSelectedHdr10Track(): Boolean = groups.any { group ->
         }
 }
 
+private fun Tracks.selectedTrackLabel(trackType: Int): String? {
+    groups.forEach { group ->
+        if (group.type != trackType) return@forEach
+        for (trackIndex in 0 until group.length) {
+            if (group.isTrackSelected(trackIndex)) {
+                return trackLabel(group.getTrackFormat(trackIndex))
+            }
+        }
+    }
+    return null
+}
+
+private fun trackLabel(format: Format): String =
+    trackLabel(format.label, format.language)
+
+internal fun trackLabel(
+    label: String?,
+    language: String?,
+    locale: Locale = Locale.getDefault(),
+): String {
+    label?.takeIf { it.isNotBlank() }?.let { return it }
+    language
+        ?.takeIf { it.isNotBlank() && it != "und" }
+        ?.let { languageTag ->
+            Locale.forLanguageTag(languageTag).getDisplayLanguage(locale)
+                .takeIf { it.isNotBlank() }
+                ?.let { return it }
+        }
+    return "Default"
+}
+
 @Composable
 private fun PlaybackHeader(
     title: String,
     onBack: () -> Unit,
+    supportingText: String = "",
     actionText: String? = null,
     onAction: (() -> Unit)? = null,
 ) {
@@ -396,20 +613,25 @@ private fun PlaybackHeader(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        TextButton(
-            onClick = onBack,
-            colors = ButtonDefaults.textButtonColors(contentColor = Color.White),
-        ) {
-            Text(stringResource(R.string.back))
+        NavigationBackButton(onClick = onBack, tint = Color.White)
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.titleMedium,
+            )
+            if (supportingText.isNotBlank()) {
+                Text(
+                    text = supportingText,
+                    color = Color.White.copy(alpha = 0.8f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.labelMedium,
+                )
+            }
         }
-        Text(
-            text = title,
-            modifier = Modifier.weight(1f),
-            color = Color.White,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            style = MaterialTheme.typography.titleMedium,
-        )
         if (actionText != null && onAction != null) {
             TextButton(
                 onClick = onAction,

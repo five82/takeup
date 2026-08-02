@@ -100,6 +100,7 @@ class LoomJsonTest {
               "id": 52,
               "kind": "episode",
               "title": "A Double Episode",
+              "parent_id": 51,
               "season_number": 0,
               "episode_number": 1,
               "episode_end_number": 2,
@@ -108,6 +109,7 @@ class LoomJsonTest {
             """.trimIndent(),
         )
 
+        assertEquals(51L, episode.parentId)
         assertEquals(0, episode.seasonNumber)
         assertEquals(1, episode.episodeNumber)
         assertEquals(2, episode.episodeEndNumber)

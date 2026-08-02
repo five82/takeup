@@ -8,6 +8,7 @@ data class LoomItem(
     val title: String,
     val year: Int,
     val overview: String,
+    val parentId: Long = 0,
     val seasonNumber: Int = 0,
     val episodeNumber: Int = 0,
     val episodeEndNumber: Int = 0,
@@ -18,12 +19,34 @@ data class LoomItem(
     val backdropImageTag: String = "",
     val mediaDurationMs: Long = 0,
     val progress: PlaybackProgress? = null,
+    val seriesTitle: String = "",
+    val seasonTitle: String = "",
 ) {
     fun posterUrl(serverUrl: String): String? =
         imageUrl(serverUrl, posterImageId, posterImageTag)
 
     fun backdropUrl(serverUrl: String): String? =
         imageUrl(serverUrl, backdropImageId, backdropImageTag)
+
+    fun episodeLabel(): String? {
+        if (kind != "episode" || episodeNumber <= 0) return null
+        return buildString {
+            append("S")
+            append(seasonNumber.toString().padStart(2, '0'))
+            append("E")
+            append(episodeNumber.toString().padStart(2, '0'))
+            if (episodeEndNumber > episodeNumber) {
+                append("-")
+                append(episodeEndNumber.toString().padStart(2, '0'))
+            }
+        }
+    }
+
+    fun episodeContext(): String = listOfNotNull(
+        seriesTitle.takeIf { it.isNotBlank() },
+        seasonTitle.takeIf { it.isNotBlank() },
+        episodeLabel(),
+    ).joinToString(" \u00B7 ")
 
     private fun imageUrl(serverUrl: String, imageId: Long, tag: String): String? {
         if (imageId <= 0) return null
@@ -54,6 +77,7 @@ data class PlaybackResponse(
 data class PreparedPlayback(
     val itemId: Long,
     val title: String,
+    val contextTitle: String,
     val streamUrl: String,
     val durationMs: Long,
     val resumePositionMs: Long,

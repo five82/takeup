@@ -30,15 +30,23 @@
     <string name="loading_movies">Loading movies&#8230;</string>
     <string name="loading_shows">Loading shows&#8230;</string>
     <string name="loading_episodes">Loading episodes&#8230;</string>
-    <string name="back">Back</string>
+    <string name="navigate_back">Navigate back</string>
+    <string name="back_to_details">Back to details</string>
+    <string name="back_to_season">Back to season</string>
     <string name="play">Play</string>
+    <string name="play_next">Play next</string>
+    <string name="replay">Replay</string>
+    <string name="finished">Finished</string>
     <string name="resume">Resume</string>
     <string name="overview">Overview</string>
     <string name="watched">Watched</string>
     <string name="crop_video">Crop</string>
     <string name="fit_video">Fit</string>
     <string name="hdr_badge">HDR</string>
+    <string name="audio_track">Audio: %1$s</string>
+    <string name="subtitle_track">Subtitles: %1$s</string>
     <string name="resume_progress">Resume at %1$s &#183; %2$d%% watched</string>
     <string name="loading_playback">Preparing playback&#8230;</string>
+    <string name="playback_failed_title">Playback stopped</string>
     <string name="playback_failed">Playback failed: %1$s</string>
 </resources>

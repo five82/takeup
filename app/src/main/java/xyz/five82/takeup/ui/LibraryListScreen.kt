@@ -17,10 +17,9 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -29,6 +28,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import xyz.five82.takeup.R
 import xyz.five82.takeup.data.LoomItem
@@ -56,11 +57,7 @@ internal fun LibraryListScreen(
                         ),
                     )
                 },
-                navigationIcon = {
-                    TextButton(onClick = onBack) {
-                        Text(stringResource(R.string.back))
-                    }
-                },
+                navigationIcon = { NavigationBackButton(onClick = onBack) },
             )
         },
     ) { contentPadding ->
@@ -90,20 +87,21 @@ private fun LoadingLibrary(
     contentPadding: PaddingValues,
     kind: LibraryKind,
 ) {
-    Box(
+    val description = stringResource(
+        if (kind == LibraryKind.Movies) R.string.loading_movies else R.string.loading_shows,
+    )
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(minSize = 132.dp),
         modifier = Modifier
             .fillMaxSize()
-            .padding(contentPadding),
-        contentAlignment = Alignment.Center,
+            .padding(contentPadding)
+            .semantics { contentDescription = description },
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            CircularProgressIndicator()
-            Spacer(Modifier.height(12.dp))
-            Text(
-                stringResource(
-                    if (kind == LibraryKind.Movies) R.string.loading_movies else R.string.loading_shows,
-                ),
-            )
+        items(6) {
+            PosterCardPlaceholder()
         }
     }
 }
@@ -162,47 +160,48 @@ private fun LibraryGrid(
     onRetry: () -> Unit,
     onItemSelected: (LoomItem) -> Unit,
 ) {
-    LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = 132.dp),
+    PullToRefreshBox(
+        isRefreshing = state.isLoading,
+        onRefresh = onRetry,
         modifier = Modifier
             .fillMaxSize()
             .padding(contentPadding),
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        if (state.isLoading) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                LinearProgressIndicator(Modifier.fillMaxWidth())
-            }
-        }
-        state.error?.let { error ->
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer,
-                    ),
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
+        LazyVerticalGrid(
+            columns = GridCells.Adaptive(minSize = 132.dp),
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            state.error?.let { error ->
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                        ),
                     ) {
-                        Text(error, color = MaterialTheme.colorScheme.onErrorContainer)
-                        TextButton(onClick = onRetry) {
-                            Text(stringResource(R.string.retry))
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                        ) {
+                            Text(error, color = MaterialTheme.colorScheme.onErrorContainer)
+                            TextButton(onClick = onRetry) {
+                                Text(stringResource(R.string.retry))
+                            }
                         }
                     }
                 }
             }
-        }
-        items(state.items, key = { it.id }) { item ->
-            MediaCard(
-                serverUrl = state.serverUrl,
-                item = item,
-                onClick = { onItemSelected(item) },
-                modifier = Modifier.fillMaxWidth(),
-            )
+            items(state.items, key = { it.id }) { item ->
+                MediaCard(
+                    serverUrl = state.serverUrl,
+                    item = item,
+                    onClick = { onItemSelected(item) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
     }
 }

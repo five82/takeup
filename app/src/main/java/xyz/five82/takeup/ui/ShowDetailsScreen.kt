@@ -1,9 +1,7 @@
 package xyz.five82.takeup.ui
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -28,11 +26,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
 import xyz.five82.takeup.R
 import xyz.five82.takeup.data.LoomItem
 
@@ -55,11 +51,7 @@ internal fun ShowDetailsScreen(
                         overflow = TextOverflow.Ellipsis,
                     )
                 },
-                navigationIcon = {
-                    TextButton(onClick = onBack) {
-                        Text(stringResource(R.string.back))
-                    }
-                },
+                navigationIcon = { NavigationBackButton(onClick = onBack) },
             )
         },
     ) { contentPadding ->
@@ -74,19 +66,12 @@ internal fun ShowDetailsScreen(
                 item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
             }
             item {
-                Box(
+                MediaArtwork(
+                    url = state.show.backdropUrl(state.serverUrl),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .aspectRatio(16f / 9f)
-                        .background(MaterialTheme.colorScheme.surfaceContainerHighest),
-                ) {
-                    AsyncImage(
-                        model = state.show.backdropUrl(state.serverUrl),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
+                        .aspectRatio(16f / 9f),
+                )
             }
             state.error?.let { error ->
                 item {
@@ -115,15 +100,12 @@ internal fun ShowDetailsScreen(
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                     verticalAlignment = Alignment.Top,
                 ) {
-                    AsyncImage(
-                        model = state.show.posterUrl(state.serverUrl),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
+                    MediaArtwork(
+                        url = state.show.posterUrl(state.serverUrl),
                         modifier = Modifier
                             .width(112.dp)
                             .aspectRatio(2f / 3f)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                            .clip(RoundedCornerShape(10.dp)),
                     )
                     Column(
                         modifier = Modifier.weight(1f),

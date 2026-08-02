@@ -5,9 +5,11 @@ import androidx.media3.common.ColorInfo
 import androidx.media3.common.Format
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.UnstableApi
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.Locale
 
 @androidx.annotation.OptIn(markerClass = [UnstableApi::class])
 class PlayerScreenTest {
@@ -17,6 +19,22 @@ class PlayerScreenTest {
             isHdr10Track(
                 videoFormat(MimeTypes.VIDEO_H265, C.COLOR_TRANSFER_ST2084),
             ),
+        )
+    }
+
+    @Test
+    fun `uses track labels before human readable languages`() {
+        assertEquals(
+            "Director commentary",
+            trackLabel("Director commentary", "en", Locale.US),
+        )
+        assertEquals(
+            "Spanish",
+            trackLabel(null, "es", Locale.US),
+        )
+        assertEquals(
+            "Default",
+            trackLabel(null, "und", Locale.US),
         )
     }
 

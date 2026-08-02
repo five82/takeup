@@ -1,7 +1,6 @@
 package xyz.five82.takeup.ui
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,8 +15,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -26,11 +26,11 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
 import xyz.five82.takeup.R
 import xyz.five82.takeup.data.LoomItem
 
@@ -53,11 +53,7 @@ internal fun SeasonScreen(
                         overflow = TextOverflow.Ellipsis,
                     )
                 },
-                navigationIcon = {
-                    TextButton(onClick = onBack) {
-                        Text(stringResource(R.string.back))
-                    }
-                },
+                navigationIcon = { NavigationBackButton(onClick = onBack) },
             )
         },
     ) { contentPadding ->
@@ -71,6 +67,7 @@ internal fun SeasonScreen(
             else -> EpisodeList(
                 contentPadding = contentPadding,
                 state = state,
+                onRetry = onRetry,
                 onEpisodeSelected = onEpisodeSelected,
             )
         }
@@ -79,18 +76,19 @@ internal fun SeasonScreen(
 
 @Composable
 private fun LoadingSeason(contentPadding: PaddingValues) {
-    Box(
+    val description = stringResource(R.string.loading_episodes)
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .padding(contentPadding),
-        contentAlignment = Alignment.Center,
+            .padding(contentPadding)
+            .semantics { contentDescription = description },
+        contentPadding = PaddingValues(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            CircularProgressIndicator()
-            Text(
-                text = stringResource(R.string.loading_episodes),
-                modifier = Modifier.padding(top = 12.dp),
-            )
+        items(3) {
+            Card {
+                EpisodeCardPlaceholder()
+            }
         }
     }
 }
@@ -128,6 +126,7 @@ private fun SeasonError(
 private fun EpisodeList(
     contentPadding: PaddingValues,
     state: MainUiState.Season,
+    onRetry: () -> Unit,
     onEpisodeSelected: (LoomItem) -> Unit,
 ) {
     LazyColumn(
@@ -137,6 +136,9 @@ private fun EpisodeList(
         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        if (state.isLoading) {
+            item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
+        }
         item {
             Column(
                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
@@ -151,6 +153,26 @@ private fun EpisodeList(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.labelLarge,
                 )
+            }
+        }
+        state.error?.let { error ->
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                    ),
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                    ) {
+                        Text(error, color = MaterialTheme.colorScheme.onErrorContainer)
+                        TextButton(onClick = onRetry) {
+                            Text(stringResource(R.string.retry))
+                        }
+                    }
+                }
             }
         }
         if (state.episodes.isEmpty()) {
@@ -180,22 +202,30 @@ private fun EpisodeCard(
 ) {
     Card(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics(mergeDescendants = true) {},
     ) {
         Row(
             modifier = Modifier.padding(12.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.Top,
         ) {
-            AsyncImage(
-                model = episode.backdropUrl(serverUrl),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .width(128.dp)
-                    .aspectRatio(16f / 9f)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
-            )
+            Box {
+                MediaArtwork(
+                    url = episode.backdropUrl(serverUrl),
+                    modifier = Modifier
+                        .width(128.dp)
+                        .aspectRatio(16f / 9f),
+                )
+                if (episode.progress?.played == true) {
+                    WatchedBadge(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(6.dp),
+                    )
+                }
+            }
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(5.dp),
@@ -215,7 +245,7 @@ private fun EpisodeCard(
                 )
                 val metadata = listOfNotNull(
                     episode.mediaDurationMs.takeIf { it > 0 }?.let(::formatRuntime),
-                    episode.releaseDate.takeIf { it.isNotBlank() },
+                    episode.releaseDate.takeIf { it.isNotBlank() }?.let(::formatReleaseDate),
                 ).joinToString(" \u00B7 ")
                 if (metadata.isNotBlank()) {
                     Text(

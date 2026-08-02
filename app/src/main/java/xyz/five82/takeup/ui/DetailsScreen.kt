@@ -1,7 +1,6 @@
 package xyz.five82.takeup.ui
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.progressSemantics
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -27,13 +27,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
 import xyz.five82.takeup.R
 import xyz.five82.takeup.data.PlaybackProgress
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -55,11 +56,7 @@ internal fun DetailsScreen(
                         overflow = TextOverflow.Ellipsis,
                     )
                 },
-                navigationIcon = {
-                    TextButton(onClick = onBack) {
-                        Text(stringResource(R.string.back))
-                    }
-                },
+                navigationIcon = { NavigationBackButton(onClick = onBack) },
             )
         },
     ) { contentPadding ->
@@ -73,19 +70,12 @@ internal fun DetailsScreen(
                 item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
             }
             item {
-                Box(
+                MediaArtwork(
+                    url = state.item.backdropUrl(state.serverUrl),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .aspectRatio(16f / 9f)
-                        .background(MaterialTheme.colorScheme.surfaceContainerHighest),
-                ) {
-                    AsyncImage(
-                        model = state.item.backdropUrl(state.serverUrl),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
+                        .aspectRatio(16f / 9f),
+                )
             }
             state.error?.let { error ->
                 item {
@@ -114,15 +104,12 @@ internal fun DetailsScreen(
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                     verticalAlignment = Alignment.Top,
                 ) {
-                    AsyncImage(
-                        model = state.item.posterUrl(state.serverUrl),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
+                    MediaArtwork(
+                        url = state.item.posterUrl(state.serverUrl),
                         modifier = Modifier
                             .width(112.dp)
                             .aspectRatio(2f / 3f)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                            .clip(RoundedCornerShape(10.dp)),
                     )
                     Column(
                         modifier = Modifier.weight(1f),
@@ -132,9 +119,23 @@ internal fun DetailsScreen(
                             text = state.item.title,
                             style = MaterialTheme.typography.headlineSmall,
                         )
+                        val seriesContext = listOf(
+                            state.item.seriesTitle,
+                            state.item.seasonTitle,
+                        ).filter { it.isNotBlank() }.joinToString(" \u00B7 ")
+                        if (seriesContext.isNotBlank()) {
+                            Text(
+                                text = seriesContext,
+                                color = MaterialTheme.colorScheme.primary,
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                        }
                         val metadata = listOfNotNull(
                             state.item.subtitle(),
                             state.item.mediaDurationMs.takeIf { it > 0 }?.let(::formatRuntime),
+                            state.item.releaseDate
+                                .takeIf { state.item.kind == "episode" && it.isNotBlank() }
+                                ?.let(::formatReleaseDate),
                         ).joinToString(" \u00B7 ")
                         if (metadata.isNotBlank()) {
                             Text(
@@ -212,9 +213,12 @@ internal fun PlaybackStatus(progress: PlaybackProgress) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.labelLarge,
         )
+        val fraction = percent / 100f
         LinearProgressIndicator(
-            progress = { percent / 100f },
-            modifier = Modifier.fillMaxWidth(),
+            progress = { fraction },
+            modifier = Modifier
+                .fillMaxWidth()
+                .progressSemantics(fraction),
         )
     }
 }
@@ -229,6 +233,13 @@ private fun formatPosition(durationMs: Long): String {
         "$minutes min"
     }
 }
+
+internal fun formatReleaseDate(
+    value: String,
+    locale: Locale = Locale.getDefault(),
+): String = runCatching {
+    LocalDate.parse(value).format(DateTimeFormatter.ofPattern("MMM d, uuuu", locale))
+}.getOrDefault(value)
 
 internal fun formatRuntime(durationMs: Long): String {
     val totalMinutes = durationMs / 60_000

@@ -5,8 +5,9 @@ Native Android client for the [Loom](../loom) media server.
 Takeup connects to a Loom server and provides a phone-focused home screen with
 Continue Watching, Recently Added, poster artwork, and complete movie and TV
 show libraries. Shows can be browsed by season and episode, with runtime and
-playback progress shown for each episode. Takeup direct-plays selected media
-with Media3 and saves playback progress every 15 seconds and when playback
+playback progress shown for each episode. Browsing screens support pull-to-refresh
+and preserve existing content when a refresh fails. Takeup direct-plays selected
+media with Media3 and saves playback progress every 15 seconds and when playback
 stops.
 
 ## Requirements
@@ -54,7 +55,9 @@ Loom serves original files without transcoding or remuxing. Playback therefore
 depends on the container, codecs, embedded tracks, and decoders available to
 Media3 and the phone. Playback switches to immersive, sensor-aware landscape
 and exposes Media3's standard controls for seeking, audio-track selection, and
-embedded subtitles. A Crop/Fit toggle fills the display without distorting the
-video or returns to the complete uncropped frame.
+embedded subtitles. The player reports selected track labels, provides a visible
+subtitle button, and offers Replay, Play Next, and Back to Season when an episode
+ends. A Crop/Fit toggle fills the display without distorting the video or returns
+to the complete uncropped frame.
 
 Android TV navigation and TV-specific layouts are intentionally deferred.

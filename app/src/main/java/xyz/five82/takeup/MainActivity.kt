@@ -201,6 +201,8 @@ private fun TakeupApp(viewModel: MainViewModel) {
             state = current,
             onRetry = viewModel::retryPlayback,
             onBack = viewModel::backFromPlayback,
+            onPlayNext = viewModel::playNextEpisode,
+            onBackToSeason = viewModel::backToSeasonFromPlayback,
             onSaveProgress = { itemId, positionMs, durationMs ->
                 viewModel.saveProgress(
                     serverUrl = current.serverUrl,

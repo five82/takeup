@@ -17,10 +17,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -81,16 +80,30 @@ internal fun HomeScreen(
 
 @Composable
 private fun LoadingHome(contentPadding: PaddingValues) {
-    Box(
+    val description = stringResource(R.string.loading_home)
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .padding(contentPadding),
-        contentAlignment = Alignment.Center,
+        contentPadding = PaddingValues(vertical = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            CircularProgressIndicator()
-            Spacer(Modifier.height(12.dp))
-            Text(stringResource(R.string.loading_home))
+        item {
+            Text(
+                text = description,
+                modifier = Modifier.padding(horizontal = 16.dp),
+                style = MaterialTheme.typography.titleLarge,
+            )
+        }
+        items(2) {
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                items(4) {
+                    PosterCardPlaceholder(modifier = Modifier.width(140.dp))
+                }
+            }
         }
     }
 }
@@ -137,93 +150,96 @@ private fun HomeList(
     onShowShows: () -> Unit,
     onItemSelected: (LoomItem) -> Unit,
 ) {
-    LazyColumn(
+    PullToRefreshBox(
+        isRefreshing = state.isLoading,
+        onRefresh = onRetry,
         modifier = Modifier
             .fillMaxSize()
             .padding(contentPadding),
-        contentPadding = PaddingValues(bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
-        if (state.isLoading) {
-            item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
-        }
-        state.error?.let { error ->
-            item {
-                Card(
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer,
-                    ),
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp),
+        ) {
+            state.error?.let { error ->
+                item {
+                    Card(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                        ),
                     ) {
-                        Text(error, color = MaterialTheme.colorScheme.onErrorContainer)
-                        TextButton(onClick = onRetry) {
-                            Text(stringResource(R.string.retry))
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                        ) {
+                            Text(error, color = MaterialTheme.colorScheme.onErrorContainer)
+                            TextButton(onClick = onRetry) {
+                                Text(stringResource(R.string.retry))
+                            }
                         }
                     }
                 }
             }
-        }
-        if (state.content.continueWatching.isNotEmpty()) {
-            item {
-                MediaRow(
-                    title = stringResource(R.string.continue_watching),
-                    serverUrl = state.serverUrl,
-                    items = state.content.continueWatching,
-                    onItemSelected = onItemSelected,
-                )
+            if (state.content.continueWatching.isNotEmpty()) {
+                item {
+                    MediaRow(
+                        title = stringResource(R.string.continue_watching),
+                        serverUrl = state.serverUrl,
+                        items = state.content.continueWatching,
+                        onItemSelected = onItemSelected,
+                    )
+                }
             }
-        }
-        if (state.content.recentlyAdded.isNotEmpty()) {
-            item {
-                MediaRow(
-                    title = stringResource(R.string.recently_added),
-                    serverUrl = state.serverUrl,
-                    items = state.content.recentlyAdded,
-                    onItemSelected = onItemSelected,
-                )
+            if (state.content.recentlyAdded.isNotEmpty()) {
+                item {
+                    MediaRow(
+                        title = stringResource(R.string.recently_added),
+                        serverUrl = state.serverUrl,
+                        items = state.content.recentlyAdded,
+                        onItemSelected = onItemSelected,
+                    )
+                }
             }
-        }
-        if (state.content.movies.isNotEmpty()) {
-            item {
-                MediaRow(
-                    title = stringResource(R.string.movies),
-                    serverUrl = state.serverUrl,
-                    items = state.content.movies.take(12),
-                    actionText = stringResource(R.string.see_all),
-                    onAction = onShowMovies,
-                    onItemSelected = onItemSelected,
-                )
+            if (state.content.movies.isNotEmpty()) {
+                item {
+                    MediaRow(
+                        title = stringResource(R.string.movies),
+                        serverUrl = state.serverUrl,
+                        items = state.content.movies.take(12),
+                        actionText = stringResource(R.string.see_all),
+                        onAction = onShowMovies,
+                        onItemSelected = onItemSelected,
+                    )
+                }
             }
-        }
-        if (state.content.shows.isNotEmpty()) {
-            item {
-                MediaRow(
-                    title = stringResource(R.string.shows),
-                    serverUrl = state.serverUrl,
-                    items = state.content.shows.take(12),
-                    actionText = stringResource(R.string.see_all),
-                    onAction = onShowShows,
-                    onItemSelected = onItemSelected,
-                )
+            if (state.content.shows.isNotEmpty()) {
+                item {
+                    MediaRow(
+                        title = stringResource(R.string.shows),
+                        serverUrl = state.serverUrl,
+                        items = state.content.shows.take(12),
+                        actionText = stringResource(R.string.see_all),
+                        onAction = onShowShows,
+                        onItemSelected = onItemSelected,
+                    )
+                }
             }
-        }
-        if (
-            state.content.continueWatching.isEmpty() &&
-            state.content.recentlyAdded.isEmpty() &&
-            state.content.movies.isEmpty() &&
-            state.content.shows.isEmpty()
-        ) {
-            item {
-                Text(
-                    text = stringResource(R.string.no_home_items),
-                    modifier = Modifier.padding(horizontal = 24.dp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            if (
+                state.content.continueWatching.isEmpty() &&
+                state.content.recentlyAdded.isEmpty() &&
+                state.content.movies.isEmpty() &&
+                state.content.shows.isEmpty()
+            ) {
+                item {
+                    Text(
+                        text = stringResource(R.string.no_home_items),
+                        modifier = Modifier.padding(horizontal = 24.dp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
     }
