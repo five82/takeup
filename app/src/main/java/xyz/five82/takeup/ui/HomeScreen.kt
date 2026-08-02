@@ -41,6 +41,7 @@ internal fun HomeScreen(
     onRetry: () -> Unit,
     onChangeServer: () -> Unit,
     onShowMovies: () -> Unit,
+    onShowShows: () -> Unit,
     onItemSelected: (LoomItem) -> Unit,
 ) {
     Scaffold(
@@ -57,7 +58,7 @@ internal fun HomeScreen(
     ) { contentPadding ->
         val content = state.content
         val isEmpty = content.continueWatching.isEmpty() &&
-            content.recentlyAdded.isEmpty() && content.movies.isEmpty()
+            content.recentlyAdded.isEmpty() && content.movies.isEmpty() && content.shows.isEmpty()
         when {
             state.isLoading && isEmpty -> LoadingHome(contentPadding)
             state.error != null && isEmpty -> HomeError(
@@ -71,6 +72,7 @@ internal fun HomeScreen(
                 state = state,
                 onRetry = onRetry,
                 onShowMovies = onShowMovies,
+                onShowShows = onShowShows,
                 onItemSelected = onItemSelected,
             )
         }
@@ -132,6 +134,7 @@ private fun HomeList(
     state: MainUiState.Home,
     onRetry: () -> Unit,
     onShowMovies: () -> Unit,
+    onShowShows: () -> Unit,
     onItemSelected: (LoomItem) -> Unit,
 ) {
     LazyColumn(
@@ -197,10 +200,23 @@ private fun HomeList(
                 )
             }
         }
+        if (state.content.shows.isNotEmpty()) {
+            item {
+                MediaRow(
+                    title = stringResource(R.string.shows),
+                    serverUrl = state.serverUrl,
+                    items = state.content.shows.take(12),
+                    actionText = stringResource(R.string.see_all),
+                    onAction = onShowShows,
+                    onItemSelected = onItemSelected,
+                )
+            }
+        }
         if (
             state.content.continueWatching.isEmpty() &&
             state.content.recentlyAdded.isEmpty() &&
-            state.content.movies.isEmpty()
+            state.content.movies.isEmpty() &&
+            state.content.shows.isEmpty()
         ) {
             item {
                 Text(

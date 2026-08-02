@@ -13,6 +13,9 @@
     <string name="grant_access">Grant access</string>
     <string name="open_settings">Open settings</string>
     <string name="movies">Movies</string>
+    <string name="shows">Shows</string>
+    <string name="seasons">Seasons</string>
+    <string name="episodes">Episodes</string>
     <string name="continue_watching">Continue Watching</string>
     <string name="recently_added">Recently Added</string>
     <string name="see_all">See all</string>
@@ -20,8 +23,13 @@
     <string name="change_server">Change server</string>
     <string name="no_home_items">Loom did not return any media.</string>
     <string name="no_movies">Loom did not return any movies.</string>
+    <string name="no_shows">Loom did not return any shows.</string>
+    <string name="no_seasons">Loom did not return any seasons for this show.</string>
+    <string name="no_episodes">Loom did not return any episodes for this season.</string>
     <string name="loading_home">Loading your library&#8230;</string>
     <string name="loading_movies">Loading movies&#8230;</string>
+    <string name="loading_shows">Loading shows&#8230;</string>
+    <string name="loading_episodes">Loading episodes&#8230;</string>
     <string name="back">Back</string>
     <string name="play">Play</string>
     <string name="resume">Resume</string>

@@ -91,7 +91,7 @@ internal fun MediaCard(
 }
 
 internal fun LoomItem.subtitle(): String? = when {
-    kind == "episode" && seasonNumber > 0 && episodeNumber > 0 -> buildString {
+    kind == "episode" && episodeNumber > 0 -> buildString {
         append("S")
         append(seasonNumber.toString().padStart(2, '0'))
         append("E")

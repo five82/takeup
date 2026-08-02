@@ -18,11 +18,27 @@ internal class LoomRepository(
             continueWatching = client.continueWatching(server),
             recentlyAdded = client.recentlyAdded(server),
             movies = client.movies(server),
+            shows = client.shows(server),
         )
     }
 
     suspend fun movies(serverUrl: String): List<LoomItem> =
         client.movies(ServerAddress.parse(serverUrl))
+
+    suspend fun shows(serverUrl: String): List<LoomItem> =
+        client.shows(ServerAddress.parse(serverUrl))
+
+    suspend fun seasons(serverUrl: String, showId: Long): List<LoomItem> =
+        client.children(ServerAddress.parse(serverUrl), showId)
+            .filter { it.kind == "season" }
+
+    suspend fun episodes(serverUrl: String, seasonId: Long): List<LoomItem> {
+        val server = ServerAddress.parse(serverUrl)
+        // Loom's child summaries omit media duration and playback progress.
+        return client.children(server, seasonId)
+            .filter { it.kind == "episode" }
+            .map { client.item(server, it.id) }
+    }
 
     suspend fun item(serverUrl: String, itemId: Long): LoomItem =
         client.item(ServerAddress.parse(serverUrl), itemId)

@@ -64,4 +64,5 @@ data class HomeContent(
     val continueWatching: List<LoomItem>,
     val recentlyAdded: List<LoomItem>,
     val movies: List<LoomItem>,
+    val shows: List<LoomItem>,
 )

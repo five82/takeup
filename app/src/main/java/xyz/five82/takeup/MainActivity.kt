@@ -38,11 +38,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import xyz.five82.takeup.ui.ConnectScreen
 import xyz.five82.takeup.ui.DetailsScreen
 import xyz.five82.takeup.ui.HomeScreen
+import xyz.five82.takeup.ui.LibraryListScreen
 import xyz.five82.takeup.ui.LocalNetworkPermissionScreen
 import xyz.five82.takeup.ui.MainUiState
 import xyz.five82.takeup.ui.MainViewModel
-import xyz.five82.takeup.ui.MovieListScreen
 import xyz.five82.takeup.ui.PlaybackScreen
+import xyz.five82.takeup.ui.SeasonScreen
+import xyz.five82.takeup.ui.ShowDetailsScreen
 import xyz.five82.takeup.ui.theme.TakeupTheme
 
 private const val LOCAL_NETWORK_PERMISSION = "android.permission.ACCESS_LOCAL_NETWORK"
@@ -155,17 +157,38 @@ private fun TakeupApp(viewModel: MainViewModel) {
                 onRetry = viewModel::retryHome,
                 onChangeServer = viewModel::changeServer,
                 onShowMovies = viewModel::showMovies,
+                onShowShows = viewModel::showShows,
                 onItemSelected = viewModel::selectHomeItem,
             )
         }
-        is MainUiState.Movies -> saveableStateHolder.SaveableStateProvider(
-            key = "movies:${current.serverUrl}",
+        is MainUiState.Library -> saveableStateHolder.SaveableStateProvider(
+            key = "library:${current.kind}:${current.serverUrl}",
         ) {
-            MovieListScreen(
+            LibraryListScreen(
                 state = current,
-                onRetry = viewModel::retryMovies,
+                onRetry = viewModel::retryLibrary,
                 onBack = viewModel::backToHome,
-                onMovieSelected = viewModel::selectMovie,
+                onItemSelected = viewModel::selectLibraryItem,
+            )
+        }
+        is MainUiState.ShowDetails -> saveableStateHolder.SaveableStateProvider(
+            key = "show:${current.show.id}",
+        ) {
+            ShowDetailsScreen(
+                state = current,
+                onBack = viewModel::backFromShowDetails,
+                onRetry = viewModel::retryShowDetails,
+                onSeasonSelected = viewModel::selectSeason,
+            )
+        }
+        is MainUiState.Season -> saveableStateHolder.SaveableStateProvider(
+            key = "season:${current.season.id}",
+        ) {
+            SeasonScreen(
+                state = current,
+                onBack = viewModel::backFromSeason,
+                onRetry = viewModel::retrySeason,
+                onEpisodeSelected = viewModel::selectEpisode,
             )
         }
         is MainUiState.Details -> DetailsScreen(

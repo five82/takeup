@@ -15,20 +15,15 @@ internal class LoomClient(
         LoomJson.requireHealthy(body)
     }
 
-    suspend fun movies(server: ServerAddress): List<LoomItem> {
-        val movies = mutableListOf<LoomItem>()
-        do {
-            val page = LoomJson.items(
-                request(
-                    server.api(
-                        "api/v1/items?library=movies&kind=movie" +
-                            "&limit=$MOVIE_PAGE_SIZE&offset=${movies.size}",
-                    ),
-                ),
-            )
-            movies += page
-        } while (page.size == MOVIE_PAGE_SIZE)
-        return movies
+    suspend fun movies(server: ServerAddress): List<LoomItem> =
+        pagedItems(server, "api/v1/items", "library=movies&kind=movie")
+
+    suspend fun shows(server: ServerAddress): List<LoomItem> =
+        pagedItems(server, "api/v1/items", "library=tv&kind=show")
+
+    suspend fun children(server: ServerAddress, itemId: Long): List<LoomItem> {
+        require(itemId > 0)
+        return pagedItems(server, "api/v1/items/$itemId/children")
     }
 
     suspend fun continueWatching(server: ServerAddress): List<LoomItem> =
@@ -63,6 +58,26 @@ internal class LoomClient(
         )
     }
 
+    private suspend fun pagedItems(
+        server: ServerAddress,
+        path: String,
+        query: String = "",
+    ): List<LoomItem> {
+        val items = mutableListOf<LoomItem>()
+        do {
+            val pageQuery = buildString {
+                if (query.isNotBlank()) {
+                    append(query)
+                    append('&')
+                }
+                append("limit=$PAGE_SIZE&offset=${items.size}")
+            }
+            val page = LoomJson.items(request(server.api("$path?$pageQuery")))
+            items += page
+        } while (page.size == PAGE_SIZE)
+        return items
+    }
+
     private suspend fun request(
         uri: URI,
         method: String = "GET",
@@ -74,7 +89,7 @@ internal class LoomClient(
             connection.connectTimeout = connectTimeoutMs
             connection.readTimeout = readTimeoutMs
             connection.setRequestProperty("Accept", "application/json")
-            connection.setRequestProperty("User-Agent", "Takeup/0.2")
+            connection.setRequestProperty("User-Agent", "Takeup/0.3")
             if (requestBody != null) {
                 connection.doOutput = true
                 connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
@@ -99,7 +114,7 @@ internal class LoomClient(
     }
 
     private companion object {
-        const val MOVIE_PAGE_SIZE = 200
+        const val PAGE_SIZE = 200
     }
 }
 

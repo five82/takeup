@@ -20,9 +20,16 @@ import java.net.ConnectException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 
+internal enum class LibraryKind {
+    Movies,
+    Shows,
+}
+
 internal enum class BrowseOrigin {
     Home,
     Movies,
+    Shows,
+    Season,
 }
 
 internal sealed interface MainUiState {
@@ -41,9 +48,28 @@ internal sealed interface MainUiState {
         val error: String? = null,
     ) : MainUiState
 
-    data class Movies(
+    data class Library(
         val serverUrl: String,
+        val kind: LibraryKind,
         val items: List<LoomItem> = emptyList(),
+        val isLoading: Boolean = false,
+        val error: String? = null,
+    ) : MainUiState
+
+    data class ShowDetails(
+        val serverUrl: String,
+        val show: LoomItem,
+        val seasons: List<LoomItem> = emptyList(),
+        val origin: BrowseOrigin,
+        val isLoading: Boolean = false,
+        val error: String? = null,
+    ) : MainUiState
+
+    data class Season(
+        val serverUrl: String,
+        val show: LoomItem,
+        val season: LoomItem,
+        val episodes: List<LoomItem> = emptyList(),
         val isLoading: Boolean = false,
         val error: String? = null,
     ) : MainUiState
@@ -70,6 +96,19 @@ internal val EMPTY_HOME_CONTENT = HomeContent(
     continueWatching = emptyList(),
     recentlyAdded = emptyList(),
     movies = emptyList(),
+    shows = emptyList(),
+)
+
+private data class ShowContent(
+    val show: LoomItem,
+    val seasons: List<LoomItem>,
+    val origin: BrowseOrigin,
+)
+
+private data class SeasonContent(
+    val show: LoomItem,
+    val season: LoomItem,
+    val episodes: List<LoomItem>,
 )
 
 internal class MainViewModel(
@@ -82,6 +121,8 @@ internal class MainViewModel(
     private var activeJob: Job? = null
     private var progressJob: Job? = null
     private var homeContent = EMPTY_HOME_CONTENT
+    private var showContent: ShowContent? = null
+    private var seasonContent: SeasonContent? = null
 
     fun start() {
         if (started) return
@@ -114,6 +155,8 @@ internal class MainViewModel(
             runCatching { repository.connect(state.serverUrl) }
                 .onSuccess {
                     homeContent = EMPTY_HOME_CONTENT
+                    showContent = null
+                    seasonContent = null
                     loadHome(it)
                 }
                 .onFailure {
@@ -131,23 +174,26 @@ internal class MainViewModel(
         activeJob = viewModelScope.launch { loadHome(state.serverUrl) }
     }
 
-    fun showMovies() {
-        val state = _uiState.value as? MainUiState.Home ?: return
-        _uiState.value = MainUiState.Movies(
-            serverUrl = state.serverUrl,
-            items = homeContent.movies,
-        )
-    }
+    fun showMovies() = showLibrary(LibraryKind.Movies)
 
-    fun retryMovies() {
-        val state = _uiState.value as? MainUiState.Movies ?: return
+    fun showShows() = showLibrary(LibraryKind.Shows)
+
+    fun retryLibrary() {
+        val state = _uiState.value as? MainUiState.Library ?: return
         activeJob?.cancel()
         activeJob = viewModelScope.launch {
             _uiState.value = state.copy(isLoading = true, error = null)
-            runCatching { repository.movies(state.serverUrl) }
-                .onSuccess {
-                    homeContent = homeContent.copy(movies = it)
-                    _uiState.value = state.copy(items = it, isLoading = false, error = null)
+            val result = when (state.kind) {
+                LibraryKind.Movies -> runCatching { repository.movies(state.serverUrl) }
+                LibraryKind.Shows -> runCatching { repository.shows(state.serverUrl) }
+            }
+            result
+                .onSuccess { items ->
+                    homeContent = when (state.kind) {
+                        LibraryKind.Movies -> homeContent.copy(movies = items)
+                        LibraryKind.Shows -> homeContent.copy(shows = items)
+                    }
+                    _uiState.value = state.copy(items = items, isLoading = false, error = null)
                 }
                 .onFailure {
                     _uiState.value = state.copy(
@@ -159,29 +205,89 @@ internal class MainViewModel(
     }
 
     fun backToHome() {
-        val state = _uiState.value as? MainUiState.Movies ?: return
+        val state = _uiState.value as? MainUiState.Library ?: return
         activeJob?.cancel()
         _uiState.value = MainUiState.Home(serverUrl = state.serverUrl, content = homeContent)
     }
 
     fun changeServer() {
-        val serverUrl = when (val state = _uiState.value) {
-            is MainUiState.Home -> state.serverUrl
-            is MainUiState.Movies -> state.serverUrl
-            is MainUiState.Details -> state.serverUrl
-            is MainUiState.Playback -> state.serverUrl
-            else -> ""
-        }
+        val serverUrl = currentServerUrl().orEmpty()
         activeJob?.cancel()
         _uiState.value = MainUiState.Connect(serverUrl = serverUrl)
     }
 
     fun selectHomeItem(item: LoomItem) {
-        selectItem(item, BrowseOrigin.Home)
+        if (item.kind == "show") {
+            selectShow(item, BrowseOrigin.Home)
+        } else {
+            selectItem(item, BrowseOrigin.Home)
+        }
     }
 
-    fun selectMovie(item: LoomItem) {
-        selectItem(item, BrowseOrigin.Movies)
+    fun selectLibraryItem(item: LoomItem) {
+        val state = _uiState.value as? MainUiState.Library ?: return
+        when (state.kind) {
+            LibraryKind.Movies -> selectItem(item, BrowseOrigin.Movies)
+            LibraryKind.Shows -> selectShow(item, BrowseOrigin.Shows)
+        }
+    }
+
+    fun retryShowDetails() {
+        val state = _uiState.value as? MainUiState.ShowDetails ?: return
+        activeJob?.cancel()
+        activeJob = viewModelScope.launch {
+            _uiState.value = state.copy(isLoading = true, error = null)
+            loadShow(state.serverUrl, state.show, state.origin)
+        }
+    }
+
+    fun selectSeason(season: LoomItem) {
+        val state = _uiState.value as? MainUiState.ShowDetails ?: return
+        activeJob?.cancel()
+        activeJob = viewModelScope.launch {
+            _uiState.value = MainUiState.Season(
+                serverUrl = state.serverUrl,
+                show = state.show,
+                season = season,
+                isLoading = true,
+            )
+            loadSeason(state.serverUrl, state.show, season)
+        }
+    }
+
+    fun backFromShowDetails() {
+        val state = _uiState.value as? MainUiState.ShowDetails ?: return
+        activeJob?.cancel()
+        showBrowseState(state.serverUrl, state.origin)
+    }
+
+    fun retrySeason() {
+        val state = _uiState.value as? MainUiState.Season ?: return
+        activeJob?.cancel()
+        activeJob = viewModelScope.launch {
+            _uiState.value = state.copy(isLoading = true, error = null)
+            loadSeason(state.serverUrl, state.show, state.season)
+        }
+    }
+
+    fun selectEpisode(item: LoomItem) {
+        if (_uiState.value !is MainUiState.Season) return
+        selectItem(item, BrowseOrigin.Season)
+    }
+
+    fun backFromSeason() {
+        val state = _uiState.value as? MainUiState.Season ?: return
+        activeJob?.cancel()
+        showContent?.let {
+            _uiState.value = MainUiState.ShowDetails(
+                serverUrl = state.serverUrl,
+                show = it.show,
+                seasons = it.seasons,
+                origin = it.origin,
+            )
+        } ?: run {
+            _uiState.value = MainUiState.Home(state.serverUrl, homeContent)
+        }
     }
 
     fun retryDetails() {
@@ -257,12 +363,32 @@ internal class MainViewModel(
         }
     }
 
-    private fun selectItem(item: LoomItem, origin: BrowseOrigin) {
-        val serverUrl = when (val state = _uiState.value) {
-            is MainUiState.Home -> state.serverUrl
-            is MainUiState.Movies -> state.serverUrl
-            else -> return
+    private fun showLibrary(kind: LibraryKind) {
+        val state = _uiState.value as? MainUiState.Home ?: return
+        _uiState.value = MainUiState.Library(
+            serverUrl = state.serverUrl,
+            kind = kind,
+            items = homeContent.items(kind),
+        )
+    }
+
+    private fun selectShow(item: LoomItem, origin: BrowseOrigin) {
+        val serverUrl = currentServerUrl() ?: return
+        activeJob?.cancel()
+        seasonContent = null
+        activeJob = viewModelScope.launch {
+            _uiState.value = MainUiState.ShowDetails(
+                serverUrl = serverUrl,
+                show = item,
+                origin = origin,
+                isLoading = true,
+            )
+            loadShow(serverUrl, item, origin)
         }
+    }
+
+    private fun selectItem(item: LoomItem, origin: BrowseOrigin) {
+        val serverUrl = currentServerUrl() ?: return
         activeJob?.cancel()
         activeJob = viewModelScope.launch {
             _uiState.value = MainUiState.Details(
@@ -290,6 +416,62 @@ internal class MainViewModel(
                 _uiState.value = MainUiState.Home(
                     serverUrl = serverUrl,
                     content = homeContent,
+                    error = readableError(it),
+                )
+            }
+    }
+
+    private suspend fun loadShow(
+        serverUrl: String,
+        show: LoomItem,
+        origin: BrowseOrigin,
+    ) {
+        runCatching {
+            val detailedShow = repository.item(serverUrl, show.id)
+            ShowContent(
+                show = detailedShow,
+                seasons = repository.seasons(serverUrl, show.id),
+                origin = origin,
+            )
+        }.onSuccess {
+            showContent = it
+            updateCachedItem(it.show)
+            _uiState.value = MainUiState.ShowDetails(
+                serverUrl = serverUrl,
+                show = it.show,
+                seasons = it.seasons,
+                origin = origin,
+            )
+        }.onFailure {
+            _uiState.value = MainUiState.ShowDetails(
+                serverUrl = serverUrl,
+                show = show,
+                origin = origin,
+                error = readableError(it),
+            )
+        }
+    }
+
+    private suspend fun loadSeason(
+        serverUrl: String,
+        show: LoomItem,
+        season: LoomItem,
+    ) {
+        runCatching { repository.episodes(serverUrl, season.id) }
+            .onSuccess { episodes ->
+                seasonContent = SeasonContent(show, season, episodes)
+                _uiState.value = MainUiState.Season(
+                    serverUrl = serverUrl,
+                    show = show,
+                    season = season,
+                    episodes = episodes,
+                )
+            }
+            .onFailure {
+                _uiState.value = MainUiState.Season(
+                    serverUrl = serverUrl,
+                    show = show,
+                    season = season,
                     error = readableError(it),
                 )
             }
@@ -346,10 +528,24 @@ internal class MainViewModel(
     private fun showBrowseState(serverUrl: String, origin: BrowseOrigin) {
         _uiState.value = when (origin) {
             BrowseOrigin.Home -> MainUiState.Home(serverUrl = serverUrl, content = homeContent)
-            BrowseOrigin.Movies -> MainUiState.Movies(
+            BrowseOrigin.Movies -> MainUiState.Library(
                 serverUrl = serverUrl,
+                kind = LibraryKind.Movies,
                 items = homeContent.movies,
             )
+            BrowseOrigin.Shows -> MainUiState.Library(
+                serverUrl = serverUrl,
+                kind = LibraryKind.Shows,
+                items = homeContent.shows,
+            )
+            BrowseOrigin.Season -> seasonContent?.let {
+                MainUiState.Season(
+                    serverUrl = serverUrl,
+                    show = it.show,
+                    season = it.season,
+                    episodes = it.episodes,
+                )
+            } ?: MainUiState.Home(serverUrl = serverUrl, content = homeContent)
         }
     }
 
@@ -387,16 +583,47 @@ internal class MainViewModel(
             continueWatching = homeContent.continueWatching.replaceItem(updated),
             recentlyAdded = homeContent.recentlyAdded.replaceItem(updated),
             movies = homeContent.movies.replaceItem(updated),
+            shows = homeContent.shows.replaceItem(updated),
         )
+        showContent = showContent?.let {
+            it.copy(
+                show = if (it.show.id == updated.id) updated else it.show,
+                seasons = it.seasons.replaceItem(updated),
+            )
+        }
+        seasonContent = seasonContent?.let {
+            it.copy(
+                show = if (it.show.id == updated.id) updated else it.show,
+                season = if (it.season.id == updated.id) updated else it.season,
+                episodes = it.episodes.replaceItem(updated),
+            )
+        }
     }
 
     private fun findCachedItem(itemId: Long): LoomItem? =
-        homeContent.movies.firstOrNull { it.id == itemId }
+        seasonContent?.episodes?.firstOrNull { it.id == itemId }
+            ?: homeContent.movies.firstOrNull { it.id == itemId }
+            ?: homeContent.shows.firstOrNull { it.id == itemId }
             ?: homeContent.continueWatching.firstOrNull { it.id == itemId }
             ?: homeContent.recentlyAdded.firstOrNull { it.id == itemId }
 
     private fun List<LoomItem>.replaceItem(updated: LoomItem): List<LoomItem> =
         map { if (it.id == updated.id) updated else it }
+
+    private fun HomeContent.items(kind: LibraryKind): List<LoomItem> = when (kind) {
+        LibraryKind.Movies -> movies
+        LibraryKind.Shows -> shows
+    }
+
+    private fun currentServerUrl(): String? = when (val state = _uiState.value) {
+        is MainUiState.Home -> state.serverUrl
+        is MainUiState.Library -> state.serverUrl
+        is MainUiState.ShowDetails -> state.serverUrl
+        is MainUiState.Season -> state.serverUrl
+        is MainUiState.Details -> state.serverUrl
+        is MainUiState.Playback -> state.serverUrl
+        else -> null
+    }
 
     private fun playbackProgress(positionMs: Long, durationMs: Long): PlaybackProgress {
         val fraction = positionMs.toDouble() / durationMs

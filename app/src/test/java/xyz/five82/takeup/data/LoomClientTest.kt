@@ -16,6 +16,8 @@ class LoomClientTest {
     private lateinit var server: HttpServer
     private var address = ServerAddress.parse("http://127.0.0.1")
     private val moviesQueries = CopyOnWriteArrayList<String>()
+    private val showsQueries = CopyOnWriteArrayList<String>()
+    private val childrenQueries = CopyOnWriteArrayList<String>()
     private val paginateMovies = AtomicBoolean(false)
     private val continueQuery = AtomicReference<String>()
     private val recentlyAddedQuery = AtomicReference<String>()
@@ -66,6 +68,30 @@ class LoomClientTest {
     }
 
     @Test
+    fun `loads show and episode hierarchy`() = runBlocking {
+        val client = LoomClient()
+
+        val shows = client.shows(address)
+        val seasons = client.children(address, shows.single().id)
+        val episodes = client.children(address, seasons.single().id)
+
+        assertEquals("Test Show", shows.single().title)
+        assertEquals("Specials", seasons.single().title)
+        assertEquals("Pilot", episodes.single().title)
+        assertEquals(
+            listOf("library=tv&kind=show&limit=200&offset=0"),
+            showsQueries,
+        )
+        assertEquals(
+            listOf(
+                "50:limit=200&offset=0",
+                "51:limit=200&offset=0",
+            ),
+            childrenQueries,
+        )
+    }
+
+    @Test
     fun `loads every movie page`() = runBlocking {
         paginateMovies.set(true)
 
@@ -86,12 +112,25 @@ class LoomClientTest {
         val response = when (exchange.requestURI.path) {
             "/api/v1/health" -> """{"status":"ok"}"""
             "/api/v1/items" -> {
-                moviesQueries += exchange.requestURI.query
-                if (paginateMovies.get()) {
-                    paginatedMovies(exchange.requestURI.query)
+                if (exchange.requestURI.query.startsWith("library=tv")) {
+                    showsQueries += exchange.requestURI.query
+                    """{"items":[{"id":50,"kind":"show","title":"Test Show","year":2026}]}"""
                 } else {
-                    """{"items":[{"id":42,"kind":"movie","title":"Test Movie","year":2026}]}"""
+                    moviesQueries += exchange.requestURI.query
+                    if (paginateMovies.get()) {
+                        paginatedMovies(exchange.requestURI.query)
+                    } else {
+                        """{"items":[{"id":42,"kind":"movie","title":"Test Movie","year":2026}]}"""
+                    }
                 }
+            }
+            "/api/v1/items/50/children" -> {
+                childrenQueries += "50:${exchange.requestURI.query}"
+                """{"items":[{"id":51,"kind":"season","title":"Specials","season_number":0}]}"""
+            }
+            "/api/v1/items/51/children" -> {
+                childrenQueries += "51:${exchange.requestURI.query}"
+                """{"items":[{"id":52,"kind":"episode","title":"Pilot","season_number":0,"episode_number":1}]}"""
             }
             "/api/v1/continue-watching" -> {
                 continueQuery.set(exchange.requestURI.query)

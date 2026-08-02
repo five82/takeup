@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,8 +13,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -33,16 +34,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import xyz.five82.takeup.R
-import xyz.five82.takeup.data.PlaybackProgress
-import kotlin.math.roundToInt
+import xyz.five82.takeup.data.LoomItem
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun DetailsScreen(
-    state: MainUiState.Details,
+internal fun ShowDetailsScreen(
+    state: MainUiState.ShowDetails,
     onBack: () -> Unit,
     onRetry: () -> Unit,
-    onPlay: () -> Unit,
+    onSeasonSelected: (LoomItem) -> Unit,
 ) {
     BackHandler(onBack = onBack)
     Scaffold(
@@ -50,7 +50,7 @@ internal fun DetailsScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = state.item.title,
+                        text = state.show.title,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -67,6 +67,7 @@ internal fun DetailsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(contentPadding),
+            contentPadding = PaddingValues(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             if (state.isLoading) {
@@ -80,7 +81,7 @@ internal fun DetailsScreen(
                         .background(MaterialTheme.colorScheme.surfaceContainerHighest),
                 ) {
                     AsyncImage(
-                        model = state.item.backdropUrl(state.serverUrl),
+                        model = state.show.backdropUrl(state.serverUrl),
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),
@@ -115,7 +116,7 @@ internal fun DetailsScreen(
                     verticalAlignment = Alignment.Top,
                 ) {
                     AsyncImage(
-                        model = state.item.posterUrl(state.serverUrl),
+                        model = state.show.posterUrl(state.serverUrl),
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
@@ -129,42 +130,20 @@ internal fun DetailsScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Text(
-                            text = state.item.title,
+                            text = state.show.title,
                             style = MaterialTheme.typography.headlineSmall,
                         )
-                        val metadata = listOfNotNull(
-                            state.item.subtitle(),
-                            state.item.mediaDurationMs.takeIf { it > 0 }?.let(::formatRuntime),
-                        ).joinToString(" \u00B7 ")
-                        if (metadata.isNotBlank()) {
+                        state.show.subtitle()?.let {
                             Text(
-                                text = metadata,
+                                text = it,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 style = MaterialTheme.typography.bodyLarge,
-                            )
-                        }
-                        state.item.progress?.let { progress ->
-                            PlaybackStatus(progress)
-                        }
-                        Button(
-                            onClick = onPlay,
-                            enabled = !state.isLoading,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text(
-                                stringResource(
-                                    if ((state.item.progress?.resumePositionMs ?: 0L) > 0) {
-                                        R.string.resume
-                                    } else {
-                                        R.string.play
-                                    },
-                                ),
                             )
                         }
                     }
                 }
             }
-            if (state.item.overview.isNotBlank()) {
+            if (state.show.overview.isNotBlank()) {
                 item {
                     Column(
                         modifier = Modifier.padding(horizontal = 16.dp),
@@ -175,68 +154,44 @@ internal fun DetailsScreen(
                             style = MaterialTheme.typography.titleMedium,
                         )
                         Text(
-                            text = state.item.overview,
+                            text = state.show.overview,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodyLarge,
                         )
                     }
                 }
             }
-            item { Box(Modifier.padding(bottom = 4.dp)) }
+            if (state.seasons.isNotEmpty()) {
+                item {
+                    Text(
+                        text = stringResource(R.string.seasons),
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                }
+                items(state.seasons, key = { it.id }) { season ->
+                    Card(
+                        onClick = { onSeasonSelected(season) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
+                    ) {
+                        Text(
+                            text = season.title,
+                            modifier = Modifier.padding(18.dp),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                    }
+                }
+            } else if (!state.isLoading && state.error == null) {
+                item {
+                    Text(
+                        text = stringResource(R.string.no_seasons),
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         }
-    }
-}
-
-@Composable
-internal fun PlaybackStatus(progress: PlaybackProgress) {
-    if (progress.played) {
-        Text(
-            text = stringResource(R.string.watched),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.labelLarge,
-        )
-        return
-    }
-    if (progress.resumePositionMs <= 0 || progress.durationMs <= 0) return
-
-    val percent = (progress.positionMs.toDouble() / progress.durationMs * 100)
-        .roundToInt()
-        .coerceIn(0, 100)
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(
-            text = stringResource(
-                R.string.resume_progress,
-                formatPosition(progress.resumePositionMs),
-                percent,
-            ),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.labelLarge,
-        )
-        LinearProgressIndicator(
-            progress = { percent / 100f },
-            modifier = Modifier.fillMaxWidth(),
-        )
-    }
-}
-
-private fun formatPosition(durationMs: Long): String {
-    val totalMinutes = durationMs / 60_000
-    val hours = totalMinutes / 60
-    val minutes = totalMinutes % 60
-    return if (hours > 0) {
-        "$hours:${minutes.toString().padStart(2, '0')}"
-    } else {
-        "$minutes min"
-    }
-}
-
-internal fun formatRuntime(durationMs: Long): String {
-    val totalMinutes = durationMs / 60_000
-    val hours = totalMinutes / 60
-    val minutes = totalMinutes % 60
-    return when {
-        hours > 0 && minutes > 0 -> "${hours}h ${minutes}m"
-        hours > 0 -> "${hours}h"
-        else -> "${minutes}m"
     }
 }

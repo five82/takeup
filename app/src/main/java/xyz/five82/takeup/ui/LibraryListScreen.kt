@@ -35,17 +35,27 @@ import xyz.five82.takeup.data.LoomItem
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun MovieListScreen(
-    state: MainUiState.Movies,
+internal fun LibraryListScreen(
+    state: MainUiState.Library,
     onRetry: () -> Unit,
     onBack: () -> Unit,
-    onMovieSelected: (LoomItem) -> Unit,
+    onItemSelected: (LoomItem) -> Unit,
 ) {
     BackHandler(onBack = onBack)
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.movies)) },
+                title = {
+                    Text(
+                        stringResource(
+                            if (state.kind == LibraryKind.Movies) {
+                                R.string.movies
+                            } else {
+                                R.string.shows
+                            },
+                        ),
+                    )
+                },
                 navigationIcon = {
                     TextButton(onClick = onBack) {
                         Text(stringResource(R.string.back))
@@ -55,25 +65,31 @@ internal fun MovieListScreen(
         },
     ) { contentPadding ->
         when {
-            state.isLoading && state.items.isEmpty() -> LoadingMovies(contentPadding)
-            state.error != null && state.items.isEmpty() -> MovieListError(
+            state.isLoading && state.items.isEmpty() -> LoadingLibrary(
+                contentPadding,
+                state.kind,
+            )
+            state.error != null && state.items.isEmpty() -> LibraryListError(
                 contentPadding = contentPadding,
                 message = state.error,
                 onRetry = onRetry,
             )
-            state.items.isEmpty() -> EmptyMovieList(contentPadding)
-            else -> MovieGrid(
+            state.items.isEmpty() -> EmptyLibraryList(contentPadding, state.kind)
+            else -> LibraryGrid(
                 contentPadding = contentPadding,
                 state = state,
                 onRetry = onRetry,
-                onMovieSelected = onMovieSelected,
+                onItemSelected = onItemSelected,
             )
         }
     }
 }
 
 @Composable
-private fun LoadingMovies(contentPadding: PaddingValues) {
+private fun LoadingLibrary(
+    contentPadding: PaddingValues,
+    kind: LibraryKind,
+) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -83,13 +99,17 @@ private fun LoadingMovies(contentPadding: PaddingValues) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             CircularProgressIndicator()
             Spacer(Modifier.height(12.dp))
-            Text(stringResource(R.string.loading_movies))
+            Text(
+                stringResource(
+                    if (kind == LibraryKind.Movies) R.string.loading_movies else R.string.loading_shows,
+                ),
+            )
         }
     }
 }
 
 @Composable
-private fun MovieListError(
+private fun LibraryListError(
     contentPadding: PaddingValues,
     message: String,
     onRetry: () -> Unit,
@@ -116,7 +136,10 @@ private fun MovieListError(
 }
 
 @Composable
-private fun EmptyMovieList(contentPadding: PaddingValues) {
+private fun EmptyLibraryList(
+    contentPadding: PaddingValues,
+    kind: LibraryKind,
+) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -124,16 +147,20 @@ private fun EmptyMovieList(contentPadding: PaddingValues) {
             .padding(24.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(stringResource(R.string.no_movies))
+        Text(
+            stringResource(
+                if (kind == LibraryKind.Movies) R.string.no_movies else R.string.no_shows,
+            ),
+        )
     }
 }
 
 @Composable
-private fun MovieGrid(
+private fun LibraryGrid(
     contentPadding: PaddingValues,
-    state: MainUiState.Movies,
+    state: MainUiState.Library,
     onRetry: () -> Unit,
-    onMovieSelected: (LoomItem) -> Unit,
+    onItemSelected: (LoomItem) -> Unit,
 ) {
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = 132.dp),
@@ -169,11 +196,11 @@ private fun MovieGrid(
                 }
             }
         }
-        items(state.items, key = { it.id }) { movie ->
+        items(state.items, key = { it.id }) { item ->
             MediaCard(
                 serverUrl = state.serverUrl,
-                item = movie,
-                onClick = { onMovieSelected(movie) },
+                item = item,
+                onClick = { onItemSelected(item) },
                 modifier = Modifier.fillMaxWidth(),
             )
         }

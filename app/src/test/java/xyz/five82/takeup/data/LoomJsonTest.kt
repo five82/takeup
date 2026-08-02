@@ -93,6 +93,28 @@ class LoomJsonTest {
     }
 
     @Test
+    fun `parses episode hierarchy metadata`() {
+        val episode = LoomJson.item(
+            """
+            {
+              "id": 52,
+              "kind": "episode",
+              "title": "A Double Episode",
+              "season_number": 0,
+              "episode_number": 1,
+              "episode_end_number": 2,
+              "release_date": "2026-08-02"
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals(0, episode.seasonNumber)
+        assertEquals(1, episode.episodeNumber)
+        assertEquals(2, episode.episodeEndNumber)
+        assertEquals("2026-08-02", episode.releaseDate)
+    }
+
+    @Test
     fun `parses playback response`() {
         val playback = LoomJson.playback(
             """
