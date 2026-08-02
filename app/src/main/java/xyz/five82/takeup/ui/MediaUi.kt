@@ -101,11 +101,9 @@ internal fun FadingBackdropArtwork(
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            Color.Transparent,
-                            MaterialTheme.colorScheme.background,
-                        ),
+                        0f to Color.Transparent,
+                        0.35f to Color.Transparent,
+                        1f to MaterialTheme.colorScheme.background,
                     ),
                 ),
         )

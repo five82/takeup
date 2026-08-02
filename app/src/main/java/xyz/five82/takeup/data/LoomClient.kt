@@ -89,7 +89,7 @@ internal class LoomClient(
             connection.connectTimeout = connectTimeoutMs
             connection.readTimeout = readTimeoutMs
             connection.setRequestProperty("Accept", "application/json")
-            connection.setRequestProperty("User-Agent", "Takeup/0.5.1")
+            connection.setRequestProperty("User-Agent", "Takeup/0.5.2")
             if (requestBody != null) {
                 connection.doOutput = true
                 connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
