@@ -29,6 +29,7 @@
     <string name="watched">Watched</string>
     <string name="crop_video">Crop</string>
     <string name="fit_video">Fit</string>
+    <string name="hdr_badge">HDR</string>
     <string name="resume_progress">Resume at %1$s &#183; %2$d%% watched</string>
     <string name="loading_playback">Preparing playback&#8230;</string>
     <string name="playback_failed">Playback failed: %1$s</string>

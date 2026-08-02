@@ -23,6 +23,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -50,10 +51,13 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
+import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
@@ -166,6 +170,9 @@ private fun VideoPlayer(
     var playerError by remember(playback.streamUrl) { mutableStateOf<String?>(null) }
     var cropToFill by rememberSaveable(playback.streamUrl) { mutableStateOf(false) }
     var controlsVisible by remember(playback.streamUrl) { mutableStateOf(true) }
+    var hdr10Detected by remember(playback.streamUrl) { mutableStateOf(false) }
+    var firstFrameRendered by remember(playback.streamUrl) { mutableStateOf(false) }
+    var showHdrBadge by remember(playback.streamUrl) { mutableStateOf(false) }
     val resizeMode = if (cropToFill) {
         AspectRatioFrameLayout.RESIZE_MODE_ZOOM
     } else {
@@ -219,6 +226,14 @@ private fun VideoPlayer(
         }
     }
 
+    LaunchedEffect(hdr10Detected, firstFrameRendered) {
+        if (hdr10Detected && firstFrameRendered) {
+            showHdrBadge = true
+            delay(4_000)
+            showHdrBadge = false
+        }
+    }
+
     DisposableEffect(player, lifecycleOwner) {
         val playerListener = object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
@@ -237,6 +252,16 @@ private fun VideoPlayer(
                         append(it)
                     }
                 }
+            }
+
+            override fun onTracksChanged(tracks: Tracks) {
+                if (!hdr10Detected && tracks.hasSelectedHdr10Track()) {
+                    hdr10Detected = true
+                }
+            }
+
+            override fun onRenderedFirstFrame() {
+                firstFrameRendered = true
             }
         }
         val lifecycleObserver = LifecycleEventObserver { _, event ->
@@ -312,7 +337,43 @@ private fun VideoPlayer(
                 onAction = { cropToFill = !cropToFill },
             )
         }
+        if (showHdrBadge) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .windowInsetsPadding(
+                        WindowInsets.safeDrawing.only(
+                            WindowInsetsSides.Top + WindowInsetsSides.Horizontal,
+                        ),
+                    )
+                    .padding(top = 56.dp, end = 16.dp),
+            ) {
+                Surface(
+                    color = Color(0xCC000000),
+                    shape = MaterialTheme.shapes.small,
+                ) {
+                    Text(
+                        text = stringResource(R.string.hdr_badge),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
+            }
+        }
     }
+}
+
+@androidx.annotation.OptIn(markerClass = [UnstableApi::class])
+internal fun isHdr10Track(format: Format): Boolean =
+    format.sampleMimeType != MimeTypes.VIDEO_DOLBY_VISION &&
+        format.colorInfo?.colorTransfer == C.COLOR_TRANSFER_ST2084
+
+private fun Tracks.hasSelectedHdr10Track(): Boolean = groups.any { group ->
+    group.type == C.TRACK_TYPE_VIDEO &&
+        (0 until group.length).any { trackIndex ->
+            group.isTrackSelected(trackIndex) && isHdr10Track(group.getTrackFormat(trackIndex))
+        }
 }
 
 @Composable
