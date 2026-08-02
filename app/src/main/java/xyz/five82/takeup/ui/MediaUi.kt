@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -35,6 +36,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import coil3.compose.AsyncImage
@@ -56,6 +58,42 @@ internal fun NavigationBackButton(
             painter = painterResource(R.drawable.ic_arrow_back),
             contentDescription = stringResource(R.string.navigate_back),
             tint = tint,
+        )
+    }
+}
+
+@Composable
+internal fun MediaOverlayTitle(title: String) {
+    Surface(
+        color = Color(0xCC1C252B),
+        contentColor = Color.White,
+        shape = RoundedCornerShape(18.dp),
+    ) {
+        Text(
+            text = title,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+internal fun MediaOverlayIconButton(
+    iconResource: Int,
+    contentDescription: String,
+    onClick: () -> Unit,
+) {
+    IconButton(
+        onClick = onClick,
+        colors = IconButtonDefaults.iconButtonColors(
+            containerColor = Color(0xCC1C252B),
+            contentColor = Color.White,
+        ),
+    ) {
+        Icon(
+            painter = painterResource(iconResource),
+            contentDescription = contentDescription,
         )
     }
 }

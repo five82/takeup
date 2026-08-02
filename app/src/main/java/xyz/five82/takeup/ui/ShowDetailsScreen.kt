@@ -30,7 +30,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import xyz.five82.takeup.R
 import xyz.five82.takeup.data.LoomItem
@@ -51,21 +50,21 @@ internal fun ShowDetailsScreen(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             TopAppBar(
-                title = {
-                    Text(
-                        text = state.show.title,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                },
+                title = { MediaOverlayTitle(state.show.title) },
                 navigationIcon = {
-                    NavigationBackButton(onClick = onBack, tint = Color.White)
+                    MediaOverlayIconButton(
+                        iconResource = R.drawable.ic_arrow_back,
+                        contentDescription = stringResource(R.string.navigate_back),
+                        onClick = onBack,
+                    )
                 },
                 actions = {
                     if (state.show.tmdbId > 0) {
-                        TextButton(onClick = onEditArtwork) {
-                            Text(stringResource(R.string.artwork), color = Color.White)
-                        }
+                        MediaOverlayIconButton(
+                            iconResource = R.drawable.ic_artwork,
+                            contentDescription = stringResource(R.string.artwork),
+                            onClick = onEditArtwork,
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
