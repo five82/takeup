@@ -26,7 +26,7 @@ Single-developer hobby project - prefer simple, maintainable solutions over clev
 
 ## Build, Test, Lint
 
-Run the same tests, Android lint, and debug build used by Forgejo CI:
+Run the canonical local tests, Android lint, and debug build:
 
 ```bash
 ./check-ci.sh

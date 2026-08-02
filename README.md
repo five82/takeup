@@ -43,7 +43,7 @@ responses that predate dynamic-range and channel-layout stream metadata.
 
 ## Verify
 
-Run the same unit tests, Android lint, and debug build used by Forgejo CI:
+Run the canonical local unit tests, Android lint, and debug build:
 
 ```bash
 ./check-ci.sh

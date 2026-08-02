@@ -1,5 +1,5 @@
 #!/bin/bash
-# Local CI check for Takeup. Mirrors the Forgejo Actions workflow.
+# Canonical local verification for Takeup.
 
 set -euo pipefail
 
