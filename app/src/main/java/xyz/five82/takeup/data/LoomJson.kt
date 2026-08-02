@@ -43,22 +43,13 @@ internal object LoomJson {
         val media = value.getAsJsonObject("media")
         val streamValues = media?.get("streams")
         val streams = when {
-            streamValues == null || streamValues.isJsonNull -> emptyList()
-            !streamValues.isJsonArray -> throw JsonParseException("Loom media streams must be an array")
-            else -> streamValues.asJsonArray.map { element ->
-                val stream = element.asJsonObject
-                MediaStream(
-                    kind = stream.requiredString("kind"),
-                    codec = stream.string("codec"),
-                    profile = stream.string("profile"),
-                    width = stream.int("width"),
-                    height = stream.int("height"),
-                    channels = stream.int("channels"),
-                    channelLayout = stream.string("channel_layout"),
-                    dynamicRange = stream.string("dynamic_range"),
-                    isDefault = stream.boolean("is_default"),
-                )
+            media == null -> emptyList()
+            streamValues == null || streamValues.isJsonNull -> {
+                throw JsonParseException("Loom media is missing streams")
             }
+            !streamValues.isJsonArray -> throw JsonParseException("Loom media streams must be an array")
+            streamValues.asJsonArray.isEmpty -> throw JsonParseException("Loom media streams are empty")
+            else -> streamValues.asJsonArray.map { element -> mediaStream(element.asJsonObject) }
         }
         val progress = value.getAsJsonObject("progress")?.let {
             PlaybackProgress(
@@ -89,6 +80,41 @@ internal object LoomJson {
         )
     }
 
+    private fun mediaStream(stream: JsonObject): MediaStream {
+        val kind = stream.requiredString("kind")
+        val codec = stream.requiredString("codec")
+        return when (kind) {
+            "video" -> MediaStream(
+                kind = kind,
+                codec = codec,
+                profile = stream.string("profile"),
+                width = stream.requiredPositiveInt("width"),
+                height = stream.requiredPositiveInt("height"),
+                dynamicRange = when (stream.requiredString("dynamic_range")) {
+                    "sdr" -> MediaDynamicRange.SDR
+                    "hdr" -> MediaDynamicRange.HDR
+                    "dolby_vision" -> MediaDynamicRange.DOLBY_VISION
+                    else -> throw JsonParseException("Loom video stream has invalid dynamic_range")
+                },
+                isDefault = stream.requiredBoolean("is_default"),
+            )
+            "audio" -> MediaStream(
+                kind = kind,
+                codec = codec,
+                profile = stream.string("profile"),
+                channels = stream.requiredPositiveInt("channels"),
+                channelLayout = stream.requiredString("channel_layout"),
+                isDefault = stream.requiredBoolean("is_default"),
+            )
+            "subtitle" -> MediaStream(
+                kind = kind,
+                codec = codec,
+                isDefault = stream.requiredBoolean("is_default"),
+            )
+            else -> throw JsonParseException("Loom media contains an unsupported stream kind")
+        }
+    }
+
     private fun objectFrom(body: String): JsonObject = try {
         JsonParser.parseString(body).asJsonObject
     } catch (error: RuntimeException) {
@@ -107,6 +133,14 @@ internal object LoomJson {
 
     private fun JsonObject.int(name: String): Int =
         get(name)?.takeUnless { it.isJsonNull }?.asInt ?: 0
+
+    private fun JsonObject.requiredPositiveInt(name: String): Int =
+        int(name).takeIf { it > 0 }
+            ?: throw JsonParseException("Loom response is missing $name")
+
+    private fun JsonObject.requiredBoolean(name: String): Boolean =
+        get(name)?.takeUnless { it.isJsonNull }?.asBoolean
+            ?: throw JsonParseException("Loom response is missing $name")
 
     private fun JsonObject.boolean(name: String): Boolean =
         get(name)?.takeUnless { it.isJsonNull }?.asBoolean ?: false

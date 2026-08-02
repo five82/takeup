@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.util.Locale
 import xyz.five82.takeup.data.LoomItem
+import xyz.five82.takeup.data.MediaDynamicRange
 import xyz.five82.takeup.data.MediaStream
 
 class MediaCardTest {
@@ -45,7 +46,7 @@ class MediaCardTest {
                     profile = "Main 10",
                     width = 3840,
                     height = 1604,
-                    dynamicRange = "hdr",
+                    dynamicRange = MediaDynamicRange.HDR,
                     isDefault = true,
                 ),
                 MediaStream(
@@ -68,7 +69,7 @@ class MediaCardTest {
     }
 
     @Test
-    fun `formats SD Dolby Vision and channel count fallbacks`() {
+    fun `formats SD Dolby Vision and stereo layout`() {
         val item = episode(season = 1, episode = 2).copy(
             mediaStreams = listOf(
                 MediaStream(
@@ -76,9 +77,14 @@ class MediaCardTest {
                     codec = "mpeg4",
                     width = 624,
                     height = 352,
-                    dynamicRange = "dolby_vision",
+                    dynamicRange = MediaDynamicRange.DOLBY_VISION,
                 ),
-                MediaStream(kind = "audio", codec = "mp3", channels = 2),
+                MediaStream(
+                    kind = "audio",
+                    codec = "mp3",
+                    channels = 2,
+                    channelLayout = "stereo",
+                ),
             ),
         )
 

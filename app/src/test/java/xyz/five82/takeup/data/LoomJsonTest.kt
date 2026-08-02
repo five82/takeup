@@ -110,10 +110,37 @@ class LoomJsonTest {
         assertEquals(6_960_000L, item.mediaDurationMs)
         assertEquals(2, item.mediaStreams.size)
         assertEquals("Main 10", item.mediaStreams[0].profile)
-        assertEquals("hdr", item.mediaStreams[0].dynamicRange)
+        assertEquals(MediaDynamicRange.HDR, item.mediaStreams[0].dynamicRange)
         assertEquals("7.1", item.mediaStreams[1].channelLayout)
         assertEquals(600000L, item.progress?.resumePositionMs)
         assertFalse(item.progress?.played ?: true)
+    }
+
+    @Test
+    fun `rejects media from Loom without technical stream metadata`() {
+        assertThrows(JsonParseException::class.java) {
+            LoomJson.item(
+                """
+                {
+                  "id": 42,
+                  "kind": "movie",
+                  "title": "Arrival",
+                  "media": {
+                    "duration_ms": 6960000,
+                    "streams": [
+                      {
+                        "kind": "video",
+                        "codec": "hevc",
+                        "width": 3840,
+                        "height": 1604,
+                        "is_default": true
+                      }
+                    ]
+                  }
+                }
+                """.trimIndent(),
+            )
+        }
     }
 
     @Test

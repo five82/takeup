@@ -697,7 +697,7 @@ internal class MainViewModel(
         is ConnectException -> "Takeup could not connect to Loom. Check the address and server."
         is SocketTimeoutException -> "The Loom server did not respond in time."
         is LoomHttpException -> error.message ?: "Loom rejected the request."
-        is JsonParseException -> "Loom returned data that Takeup could not read."
+        is JsonParseException -> "Loom returned incompatible data. Make sure Loom is up to date."
         is IOException -> "The connection to Loom was interrupted. Try again."
         is SecurityException -> "Local network access is not available."
         is IllegalArgumentException -> error.message ?: "The server address is invalid."

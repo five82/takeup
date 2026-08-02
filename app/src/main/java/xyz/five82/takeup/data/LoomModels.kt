@@ -70,9 +70,15 @@ data class MediaStream(
     val height: Int = 0,
     val channels: Int = 0,
     val channelLayout: String = "",
-    val dynamicRange: String = "",
+    val dynamicRange: MediaDynamicRange? = null,
     val isDefault: Boolean = false,
 )
+
+enum class MediaDynamicRange {
+    SDR,
+    HDR,
+    DOLBY_VISION,
+}
 
 data class PlaybackProgress(
     val positionMs: Long,

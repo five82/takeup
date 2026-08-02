@@ -39,6 +39,7 @@ import coil3.request.crossfade
 import java.util.Locale
 import xyz.five82.takeup.R
 import xyz.five82.takeup.data.LoomItem
+import xyz.five82.takeup.data.MediaDynamicRange
 import xyz.five82.takeup.data.MediaStream
 
 @Composable
@@ -192,28 +193,19 @@ private fun MediaStream.resolutionLabel(): String? {
 }
 
 private fun MediaStream.dynamicRangeLabel(): String? = when (dynamicRange) {
-    "dolby_vision" -> "Dolby Vision"
-    "hdr" -> "HDR"
-    "sdr" -> "SDR"
-    else -> null
+    MediaDynamicRange.DOLBY_VISION -> "Dolby Vision"
+    MediaDynamicRange.HDR -> "HDR"
+    MediaDynamicRange.SDR -> "SDR"
+    null -> null
 }
 
 private fun MediaStream.channelLayoutLabel(): String? {
-    if (channelLayout.isNotBlank()) {
-        val layout = channelLayout.substringBefore('(')
-        return when (layout.lowercase(Locale.ROOT)) {
-            "mono" -> "Mono"
-            "stereo" -> "Stereo"
-            else -> layout
-        }
-    }
-    return when (channels) {
-        1 -> "Mono"
-        2 -> "Stereo"
-        6 -> "5.1"
-        8 -> "7.1"
-        in 3..Int.MAX_VALUE -> "$channels ch"
-        else -> null
+    if (channelLayout.isBlank()) return null
+    val layout = channelLayout.substringBefore('(')
+    return when (layout.lowercase(Locale.ROOT)) {
+        "mono" -> "Mono"
+        "stereo" -> "Stereo"
+        else -> layout
     }
 }
 
