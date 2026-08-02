@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+
 package xyz.five82.takeup.ui
 
 import androidx.activity.compose.BackHandler
@@ -15,18 +17,22 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MediumFlexibleTopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -34,7 +40,7 @@ import androidx.compose.ui.unit.dp
 import xyz.five82.takeup.R
 import xyz.five82.takeup.data.LoomItem
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun LibraryListScreen(
     state: MainUiState.Library,
@@ -43,12 +49,14 @@ internal fun LibraryListScreen(
     onItemSelected: (LoomItem) -> Unit,
 ) {
     BackHandler(onBack = onBack)
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            TopAppBar(
+            MediumFlexibleTopAppBar(
                 title = {
                     Text(
-                        stringResource(
+                        text = stringResource(
                             if (state.kind == LibraryKind.Movies) {
                                 R.string.movies
                             } else {
@@ -58,6 +66,7 @@ internal fun LibraryListScreen(
                     )
                 },
                 navigationIcon = { NavigationBackButton(onClick = onBack) },
+                scrollBehavior = scrollBehavior,
             )
         },
     ) { contentPadding ->
@@ -126,7 +135,10 @@ private fun LibraryListError(
                 style = MaterialTheme.typography.bodyLarge,
             )
             Spacer(Modifier.height(16.dp))
-            Button(onClick = onRetry) {
+            Button(
+                onClick = onRetry,
+                shapes = ButtonDefaults.shapes(),
+            ) {
                 Text(stringResource(R.string.retry))
             }
         }
@@ -187,7 +199,10 @@ private fun LibraryGrid(
                                 .padding(16.dp),
                         ) {
                             Text(error, color = MaterialTheme.colorScheme.onErrorContainer)
-                            TextButton(onClick = onRetry) {
+                            TextButton(
+                                onClick = onRetry,
+                                shapes = ButtonDefaults.shapes(),
+                            ) {
                                 Text(stringResource(R.string.retry))
                             }
                         }

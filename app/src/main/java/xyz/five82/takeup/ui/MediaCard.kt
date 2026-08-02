@@ -32,8 +32,9 @@ internal fun MediaCard(
         onClick = onClick,
         modifier = modifier.semantics(mergeDescendants = true) {},
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         ),
+        shape = MaterialTheme.shapes.large,
     ) {
         Column {
             Box(modifier = Modifier.fillMaxWidth()) {

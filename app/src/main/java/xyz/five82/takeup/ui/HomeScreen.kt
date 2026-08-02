@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+
 package xyz.five82.takeup.ui
 
 import androidx.compose.foundation.layout.Arrangement
@@ -15,20 +17,25 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -36,7 +43,7 @@ import androidx.compose.ui.unit.dp
 import xyz.five82.takeup.R
 import xyz.five82.takeup.data.LoomItem
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun HomeScreen(
     state: MainUiState.Home,
@@ -46,18 +53,28 @@ internal fun HomeScreen(
     onShowShows: () -> Unit,
     onItemSelected: (LoomItem) -> Unit,
 ) {
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.app_name)) },
+            LargeFlexibleTopAppBar(
+                title = {
+                    Text(
+                        text = stringResource(R.string.app_name),
+                    )
+                },
                 actions = {
-                    IconButton(onClick = onOpenSettings) {
+                    FilledTonalIconButton(
+                        onClick = onOpenSettings,
+                        shapes = IconButtonDefaults.shapes(),
+                    ) {
                         Icon(
                             painter = painterResource(R.drawable.ic_settings),
                             contentDescription = stringResource(R.string.settings),
                         )
                     }
                 },
+                scrollBehavior = scrollBehavior,
             )
         },
     ) { contentPadding ->
@@ -136,10 +153,16 @@ private fun HomeError(
             )
             Spacer(Modifier.height(16.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = onRetry) {
+                Button(
+                    onClick = onRetry,
+                    shapes = ButtonDefaults.shapes(),
+                ) {
                     Text(stringResource(R.string.retry))
                 }
-                TextButton(onClick = onOpenSettings) {
+                TextButton(
+                    onClick = onOpenSettings,
+                    shapes = ButtonDefaults.shapes(),
+                ) {
                     Text(stringResource(R.string.settings))
                 }
             }
@@ -182,7 +205,10 @@ private fun HomeList(
                                 .padding(16.dp),
                         ) {
                             Text(error, color = MaterialTheme.colorScheme.onErrorContainer)
-                            TextButton(onClick = onRetry) {
+                            TextButton(
+                                onClick = onRetry,
+                                shapes = ButtonDefaults.shapes(),
+                            ) {
                                 Text(stringResource(R.string.retry))
                             }
                         }
@@ -272,10 +298,13 @@ private fun MediaRow(
                 modifier = Modifier.weight(1f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.titleLargeEmphasized,
             )
             if (actionText != null && onAction != null) {
-                TextButton(onClick = onAction) {
+                TextButton(
+                    onClick = onAction,
+                    shapes = ButtonDefaults.shapes(),
+                ) {
                     Text(actionText)
                 }
             }

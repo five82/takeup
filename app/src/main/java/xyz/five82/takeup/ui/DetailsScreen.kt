@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+
 package xyz.five82.takeup.ui
 
 import androidx.activity.compose.BackHandler
@@ -9,18 +11,22 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.progressSemantics
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -31,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import xyz.five82.takeup.R
@@ -40,7 +47,7 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.roundToInt
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun DetailsScreen(
     state: MainUiState.Details,
@@ -113,7 +120,10 @@ internal fun DetailsScreen(
                                 .padding(16.dp),
                         ) {
                             Text(error, color = MaterialTheme.colorScheme.onErrorContainer)
-                            TextButton(onClick = onRetry) {
+                            TextButton(
+                                onClick = onRetry,
+                                shapes = ButtonDefaults.shapes(),
+                            ) {
                                 Text(stringResource(R.string.retry))
                             }
                         }
@@ -121,81 +131,99 @@ internal fun DetailsScreen(
                 }
             }
             item {
-                Row(
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalAlignment = Alignment.Top,
+                Surface(
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainer,
+                    shape = MaterialTheme.shapes.extraLarge,
                 ) {
-                    MediaArtwork(
-                        url = state.item.posterUrl(state.serverUrl),
-                        modifier = Modifier
-                            .width(112.dp)
-                            .aspectRatio(2f / 3f)
-                            .clip(RoundedCornerShape(10.dp)),
-                    )
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.Top,
                     ) {
-                        val logoUrl = if (state.item.kind == "movie") {
-                            state.item.logoUrl(state.serverUrl)
-                        } else {
-                            null
-                        }
-                        if (logoUrl != null) {
-                            TitleLogo(
-                                url = logoUrl,
-                                title = state.item.title,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                        } else {
-                            Text(
-                                text = state.item.title,
-                                style = MaterialTheme.typography.headlineSmall,
-                            )
-                        }
-                        val seriesContext = listOf(
-                            state.item.seriesTitle,
-                            state.item.seasonTitle,
-                        ).filter { it.isNotBlank() }.joinToString(" \u00B7 ")
-                        if (seriesContext.isNotBlank()) {
-                            Text(
-                                text = seriesContext,
-                                color = MaterialTheme.colorScheme.primary,
-                                style = MaterialTheme.typography.titleMedium,
-                            )
-                        }
-                        val metadata = listOfNotNull(
-                            state.item.subtitle(),
-                            state.item.mediaDurationMs.takeIf { it > 0 }?.let(::formatRuntime),
-                            state.item.releaseDate
-                                .takeIf { state.item.kind == "episode" && it.isNotBlank() }
-                                ?.let(::formatReleaseDate),
-                        ).joinToString(" \u00B7 ")
-                        if (metadata.isNotBlank()) {
-                            Text(
-                                text = metadata,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                style = MaterialTheme.typography.bodyLarge,
-                            )
-                        }
-                        state.item.progress?.let { progress ->
-                            PlaybackStatus(progress)
-                        }
-                        Button(
-                            onClick = onPlay,
-                            enabled = !state.isLoading,
-                            modifier = Modifier.fillMaxWidth(),
+                        MediaArtwork(
+                            url = state.item.posterUrl(state.serverUrl),
+                            modifier = Modifier
+                                .width(112.dp)
+                                .aspectRatio(2f / 3f)
+                                .clip(MaterialTheme.shapes.medium),
+                        )
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            Text(
-                                stringResource(
-                                    if ((state.item.progress?.resumePositionMs ?: 0L) > 0) {
-                                        R.string.resume
-                                    } else {
-                                        R.string.play
-                                    },
+                            val logoUrl = if (state.item.kind == "movie") {
+                                state.item.logoUrl(state.serverUrl)
+                            } else {
+                                null
+                            }
+                            if (logoUrl != null) {
+                                TitleLogo(
+                                    url = logoUrl,
+                                    title = state.item.title,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            } else {
+                                Text(
+                                    text = state.item.title,
+                                    style = MaterialTheme.typography.headlineSmallEmphasized,
+                                )
+                            }
+                            val seriesContext = listOf(
+                                state.item.seriesTitle,
+                                state.item.seasonTitle,
+                            ).filter { it.isNotBlank() }.joinToString(" \u00B7 ")
+                            if (seriesContext.isNotBlank()) {
+                                Text(
+                                    text = seriesContext,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    style = MaterialTheme.typography.titleMedium,
+                                )
+                            }
+                            val metadata = listOfNotNull(
+                                state.item.subtitle(),
+                                state.item.mediaDurationMs.takeIf { it > 0 }?.let(::formatRuntime),
+                                state.item.releaseDate
+                                    .takeIf { state.item.kind == "episode" && it.isNotBlank() }
+                                    ?.let(::formatReleaseDate),
+                            ).joinToString(" \u00B7 ")
+                            if (metadata.isNotBlank()) {
+                                Text(
+                                    text = metadata,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                )
+                            }
+                            state.item.progress?.let { progress ->
+                                PlaybackStatus(progress)
+                            }
+                            Button(
+                                onClick = onPlay,
+                                shapes = ButtonDefaults.shapesFor(
+                                    ButtonDefaults.MediumContainerHeight,
                                 ),
-                            )
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(ButtonDefaults.MediumContainerHeight),
+                                enabled = !state.isLoading,
+                                contentPadding = ButtonDefaults.contentPaddingFor(
+                                    ButtonDefaults.MediumContainerHeight,
+                                ),
+                            ) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_play),
+                                    contentDescription = null,
+                                )
+                                Text(
+                                    stringResource(
+                                        if ((state.item.progress?.resumePositionMs ?: 0L) > 0) {
+                                            R.string.resume
+                                        } else {
+                                            R.string.play
+                                        },
+                                    ),
+                                )
+                            }
                         }
                     }
                 }

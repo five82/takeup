@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+
 package xyz.five82.takeup.ui
 
 import androidx.activity.compose.BackHandler
@@ -15,22 +17,26 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MediumFlexibleTopAppBar
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -41,7 +47,7 @@ import xyz.five82.takeup.data.ArtworkKind
 import xyz.five82.takeup.data.ArtworkOption
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun ArtworkScreen(
     state: MainUiState.Artwork,
@@ -57,13 +63,15 @@ internal fun ArtworkScreen(
     } else {
         ArtworkKind.entries
     }
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            TopAppBar(
+            MediumFlexibleTopAppBar(
                 title = {
                     Text(
                         text = stringResource(R.string.artwork_title, state.item.title),
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
                 },
@@ -71,11 +79,13 @@ internal fun ArtworkScreen(
                 actions = {
                     TextButton(
                         onClick = onReset,
+                        shapes = ButtonDefaults.shapes(),
                         enabled = state.options.isNotEmpty() && !state.isLoading && !state.isSaving,
                     ) {
                         Text(stringResource(R.string.reset_artwork))
                     }
                 },
+                scrollBehavior = scrollBehavior,
             )
         },
     ) { contentPadding ->
@@ -103,11 +113,15 @@ internal fun ArtworkScreen(
                 Surface(
                     modifier = Modifier.padding(12.dp),
                     color = MaterialTheme.colorScheme.errorContainer,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = MaterialTheme.shapes.large,
                 ) {
                     Column(Modifier.padding(16.dp)) {
                         Text(error, color = MaterialTheme.colorScheme.onErrorContainer)
-                        TextButton(onClick = onRetry, enabled = !state.isSaving) {
+                        TextButton(
+                            onClick = onRetry,
+                            shapes = ButtonDefaults.shapes(),
+                            enabled = !state.isSaving,
+                        ) {
                             Text(stringResource(R.string.retry))
                         }
                     }
@@ -180,9 +194,11 @@ private fun ArtworkOptionCard(
             null
         },
         colors = CardDefaults.cardColors(
-            disabledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             disabledContentColor = MaterialTheme.colorScheme.onSurface,
         ),
+        shape = MaterialTheme.shapes.large,
     ) {
         Box {
             MediaArtwork(

@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+
 package xyz.five82.takeup
 
 import android.content.Intent
@@ -15,9 +17,15 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -147,7 +155,22 @@ private fun TakeupApp(viewModel: MainViewModel) {
         }
     }
 
-    when (val current = state) {
+    val motionScheme = MaterialTheme.motionScheme
+    AnimatedContent(
+        targetState = state,
+        contentKey = { it::class },
+        transitionSpec = {
+            (
+                fadeIn(motionScheme.defaultEffectsSpec()) +
+                    scaleIn(motionScheme.defaultSpatialSpec(), initialScale = 0.98f)
+                ) togetherWith (
+                fadeOut(motionScheme.fastEffectsSpec()) +
+                    scaleOut(motionScheme.fastSpatialSpec(), targetScale = 1.01f)
+                )
+        },
+        label = "screen",
+    ) { animatedState ->
+        when (val current = animatedState) {
         MainUiState.Starting -> StartingScreen()
         is MainUiState.Connect -> SettingsScreen(
             state = current,
@@ -229,6 +252,7 @@ private fun TakeupApp(viewModel: MainViewModel) {
                 )
             },
         )
+        }
     }
 }
 
@@ -238,6 +262,6 @@ private fun StartingScreen() {
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center,
     ) {
-        CircularProgressIndicator()
+        LoadingIndicator()
     }
 }

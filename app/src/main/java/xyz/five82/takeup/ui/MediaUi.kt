@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+
 package xyz.five82.takeup.ui
 
 import androidx.activity.compose.LocalActivity
@@ -52,7 +54,10 @@ internal fun NavigationBackButton(
     onClick: () -> Unit,
     tint: Color = LocalContentColor.current,
 ) {
-    IconButton(onClick = onClick) {
+    IconButton(
+        onClick = onClick,
+        shapes = IconButtonDefaults.shapes(),
+    ) {
         Icon(
             painter = painterResource(R.drawable.ic_arrow_back),
             contentDescription = stringResource(R.string.navigate_back),
@@ -69,6 +74,7 @@ internal fun MediaOverlayIconButton(
 ) {
     IconButton(
         onClick = onClick,
+        shapes = IconButtonDefaults.shapes(),
         colors = IconButtonDefaults.iconButtonColors(
             containerColor = Color(0xCC1C252B),
             contentColor = Color.White,
@@ -206,7 +212,7 @@ internal fun MediaBadges(
             Surface(
                 color = MaterialTheme.colorScheme.secondaryContainer,
                 contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                shape = RoundedCornerShape(6.dp),
+                shape = MaterialTheme.shapes.extraLarge,
             ) {
                 Text(
                     text = label,
@@ -306,7 +312,7 @@ internal fun PosterCardPlaceholder(modifier: Modifier = Modifier) {
             Modifier
                 .fillMaxWidth()
                 .aspectRatio(2f / 3f)
-                .clip(RoundedCornerShape(12.dp))
+                .clip(MaterialTheme.shapes.large)
                 .background(placeholder),
         )
         Box(
@@ -339,7 +345,7 @@ internal fun EpisodeCardPlaceholder(modifier: Modifier = Modifier) {
             Modifier
                 .width(128.dp)
                 .aspectRatio(16f / 9f)
-                .clip(RoundedCornerShape(8.dp))
+                .clip(MaterialTheme.shapes.medium)
                 .background(placeholder),
         )
         Column(

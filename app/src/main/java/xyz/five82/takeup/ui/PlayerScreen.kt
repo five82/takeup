@@ -1,10 +1,25 @@
+@file:OptIn(
+    androidx.compose.material3.ExperimentalMaterial3Api::class,
+    androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class,
+)
+@file:androidx.annotation.OptIn(
+    markerClass = [
+        androidx.media3.common.util.ExperimentalApi::class,
+        androidx.media3.common.util.UnstableApi::class,
+    ],
+)
+
 package xyz.five82.takeup.ui
 
-import android.view.View
 import android.view.ViewGroup
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -20,13 +35,24 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ButtonGroup
+import androidx.compose.material3.ContainedLoadingIndicator
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -34,6 +60,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -41,8 +68,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -61,11 +91,17 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import androidx.media3.ui.compose.material3.indicator.PositionAndDurationText
+import androidx.media3.ui.compose.material3.indicator.ProgressSlider
+import androidx.media3.ui.compose.state.rememberPlayPauseButtonState
+import androidx.media3.ui.compose.state.rememberSeekBackButtonState
+import androidx.media3.ui.compose.state.rememberSeekForwardButtonState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import xyz.five82.takeup.R
@@ -138,7 +174,7 @@ private fun PlaybackLoading() {
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            CircularProgressIndicator()
+            LoadingIndicator()
             Spacer(Modifier.height(12.dp))
             Text(stringResource(R.string.loading_playback), color = Color.White)
         }
@@ -162,7 +198,10 @@ private fun PlaybackError(
                 color = MaterialTheme.colorScheme.error,
             )
             Spacer(Modifier.height(16.dp))
-            Button(onClick = onRetry) {
+            Button(
+                onClick = onRetry,
+                shapes = ButtonDefaults.shapes(),
+            ) {
                 Text(stringResource(R.string.retry))
             }
         }
@@ -186,12 +225,17 @@ private fun VideoPlayer(
     var playerError by remember(playback.streamUrl) { mutableStateOf<String?>(null) }
     var cropToFill by rememberSaveable(playback.streamUrl) { mutableStateOf(false) }
     var controlsVisible by remember(playback.streamUrl) { mutableStateOf(true) }
+    var controlsInteraction by remember(playback.streamUrl) { mutableIntStateOf(0) }
+    var isPlaying by remember(playback.streamUrl) { mutableStateOf(false) }
+    var isBuffering by remember(playback.streamUrl) { mutableStateOf(true) }
     var hdr10Detected by remember(playback.streamUrl) { mutableStateOf(false) }
     var firstFrameRendered by remember(playback.streamUrl) { mutableStateOf(false) }
     var showHdrBadge by remember(playback.streamUrl) { mutableStateOf(false) }
     var playbackEnded by remember(playback.streamUrl) { mutableStateOf(false) }
     var selectedAudioLabel by remember(playback.streamUrl) { mutableStateOf<String?>(null) }
     var selectedSubtitleLabel by remember(playback.streamUrl) { mutableStateOf<String?>(null) }
+    var currentTracks by remember(playback.streamUrl) { mutableStateOf(Tracks.EMPTY) }
+    var showPlaybackOptions by remember(playback.streamUrl) { mutableStateOf(false) }
     val resizeMode = if (cropToFill) {
         AspectRatioFrameLayout.RESIZE_MODE_ZOOM
     } else {
@@ -256,14 +300,16 @@ private fun VideoPlayer(
     DisposableEffect(player, lifecycleOwner) {
         val playerListener = object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
+                isBuffering = playbackState == Player.STATE_BUFFERING
                 if (playbackState == Player.STATE_ENDED) {
                     saveProgress()
                     playbackEnded = true
                 }
             }
 
-            override fun onIsPlayingChanged(isPlaying: Boolean) {
-                if (isPlaying) playbackEnded = false
+            override fun onIsPlayingChanged(playing: Boolean) {
+                isPlaying = playing
+                if (playing) playbackEnded = false
             }
 
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
@@ -282,6 +328,7 @@ private fun VideoPlayer(
             }
 
             override fun onTracksChanged(tracks: Tracks) {
+                currentTracks = tracks
                 if (!hdr10Detected && tracks.hasSelectedHdr10Track()) {
                     hdr10Detected = true
                 }
@@ -316,11 +363,40 @@ private fun VideoPlayer(
         playback.contextTitle.takeIf { it.isNotBlank() },
         listOfNotNull(audioText, subtitleText).joinToString(" \u00B7 ").ifBlank { null },
     ).joinToString("  |  ")
+    val onControlsInteraction: () -> Unit = {
+        controlsVisible = true
+        controlsInteraction = controlsInteraction + 1
+    }
+
+    LaunchedEffect(
+        controlsVisible,
+        controlsInteraction,
+        isPlaying,
+        playbackEnded,
+        playerError,
+        showPlaybackOptions,
+    ) {
+        if (
+            controlsVisible && isPlaying && !playbackEnded &&
+            playerError == null && !showPlaybackOptions
+        ) {
+            delay(4_000)
+            controlsVisible = false
+        }
+    }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black),
+            .background(Color.Black)
+            .pointerInput(playback.streamUrl, playbackEnded, playerError) {
+                detectTapGestures {
+                    if (!playbackEnded && playerError == null) {
+                        controlsVisible = !controlsVisible
+                        controlsInteraction++
+                    }
+                }
+            },
     ) {
         AndroidView(
             factory = { viewContext ->
@@ -332,15 +408,8 @@ private fun VideoPlayer(
                     this.player = player
                     this.resizeMode = resizeMode
                     keepScreenOn = true
-                    useController = true
-                    controllerAutoShow = true
-                    setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
-                    setShowSubtitleButton(true)
-                    setControllerVisibilityListener(
-                        PlayerView.ControllerVisibilityListener { visibility ->
-                            controlsVisible = visibility == View.VISIBLE
-                        },
-                    )
+                    useController = false
+                    setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
                 }
             },
             update = {
@@ -349,6 +418,32 @@ private fun VideoPlayer(
             },
             modifier = Modifier.fillMaxSize(),
         )
+        if (isBuffering && !controlsVisible && playerError == null) {
+            ContainedLoadingIndicator(modifier = Modifier.align(Alignment.Center))
+        }
+        AnimatedVisibility(
+            visible = controlsVisible && !playbackEnded && playerError == null,
+            enter = fadeIn(),
+            exit = fadeOut(),
+        ) {
+            PlaybackControls(
+                player = player,
+                title = playback.title,
+                supportingText = supportingText,
+                cropToFill = cropToFill,
+                isBuffering = isBuffering,
+                onBack = onBack,
+                onToggleCrop = {
+                    cropToFill = !cropToFill
+                    onControlsInteraction()
+                },
+                onShowOptions = {
+                    showPlaybackOptions = true
+                    onControlsInteraction()
+                },
+                onInteraction = onControlsInteraction,
+            )
+        }
         playerError?.let { error ->
             PlaybackFailureOverlay(
                 message = error,
@@ -358,17 +453,6 @@ private fun VideoPlayer(
                     player.play()
                 },
                 onBack = onBack,
-            )
-        }
-        if (controlsVisible || playbackEnded || playerError != null) {
-            PlaybackHeader(
-                title = playback.title,
-                supportingText = supportingText,
-                onBack = onBack,
-                actionText = stringResource(
-                    if (cropToFill) R.string.fit_video else R.string.crop_video,
-                ),
-                onAction = { cropToFill = !cropToFill },
             )
         }
         if (playbackEnded) {
@@ -384,6 +468,30 @@ private fun VideoPlayer(
                     player.play()
                 },
                 onBack = if (canReturnToSeason) onBackToSeason else onBack,
+            )
+        }
+        if (showPlaybackOptions) {
+            PlaybackOptionsSheet(
+                tracks = currentTracks,
+                onDismiss = { showPlaybackOptions = false },
+                onSelectTrack = { group, trackIndex ->
+                    player.trackSelectionParameters = player.trackSelectionParameters
+                        .buildUpon()
+                        .setTrackTypeDisabled(group.type, false)
+                        .setOverrideForType(
+                            TrackSelectionOverride(group.mediaTrackGroup, trackIndex),
+                        )
+                        .build()
+                    showPlaybackOptions = false
+                },
+                onDisableSubtitles = {
+                    player.trackSelectionParameters = player.trackSelectionParameters
+                        .buildUpon()
+                        .clearOverridesOfType(C.TRACK_TYPE_TEXT)
+                        .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+                        .build()
+                    showPlaybackOptions = false
+                },
             )
         }
         if (showHdrBadge) {
@@ -414,6 +522,262 @@ private fun VideoPlayer(
 }
 
 @Composable
+private fun PlaybackControls(
+    player: Player,
+    title: String,
+    supportingText: String,
+    cropToFill: Boolean,
+    isBuffering: Boolean,
+    onBack: () -> Unit,
+    onToggleCrop: () -> Unit,
+    onShowOptions: () -> Unit,
+    onInteraction: () -> Unit,
+) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        PlaybackHeader(
+            title = title,
+            supportingText = supportingText,
+            onBack = onBack,
+            actionText = stringResource(
+                if (cropToFill) R.string.fit_video else R.string.crop_video,
+            ),
+            onAction = onToggleCrop,
+            onOptions = onShowOptions,
+        )
+        if (isBuffering) {
+            ContainedLoadingIndicator(modifier = Modifier.align(Alignment.Center))
+        } else {
+            PlaybackButtonGroup(
+                player = player,
+                onInteraction = onInteraction,
+                modifier = Modifier.align(Alignment.Center),
+            )
+        }
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(Color.Transparent, Color.Black.copy(alpha = 0.88f)),
+                    ),
+                )
+                .windowInsetsPadding(
+                    WindowInsets.safeDrawing.only(
+                        WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal,
+                    ),
+                )
+                .padding(start = 20.dp, top = 32.dp, end = 20.dp, bottom = 12.dp),
+        ) {
+            ProgressSlider(
+                player = player,
+                modifier = Modifier.fillMaxWidth(),
+                onValueChange = { onInteraction() },
+                onValueChangeFinished = onInteraction,
+            )
+            ProvideTextStyle(MaterialTheme.typography.labelLargeEmphasized) {
+                PositionAndDurationText(
+                    player = player,
+                    color = Color.White,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlaybackButtonGroup(
+    player: Player,
+    onInteraction: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val playPauseState = rememberPlayPauseButtonState(player)
+    val seekBackState = rememberSeekBackButtonState(player)
+    val seekForwardState = rememberSeekForwardButtonState(player)
+    val mediumShapes = IconButtonDefaults.shapes(
+        shape = IconButtonDefaults.mediumRoundShape,
+        pressedShape = IconButtonDefaults.mediumPressedShape,
+    )
+    val extraLargeShapes = IconButtonDefaults.shapes(
+        shape = IconButtonDefaults.extraLargeRoundShape,
+        pressedShape = IconButtonDefaults.extraLargePressedShape,
+    )
+
+    ButtonGroup(
+        overflowIndicator = {},
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        customItem(
+            buttonGroupContent = {
+                FilledTonalIconButton(
+                    onClick = {
+                        seekBackState.onClick()
+                        onInteraction()
+                    },
+                    shapes = mediumShapes,
+                    modifier = Modifier.size(64.dp),
+                    enabled = seekBackState.isEnabled,
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_seek_back_10),
+                        contentDescription = stringResource(R.string.seek_back_10),
+                        modifier = Modifier.size(28.dp),
+                    )
+                }
+            },
+            menuContent = {},
+        )
+        customItem(
+            buttonGroupContent = {
+                FilledIconButton(
+                    onClick = {
+                        playPauseState.onClick()
+                        onInteraction()
+                    },
+                    shapes = extraLargeShapes,
+                    modifier = Modifier.size(96.dp),
+                    enabled = playPauseState.isEnabled,
+                ) {
+                    Icon(
+                        painter = painterResource(
+                            if (playPauseState.showPlay) R.drawable.ic_play else R.drawable.ic_pause,
+                        ),
+                        contentDescription = stringResource(
+                            if (playPauseState.showPlay) R.string.play else R.string.pause,
+                        ),
+                        modifier = Modifier.size(40.dp),
+                    )
+                }
+            },
+            menuContent = {},
+        )
+        customItem(
+            buttonGroupContent = {
+                FilledTonalIconButton(
+                    onClick = {
+                        seekForwardState.onClick()
+                        onInteraction()
+                    },
+                    shapes = mediumShapes,
+                    modifier = Modifier.size(64.dp),
+                    enabled = seekForwardState.isEnabled,
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_seek_forward_10),
+                        contentDescription = stringResource(R.string.seek_forward_10),
+                        modifier = Modifier.size(28.dp),
+                    )
+                }
+            },
+            menuContent = {},
+        )
+    }
+}
+
+private data class PlaybackTrackOption(
+    val group: Tracks.Group,
+    val trackIndex: Int,
+    val label: String,
+    val selected: Boolean,
+)
+
+private fun Tracks.optionsFor(trackType: Int): List<PlaybackTrackOption> = groups
+    .asSequence()
+    .filter { it.type == trackType }
+    .flatMap { group ->
+        (0 until group.length).asSequence()
+            .filter(group::isTrackSupported)
+            .map { trackIndex ->
+                PlaybackTrackOption(
+                    group = group,
+                    trackIndex = trackIndex,
+                    label = trackLabel(group.getTrackFormat(trackIndex)),
+                    selected = group.isTrackSelected(trackIndex),
+                )
+            }
+    }
+    .toList()
+
+@Composable
+private fun PlaybackOptionsSheet(
+    tracks: Tracks,
+    onDismiss: () -> Unit,
+    onSelectTrack: (Tracks.Group, Int) -> Unit,
+    onDisableSubtitles: () -> Unit,
+) {
+    val audioOptions = tracks.optionsFor(C.TRACK_TYPE_AUDIO)
+    val subtitleOptions = tracks.optionsFor(C.TRACK_TYPE_TEXT)
+
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 24.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.playback_options),
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+                style = MaterialTheme.typography.headlineSmallEmphasized,
+            )
+            if (audioOptions.isNotEmpty()) {
+                PlaybackOptionsHeading(stringResource(R.string.audio))
+                audioOptions.forEach { option ->
+                    PlaybackTrackRow(
+                        label = option.label,
+                        selected = option.selected,
+                        onClick = { onSelectTrack(option.group, option.trackIndex) },
+                    )
+                }
+            }
+            PlaybackOptionsHeading(stringResource(R.string.subtitles))
+            PlaybackTrackRow(
+                label = stringResource(R.string.off),
+                selected = !tracks.isTypeSelected(C.TRACK_TYPE_TEXT),
+                onClick = onDisableSubtitles,
+            )
+            subtitleOptions.forEach { option ->
+                PlaybackTrackRow(
+                    label = option.label,
+                    selected = option.selected,
+                    onClick = { onSelectTrack(option.group, option.trackIndex) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlaybackOptionsHeading(text: String) {
+    Text(
+        text = text,
+        modifier = Modifier.padding(start = 24.dp, top = 16.dp, end = 24.dp, bottom = 4.dp),
+        color = MaterialTheme.colorScheme.primary,
+        style = MaterialTheme.typography.titleMediumEmphasized,
+    )
+}
+
+@Composable
+private fun PlaybackTrackRow(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    ListItem(
+        modifier = Modifier.clickable(onClick = onClick),
+        trailingContent = {
+            RadioButton(
+                selected = selected,
+                onClick = null,
+            )
+        },
+    ) {
+        Text(label)
+    }
+}
+
+@Composable
 private fun PlaybackFailureOverlay(
     message: String,
     onRetry: () -> Unit,
@@ -427,9 +791,9 @@ private fun PlaybackFailureOverlay(
         contentAlignment = Alignment.Center,
     ) {
         Surface(
-            color = Color(0xF21A181C),
-            shape = MaterialTheme.shapes.large,
-            shadowElevation = 8.dp,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.96f),
+            shape = MaterialTheme.shapes.extraLarge,
+            tonalElevation = 6.dp,
         ) {
             Column(
                 modifier = Modifier
@@ -441,21 +805,25 @@ private fun PlaybackFailureOverlay(
             ) {
                 Text(
                     text = stringResource(R.string.playback_failed_title),
-                    color = Color.White,
-                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.titleLargeEmphasized,
                 )
                 Text(
                     text = message,
-                    color = Color.White.copy(alpha = 0.8f),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = onRetry) {
+                    Button(
+                        onClick = onRetry,
+                        shapes = ButtonDefaults.shapes(),
+                    ) {
                         Text(stringResource(R.string.retry))
                     }
                     TextButton(
                         onClick = onBack,
-                        colors = ButtonDefaults.textButtonColors(contentColor = Color.White),
+                        shapes = ButtonDefaults.shapes(),
+                        colors = ButtonDefaults.textButtonColors(),
                     ) {
                         Text(stringResource(R.string.back_to_details))
                     }
@@ -482,9 +850,9 @@ private fun EndOfPlaybackOverlay(
         contentAlignment = Alignment.Center,
     ) {
         Surface(
-            color = Color(0xF21A181C),
-            shape = MaterialTheme.shapes.large,
-            shadowElevation = 8.dp,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.96f),
+            shape = MaterialTheme.shapes.extraLarge,
+            tonalElevation = 6.dp,
         ) {
             Column(
                 modifier = Modifier
@@ -496,12 +864,12 @@ private fun EndOfPlaybackOverlay(
             ) {
                 Text(
                     text = stringResource(R.string.finished),
-                    color = Color.White,
-                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.titleLargeEmphasized,
                 )
                 Text(
                     text = itemTitle,
-                    color = Color.White.copy(alpha = 0.8f),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.bodyLarge,
@@ -512,27 +880,40 @@ private fun EndOfPlaybackOverlay(
                             nextEpisode.episodeLabel(),
                             nextEpisode.title,
                         ).joinToString(" \u00B7 "),
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleMediumEmphasized,
                     )
                     Button(
                         onClick = onPlayNext,
-                        modifier = Modifier.fillMaxWidth(),
+                        shapes = ButtonDefaults.shapesFor(ButtonDefaults.MediumContainerHeight),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(ButtonDefaults.MediumContainerHeight),
+                        contentPadding = ButtonDefaults.contentPaddingFor(
+                            ButtonDefaults.MediumContainerHeight,
+                        ),
                     ) {
                         Text(stringResource(R.string.play_next))
                     }
                 }
                 OutlinedButton(
                     onClick = onReplay,
-                    modifier = Modifier.fillMaxWidth(),
+                    shapes = ButtonDefaults.shapesFor(ButtonDefaults.MediumContainerHeight),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(ButtonDefaults.MediumContainerHeight),
+                    contentPadding = ButtonDefaults.contentPaddingFor(
+                        ButtonDefaults.MediumContainerHeight,
+                    ),
                 ) {
                     Text(stringResource(R.string.replay))
                 }
                 TextButton(
                     onClick = onBack,
-                    colors = ButtonDefaults.textButtonColors(contentColor = Color.White),
+                    shapes = ButtonDefaults.shapes(),
+                    colors = ButtonDefaults.textButtonColors(),
                 ) {
                     Text(
                         stringResource(
@@ -599,6 +980,7 @@ private fun PlaybackHeader(
     supportingText: String = "",
     actionText: String? = null,
     onAction: (() -> Unit)? = null,
+    onOptions: (() -> Unit)? = null,
 ) {
     Row(
         modifier = Modifier
@@ -635,9 +1017,21 @@ private fun PlaybackHeader(
         if (actionText != null && onAction != null) {
             TextButton(
                 onClick = onAction,
+                shapes = ButtonDefaults.shapes(),
                 colors = ButtonDefaults.textButtonColors(contentColor = Color.White),
             ) {
                 Text(actionText)
+            }
+        }
+        if (onOptions != null) {
+            FilledTonalIconButton(
+                onClick = onOptions,
+                shapes = IconButtonDefaults.shapes(),
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_settings),
+                    contentDescription = stringResource(R.string.playback_options),
+                )
             }
         }
     }

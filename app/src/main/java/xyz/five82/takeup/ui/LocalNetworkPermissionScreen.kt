@@ -10,7 +10,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -19,6 +22,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import xyz.five82.takeup.R
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun LocalNetworkPermissionScreen(
     wasDenied: Boolean,
@@ -32,38 +36,48 @@ internal fun LocalNetworkPermissionScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Column(
+        Surface(
             modifier = Modifier
                 .fillMaxWidth()
                 .widthIn(max = 480.dp),
+            color = MaterialTheme.colorScheme.surfaceContainer,
+            shape = MaterialTheme.shapes.extraLarge,
         ) {
-            Text(
-                text = stringResource(R.string.local_network_title),
-                style = MaterialTheme.typography.headlineLarge,
-            )
-            Spacer(Modifier.height(12.dp))
-            Text(
-                text = stringResource(R.string.local_network_rationale),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodyLarge,
-            )
-            if (wasDenied) {
+            Column(modifier = Modifier.padding(28.dp)) {
+                Text(
+                    text = stringResource(R.string.local_network_title),
+                    style = MaterialTheme.typography.headlineLargeEmphasized,
+                )
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    text = stringResource(R.string.local_network_denied),
-                    color = MaterialTheme.colorScheme.error,
+                    text = stringResource(R.string.local_network_rationale),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyLarge,
                 )
-            }
-            Spacer(Modifier.height(24.dp))
-            Button(
-                onClick = onGrantAccess,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(
-                    stringResource(
-                        if (wasDenied) R.string.open_settings else R.string.grant_access,
+                if (wasDenied) {
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = stringResource(R.string.local_network_denied),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+                Spacer(Modifier.height(24.dp))
+                Button(
+                    onClick = onGrantAccess,
+                    shapes = ButtonDefaults.shapesFor(ButtonDefaults.MediumContainerHeight),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(ButtonDefaults.MediumContainerHeight),
+                    contentPadding = ButtonDefaults.contentPaddingFor(
+                        ButtonDefaults.MediumContainerHeight,
                     ),
-                )
+                ) {
+                    Text(
+                        stringResource(
+                            if (wasDenied) R.string.open_settings else R.string.grant_access,
+                        ),
+                    )
+                }
             }
         }
     }

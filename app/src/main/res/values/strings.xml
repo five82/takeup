@@ -34,6 +34,9 @@
     <string name="back_to_details">Back to details</string>
     <string name="back_to_season">Back to season</string>
     <string name="play">Play</string>
+    <string name="pause">Pause</string>
+    <string name="seek_back_10">Seek back 10 seconds</string>
+    <string name="seek_forward_10">Seek forward 10 seconds</string>
     <string name="play_next">Play next</string>
     <string name="replay">Replay</string>
     <string name="finished">Finished</string>
@@ -56,6 +59,10 @@
     <string name="hdr_badge">HDR</string>
     <string name="audio_track">Audio: %1$s</string>
     <string name="subtitle_track">Subtitles: %1$s</string>
+    <string name="playback_options">Playback options</string>
+    <string name="audio">Audio</string>
+    <string name="subtitles">Subtitles</string>
+    <string name="off">Off</string>
     <string name="resume_progress">Resume at %1$s &#183; %2$d%% watched</string>
     <string name="loading_playback">Preparing playback&#8230;</string>
     <string name="playback_failed_title">Playback stopped</string>
