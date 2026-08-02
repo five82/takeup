@@ -74,7 +74,27 @@ class LoomJsonTest {
               "year": 2016,
               "media": {
                 "id": 7,
-                "duration_ms": 6960000
+                "duration_ms": 6960000,
+                "streams": [
+                  {
+                    "index": 0,
+                    "kind": "video",
+                    "codec": "hevc",
+                    "profile": "Main 10",
+                    "width": 3840,
+                    "height": 1604,
+                    "dynamic_range": "hdr",
+                    "is_default": true
+                  },
+                  {
+                    "index": 1,
+                    "kind": "audio",
+                    "codec": "opus",
+                    "channels": 8,
+                    "channel_layout": "7.1",
+                    "is_default": true
+                  }
+                ]
               },
               "progress": {
                 "position_ms": 600000,
@@ -88,6 +108,10 @@ class LoomJsonTest {
         )
 
         assertEquals(6_960_000L, item.mediaDurationMs)
+        assertEquals(2, item.mediaStreams.size)
+        assertEquals("Main 10", item.mediaStreams[0].profile)
+        assertEquals("hdr", item.mediaStreams[0].dynamicRange)
+        assertEquals("7.1", item.mediaStreams[1].channelLayout)
         assertEquals(600000L, item.progress?.resumePositionMs)
         assertFalse(item.progress?.played ?: true)
     }

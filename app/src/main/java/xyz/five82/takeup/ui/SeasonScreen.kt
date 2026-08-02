@@ -259,6 +259,13 @@ private fun EpisodeCard(
                 episode.progress?.let { PlaybackStatus(it) }
             }
         }
+        val mediaBadges = episode.mediaBadges()
+        if (mediaBadges.isNotEmpty()) {
+            MediaBadges(
+                labels = mediaBadges,
+                modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
+            )
+        }
         if (episode.overview.isNotBlank()) {
             Text(
                 text = episode.overview,

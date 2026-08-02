@@ -165,6 +165,15 @@ internal fun DetailsScreen(
                     }
                 }
             }
+            val mediaBadges = state.item.mediaBadges()
+            if (mediaBadges.isNotEmpty()) {
+                item {
+                    MediaBadges(
+                        labels = mediaBadges,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    )
+                }
+            }
             if (state.item.overview.isNotBlank()) {
                 item {
                     Column(

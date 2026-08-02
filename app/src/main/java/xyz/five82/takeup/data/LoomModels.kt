@@ -18,6 +18,7 @@ data class LoomItem(
     val backdropImageId: Long = 0,
     val backdropImageTag: String = "",
     val mediaDurationMs: Long = 0,
+    val mediaStreams: List<MediaStream> = emptyList(),
     val progress: PlaybackProgress? = null,
     val seriesTitle: String = "",
     val seasonTitle: String = "",
@@ -60,6 +61,18 @@ data class LoomItem(
             .toString()
     }
 }
+
+data class MediaStream(
+    val kind: String,
+    val codec: String,
+    val profile: String = "",
+    val width: Int = 0,
+    val height: Int = 0,
+    val channels: Int = 0,
+    val channelLayout: String = "",
+    val dynamicRange: String = "",
+    val isDefault: Boolean = false,
+)
 
 data class PlaybackProgress(
     val positionMs: Long,

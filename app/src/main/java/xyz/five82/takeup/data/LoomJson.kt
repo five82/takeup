@@ -40,6 +40,26 @@ internal object LoomJson {
     }.getOrNull()
 
     private fun item(value: JsonObject): LoomItem {
+        val media = value.getAsJsonObject("media")
+        val streamValues = media?.get("streams")
+        val streams = when {
+            streamValues == null || streamValues.isJsonNull -> emptyList()
+            !streamValues.isJsonArray -> throw JsonParseException("Loom media streams must be an array")
+            else -> streamValues.asJsonArray.map { element ->
+                val stream = element.asJsonObject
+                MediaStream(
+                    kind = stream.requiredString("kind"),
+                    codec = stream.string("codec"),
+                    profile = stream.string("profile"),
+                    width = stream.int("width"),
+                    height = stream.int("height"),
+                    channels = stream.int("channels"),
+                    channelLayout = stream.string("channel_layout"),
+                    dynamicRange = stream.string("dynamic_range"),
+                    isDefault = stream.boolean("is_default"),
+                )
+            }
+        }
         val progress = value.getAsJsonObject("progress")?.let {
             PlaybackProgress(
                 positionMs = it.long("position_ms"),
@@ -63,7 +83,8 @@ internal object LoomJson {
             posterImageTag = value.string("poster_image_tag"),
             backdropImageId = value.long("backdrop_image_id"),
             backdropImageTag = value.string("backdrop_image_tag"),
-            mediaDurationMs = value.getAsJsonObject("media")?.long("duration_ms") ?: 0L,
+            mediaDurationMs = media?.long("duration_ms") ?: 0L,
+            mediaStreams = streams,
             progress = progress,
         )
     }

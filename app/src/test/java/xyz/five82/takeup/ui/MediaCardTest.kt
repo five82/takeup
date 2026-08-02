@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.util.Locale
 import xyz.five82.takeup.data.LoomItem
+import xyz.five82.takeup.data.MediaStream
 
 class MediaCardTest {
     @Test
@@ -31,6 +32,59 @@ class MediaCardTest {
             episode(season = 1, episode = 2)
                 .copy(seriesTitle = "Test Show", seasonTitle = "Season 1")
                 .episodeContext(),
+        )
+    }
+
+    @Test
+    fun `formats source media badges using default streams`() {
+        val item = episode(season = 1, episode = 2).copy(
+            mediaStreams = listOf(
+                MediaStream(
+                    kind = "video",
+                    codec = "hevc",
+                    profile = "Main 10",
+                    width = 3840,
+                    height = 1604,
+                    dynamicRange = "hdr",
+                    isDefault = true,
+                ),
+                MediaStream(
+                    kind = "audio",
+                    codec = "opus",
+                    channels = 2,
+                    channelLayout = "stereo",
+                ),
+                MediaStream(
+                    kind = "audio",
+                    codec = "opus",
+                    channels = 8,
+                    channelLayout = "7.1",
+                    isDefault = true,
+                ),
+            ),
+        )
+
+        assertEquals(listOf("HEVC", "4K", "HDR", "Opus", "7.1"), item.mediaBadges())
+    }
+
+    @Test
+    fun `formats SD Dolby Vision and channel count fallbacks`() {
+        val item = episode(season = 1, episode = 2).copy(
+            mediaStreams = listOf(
+                MediaStream(
+                    kind = "video",
+                    codec = "mpeg4",
+                    width = 624,
+                    height = 352,
+                    dynamicRange = "dolby_vision",
+                ),
+                MediaStream(kind = "audio", codec = "mp3", channels = 2),
+            ),
+        )
+
+        assertEquals(
+            listOf("MPEG-4", "SD", "Dolby Vision", "MP3", "Stereo"),
+            item.mediaBadges(),
         )
     }
 
