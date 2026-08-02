@@ -5,8 +5,7 @@ This file provides guidance when working with code in this repository.
 ## TL;DR
 
 - Do not create git branches unless explicitly instructed.
-- Run the applicable Gradle verification tasks before handing work back.
-- There is no canonical CI workflow yet; do not invent or assume one.
+- Run `./check-ci.sh` before handing work back.
 
 ## Project
 
@@ -27,16 +26,14 @@ Single-developer hobby project - prefer simple, maintainable solutions over clev
 
 ## Build, Test, Lint
 
-Run the local verification tasks with the Gradle wrapper:
+Run the same tests, Android lint, and debug build used by Forgejo CI:
 
 ```bash
-./gradlew test lint assembleDebug
+./check-ci.sh
 ```
 
-Run device tests when an emulator or device is available:
+Run device tests separately when an emulator or device is available:
 
 ```bash
 ./gradlew connectedCheck
 ```
-
-There is no canonical CI workflow yet; do not invent or assume one.

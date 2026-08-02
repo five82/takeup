@@ -43,8 +43,10 @@ responses that predate dynamic-range and channel-layout stream metadata.
 
 ## Verify
 
+Run the same unit tests, Android lint, and debug build used by Forgejo CI:
+
 ```bash
-./gradlew test lint assembleDebug
+./check-ci.sh
 ```
 
 The debug APK is written under `app/build/outputs/apk/debug/`. Install an update
