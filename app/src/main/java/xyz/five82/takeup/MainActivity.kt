@@ -53,6 +53,7 @@ import xyz.five82.takeup.ui.LocalNetworkPermissionScreen
 import xyz.five82.takeup.ui.MainUiState
 import xyz.five82.takeup.ui.MainViewModel
 import xyz.five82.takeup.ui.PlaybackScreen
+import xyz.five82.takeup.ui.SearchScreen
 import xyz.five82.takeup.ui.SeasonScreen
 import xyz.five82.takeup.ui.ShowDetailsScreen
 import xyz.five82.takeup.ui.theme.TakeupTheme
@@ -185,6 +186,7 @@ private fun TakeupApp(viewModel: MainViewModel) {
                 state = current,
                 onRetry = viewModel::retryHome,
                 onOpenSettings = viewModel::openSettings,
+                onOpenSearch = viewModel::openSearch,
                 onShowMovies = viewModel::showMovies,
                 onShowShows = viewModel::showShows,
                 onItemSelected = viewModel::selectHomeItem,
@@ -201,6 +203,13 @@ private fun TakeupApp(viewModel: MainViewModel) {
                 onItemSelected = viewModel::selectLibraryItem,
             )
         }
+        is MainUiState.Search -> SearchScreen(
+            state = current,
+            onQueryChanged = viewModel::updateSearchQuery,
+            onRetry = viewModel::retrySearch,
+            onBack = viewModel::backFromSearch,
+            onItemSelected = viewModel::selectSearchItem,
+        )
         is MainUiState.ShowDetails -> saveableStateHolder.SaveableStateProvider(
             key = "show:${current.show.id}",
         ) {

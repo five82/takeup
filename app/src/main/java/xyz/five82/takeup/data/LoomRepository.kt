@@ -34,6 +34,9 @@ internal class LoomRepository(
     suspend fun genres(serverUrl: String): List<GenreSummary> =
         client.genres(ServerAddress.parse(serverUrl))
 
+    suspend fun search(serverUrl: String, query: String): List<LoomItem> =
+        client.search(ServerAddress.parse(serverUrl), query)
+
     suspend fun shows(serverUrl: String): List<LoomItem> =
         client.shows(ServerAddress.parse(serverUrl))
 

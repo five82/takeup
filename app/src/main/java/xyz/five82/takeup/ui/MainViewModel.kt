@@ -6,7 +6,9 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,6 +37,7 @@ internal enum class BrowseOrigin {
     Movies,
     Shows,
     Season,
+    Search,
 }
 
 internal sealed interface MainUiState {
@@ -60,6 +63,16 @@ internal sealed interface MainUiState {
         val items: List<LoomItem> = emptyList(),
         val genres: List<GenreSummary> = emptyList(),
         val selectedGenreId: Long = 0,
+        val isLoading: Boolean = false,
+        val error: String? = null,
+    ) : MainUiState
+
+    data class Search(
+        val serverUrl: String,
+        val query: String = "",
+        val results: List<LoomItem> = emptyList(),
+        // True once a search for the current query has completed.
+        val searched: Boolean = false,
         val isLoading: Boolean = false,
         val error: String? = null,
     ) : MainUiState
@@ -153,6 +166,7 @@ internal class MainViewModel(
     private var seasonContent: SeasonContent? = null
     private var artworkReturnState: MainUiState? = null
     private var settingsReturnState: MainUiState.Home? = null
+    private var searchReturnState: MainUiState.Search? = null
 
     fun start() {
         if (started) return
@@ -277,6 +291,54 @@ internal class MainViewModel(
     fun backToHome() {
         val state = _uiState.value as? MainUiState.Library ?: return
         activeJob?.cancel()
+        _uiState.value = MainUiState.Home(serverUrl = state.serverUrl, content = homeContent)
+    }
+
+    fun openSearch() {
+        val state = _uiState.value as? MainUiState.Home ?: return
+        activeJob?.cancel()
+        searchReturnState = null
+        _uiState.value = MainUiState.Search(serverUrl = state.serverUrl)
+    }
+
+    fun updateSearchQuery(query: String) {
+        val state = _uiState.value as? MainUiState.Search ?: return
+        activeJob?.cancel()
+        _uiState.value = state.copy(
+            query = query,
+            results = emptyList(),
+            searched = false,
+            isLoading = false,
+            error = null,
+        )
+        if (query.isBlank()) return
+        activeJob = viewModelScope.launch {
+            delay(SEARCH_DEBOUNCE_MS)
+            runSearch(query)
+        }
+    }
+
+    fun retrySearch() {
+        val state = _uiState.value as? MainUiState.Search ?: return
+        if (state.query.isBlank()) return
+        activeJob?.cancel()
+        activeJob = viewModelScope.launch { runSearch(state.query) }
+    }
+
+    fun selectSearchItem(item: LoomItem) {
+        val state = _uiState.value as? MainUiState.Search ?: return
+        searchReturnState = state.copy(isLoading = false)
+        if (item.kind == "show") {
+            selectShow(item, BrowseOrigin.Search)
+        } else {
+            selectItem(item, BrowseOrigin.Search)
+        }
+    }
+
+    fun backFromSearch() {
+        val state = _uiState.value as? MainUiState.Search ?: return
+        activeJob?.cancel()
+        searchReturnState = null
         _uiState.value = MainUiState.Home(serverUrl = state.serverUrl, content = homeContent)
     }
 
@@ -560,6 +622,33 @@ internal class MainViewModel(
         }
     }
 
+    private suspend fun runSearch(query: String) {
+        val state = _uiState.value as? MainUiState.Search ?: return
+        if (state.query != query) return
+        _uiState.value = state.copy(isLoading = true, error = null)
+        runCatching { repository.search(state.serverUrl, query) }
+            .onSuccess { results ->
+                val current = _uiState.value as? MainUiState.Search ?: return@onSuccess
+                if (current.query == query) {
+                    _uiState.value = current.copy(
+                        results = results,
+                        searched = true,
+                        isLoading = false,
+                    )
+                }
+            }
+            .onFailure {
+                if (it is CancellationException) return@onFailure
+                val current = _uiState.value as? MainUiState.Search ?: return@onFailure
+                if (current.query == query) {
+                    _uiState.value = current.copy(
+                        isLoading = false,
+                        error = readableError(it),
+                    )
+                }
+            }
+    }
+
     private suspend fun loadMovieGenres(serverUrl: String) {
         runCatching { repository.genres(serverUrl) }
             .onSuccess { genres ->
@@ -839,6 +928,8 @@ internal class MainViewModel(
                     episodes = it.episodes,
                 )
             } ?: MainUiState.Home(serverUrl = serverUrl, content = homeContent)
+            BrowseOrigin.Search -> searchReturnState
+                ?: MainUiState.Home(serverUrl = serverUrl, content = homeContent)
         }
     }
 
@@ -915,6 +1006,7 @@ internal class MainViewModel(
     private fun currentServerUrl(): String? = when (val state = _uiState.value) {
         is MainUiState.Home -> state.serverUrl
         is MainUiState.Library -> state.serverUrl
+        is MainUiState.Search -> state.serverUrl
         is MainUiState.ShowDetails -> state.serverUrl
         is MainUiState.Season -> state.serverUrl
         is MainUiState.Details -> state.serverUrl
@@ -958,6 +1050,8 @@ internal class MainViewModel(
     }
 
     companion object {
+        private const val SEARCH_DEBOUNCE_MS = 300L
+
         fun factory(repository: LoomRepository): ViewModelProvider.Factory = viewModelFactory {
             initializer { MainViewModel(repository) }
         }

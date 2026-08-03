@@ -24,6 +24,7 @@ class LoomClientTest {
     private val progressMethod = AtomicReference<String>()
     private val progressRequest = AtomicReference<String>()
     private val artworkRequests = CopyOnWriteArrayList<String>()
+    private val searchQueries = CopyOnWriteArrayList<String>()
 
     @Before
     fun setUp() {
@@ -129,6 +130,18 @@ class LoomClientTest {
     }
 
     @Test
+    fun `searches items and parses episode context`() = runBlocking {
+        val results = LoomClient().search(address, "test show")
+
+        assertEquals("Test Movie", results[0].title)
+        assertEquals("Pilot", results[1].title)
+        assertEquals("Test Show", results[1].seriesTitle)
+        assertEquals("Season 1", results[1].seasonTitle)
+        assertEquals("Test Show \u00B7 Season 1 \u00B7 S01E01", results[1].episodeContext())
+        assertEquals(listOf("q=test+show&limit=200&offset=0"), searchQueries)
+    }
+
+    @Test
     fun `loads movie genres`() = runBlocking {
         val genres = LoomClient().genres(address)
 
@@ -175,6 +188,14 @@ class LoomClientTest {
             "/api/v1/items/51/children" -> {
                 childrenQueries += "51:${exchange.requestURI.query}"
                 """{"items":[{"id":52,"kind":"episode","title":"Pilot","season_number":0,"episode_number":1}]}"""
+            }
+            "/api/v1/search" -> {
+                searchQueries += exchange.requestURI.rawQuery
+                """{"items":[
+                    {"id":42,"kind":"movie","title":"Test Movie","year":2026},
+                    {"id":52,"kind":"episode","title":"Pilot","season_number":1,"episode_number":1,
+                    "series_title":"Test Show","season_title":"Season 1"}
+                ]}"""
             }
             "/api/v1/continue-watching" -> {
                 continueQuery.set(exchange.requestURI.query)

@@ -130,6 +130,8 @@ internal object LoomJson {
             mediaDurationMs = media?.long("duration_ms") ?: 0L,
             mediaStreams = streams,
             progress = progress,
+            seriesTitle = value.string("series_title"),
+            seasonTitle = value.string("season_title"),
             genres = genres,
         )
     }

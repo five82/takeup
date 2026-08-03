@@ -6,6 +6,7 @@ import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URI
+import java.net.URLEncoder
 
 internal class LoomClient(
     private val connectTimeoutMs: Int = 5_000,
@@ -27,6 +28,13 @@ internal class LoomClient(
 
     suspend fun genres(server: ServerAddress): List<GenreSummary> =
         LoomJson.genres(request(server.api("api/v1/genres")))
+
+    suspend fun search(server: ServerAddress, query: String): List<LoomItem> {
+        val trimmed = query.trim()
+        require(trimmed.isNotEmpty())
+        val encoded = URLEncoder.encode(trimmed, Charsets.UTF_8.name())
+        return pagedItems(server, "api/v1/search", "q=$encoded")
+    }
 
     suspend fun shows(server: ServerAddress): List<LoomItem> =
         pagedItems(server, "api/v1/items", "library=tv&kind=show")

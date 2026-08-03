@@ -57,6 +57,7 @@ internal fun HomeScreen(
     state: MainUiState.Home,
     onRetry: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenSearch: () -> Unit,
     onShowMovies: () -> Unit,
     onShowShows: () -> Unit,
     onItemSelected: (LoomItem) -> Unit,
@@ -68,6 +69,15 @@ internal fun HomeScreen(
             MediumFlexibleTopAppBar(
                 title = { Text(stringResource(R.string.app_name)) },
                 actions = {
+                    FilledTonalIconButton(
+                        onClick = onOpenSearch,
+                        shapes = IconButtonDefaults.shapes(),
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_search),
+                            contentDescription = stringResource(R.string.search),
+                        )
+                    }
                     FilledTonalIconButton(
                         onClick = onOpenSettings,
                         shapes = IconButtonDefaults.shapes(),
