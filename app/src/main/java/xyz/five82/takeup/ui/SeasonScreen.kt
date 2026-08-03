@@ -3,6 +3,9 @@
 package xyz.five82.takeup.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,7 +17,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -60,7 +62,29 @@ internal fun SeasonScreen(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             TopAppBar(
-                title = {},
+                title = {
+                    AnimatedVisibility(
+                        visible = scrollBehavior.state.overlappedFraction > 0.01f,
+                        enter = fadeIn(MaterialTheme.motionScheme.fastEffectsSpec()),
+                        exit = fadeOut(MaterialTheme.motionScheme.fastEffectsSpec()),
+                    ) {
+                        Column {
+                            Text(
+                                text = state.show.title,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                style = MaterialTheme.typography.titleMediumEmphasized,
+                            )
+                            Text(
+                                text = state.season.title,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                style = MaterialTheme.typography.labelMedium,
+                            )
+                        }
+                    }
+                },
                 navigationIcon = {
                     MediaOverlayIconButton(
                         iconResource = R.drawable.ic_arrow_back,
@@ -205,43 +229,56 @@ private fun SeasonHero(state: MainUiState.Season) {
                 ?: state.season.backdropUrl(state.serverUrl),
             modifier = Modifier.fillMaxSize(),
         )
-        Column(
+        Row(
             modifier = Modifier
                 .align(Alignment.BottomStart)
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.Bottom,
         ) {
-            val logoUrl = state.show.logoUrl(state.serverUrl)
-            if (logoUrl != null) {
-                TitleLogo(
-                    url = logoUrl,
-                    title = state.show.title,
-                    modifier = Modifier.fillMaxWidth(0.7f),
-                )
-            } else {
-                Text(
-                    text = state.show.title,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.headlineLargeEmphasized,
-                )
-            }
-            Text(
-                text = state.season.title,
-                color = MaterialTheme.colorScheme.primary,
-                style = MaterialTheme.typography.headlineSmallEmphasized,
+            MediaArtwork(
+                url = state.season.posterUrl(state.serverUrl),
+                modifier = Modifier
+                    .width(88.dp)
+                    .aspectRatio(2f / 3f)
+                    .clip(MaterialTheme.shapes.large),
             )
-            if (state.episodes.isNotEmpty()) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                val logoUrl = state.show.logoUrl(state.serverUrl)
+                if (logoUrl != null) {
+                    TitleLogo(
+                        url = logoUrl,
+                        title = state.show.title,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                } else {
+                    Text(
+                        text = state.show.title,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.headlineLargeEmphasized,
+                    )
+                }
                 Text(
-                    text = pluralStringResource(
-                        R.plurals.episode_count,
-                        state.episodes.size,
-                        state.episodes.size,
-                    ),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodyLarge,
+                    text = state.season.title,
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.headlineSmallEmphasized,
                 )
+                if (state.episodes.isNotEmpty()) {
+                    Text(
+                        text = pluralStringResource(
+                            R.plurals.episode_count,
+                            state.episodes.size,
+                            state.episodes.size,
+                        ),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                }
             }
         }
     }
