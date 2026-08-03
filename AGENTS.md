@@ -25,7 +25,7 @@ Loom and Takeup are developed and deployed together for one user. Do not preserv
 - When troubleshooting, gather evidence and test rather than guessing.
 - Add focused tests for new behavior and regressions.
 - Follow established Android and project conventions. Do not add libraries, frameworks, or architectural layers without a concrete need.
-- Follow Material You design standards. Research them if needed.
+- Follow Material 3 Expressive design standards. Research them if needed.
 
 ## Build, Test, Lint
 
