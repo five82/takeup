@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import xyz.five82.takeup.data.ArtworkKind
 import xyz.five82.takeup.data.ArtworkOption
+import xyz.five82.takeup.data.GenreSummary
 import xyz.five82.takeup.data.HomeContent
 import xyz.five82.takeup.data.LoomHttpException
 import xyz.five82.takeup.data.LoomItem
@@ -57,6 +58,8 @@ internal sealed interface MainUiState {
         val serverUrl: String,
         val kind: LibraryKind,
         val items: List<LoomItem> = emptyList(),
+        val genres: List<GenreSummary> = emptyList(),
+        val selectedGenreId: Long = 0,
         val isLoading: Boolean = false,
         val error: String? = null,
     ) : MainUiState
@@ -143,6 +146,9 @@ internal class MainViewModel(
     private var activeJob: Job? = null
     private var progressJob: Job? = null
     private var homeContent = EMPTY_HOME_CONTENT
+    private var movieGenres: List<GenreSummary> = emptyList()
+    // Movies filtered by genre, kept so back navigation restores the filter.
+    private var movieGenreItems: Pair<Long, List<LoomItem>>? = null
     private var showContent: ShowContent? = null
     private var seasonContent: SeasonContent? = null
     private var artworkReturnState: MainUiState? = null
@@ -180,6 +186,8 @@ internal class MainViewModel(
                 .onSuccess {
                     settingsReturnState = null
                     homeContent = EMPTY_HOME_CONTENT
+                    movieGenres = emptyList()
+                    movieGenreItems = null
                     showContent = null
                     seasonContent = null
                     loadHome(it)
@@ -209,15 +217,14 @@ internal class MainViewModel(
         activeJob = viewModelScope.launch {
             _uiState.value = state.copy(isLoading = true, error = null)
             val result = when (state.kind) {
-                LibraryKind.Movies -> runCatching { repository.movies(state.serverUrl) }
+                LibraryKind.Movies -> runCatching {
+                    repository.movies(state.serverUrl, state.selectedGenreId)
+                }
                 LibraryKind.Shows -> runCatching { repository.shows(state.serverUrl) }
             }
             result
                 .onSuccess { items ->
-                    homeContent = when (state.kind) {
-                        LibraryKind.Movies -> homeContent.copy(movies = items)
-                        LibraryKind.Shows -> homeContent.copy(shows = items)
-                    }
+                    cacheLibraryItems(state.kind, state.selectedGenreId, items)
                     _uiState.value = state.copy(items = items, isLoading = false, error = null)
                 }
                 .onFailure {
@@ -225,6 +232,44 @@ internal class MainViewModel(
                         isLoading = false,
                         error = readableError(it),
                     )
+                }
+            if (state.kind == LibraryKind.Movies) {
+                loadMovieGenres(state.serverUrl)
+            }
+        }
+    }
+
+    fun selectGenre(genreId: Long) {
+        val state = _uiState.value as? MainUiState.Library ?: return
+        if (state.kind != LibraryKind.Movies || state.isLoading) return
+        if (genreId == state.selectedGenreId) return
+        activeJob?.cancel()
+        activeJob = viewModelScope.launch {
+            _uiState.value = state.copy(
+                selectedGenreId = genreId,
+                isLoading = true,
+                error = null,
+            )
+            runCatching { repository.movies(state.serverUrl, genreId) }
+                .onSuccess { items ->
+                    cacheLibraryItems(LibraryKind.Movies, genreId, items)
+                    val current = _uiState.value as? MainUiState.Library ?: return@onSuccess
+                    if (current.kind == LibraryKind.Movies && current.selectedGenreId == genreId) {
+                        _uiState.value = current.copy(
+                            items = items,
+                            isLoading = false,
+                            error = null,
+                        )
+                    }
+                }
+                .onFailure {
+                    val current = _uiState.value as? MainUiState.Library ?: return@onFailure
+                    if (current.kind == LibraryKind.Movies && current.selectedGenreId == genreId) {
+                        _uiState.value = state.copy(
+                            isLoading = false,
+                            error = readableError(it),
+                        )
+                    }
                 }
         }
     }
@@ -502,11 +547,44 @@ internal class MainViewModel(
 
     private fun showLibrary(kind: LibraryKind) {
         val state = _uiState.value as? MainUiState.Home ?: return
+        if (kind == LibraryKind.Movies) movieGenreItems = null
         _uiState.value = MainUiState.Library(
             serverUrl = state.serverUrl,
             kind = kind,
             items = homeContent.items(kind),
+            genres = if (kind == LibraryKind.Movies) movieGenres else emptyList(),
         )
+        if (kind == LibraryKind.Movies && movieGenres.isEmpty()) {
+            activeJob?.cancel()
+            activeJob = viewModelScope.launch { loadMovieGenres(state.serverUrl) }
+        }
+    }
+
+    private suspend fun loadMovieGenres(serverUrl: String) {
+        runCatching { repository.genres(serverUrl) }
+            .onSuccess { genres ->
+                movieGenres = genres
+                val state = _uiState.value as? MainUiState.Library ?: return@onSuccess
+                if (state.kind == LibraryKind.Movies) {
+                    _uiState.value = state.copy(genres = genres)
+                }
+            }
+        // Genre chips are optional; leave them hidden on failure.
+    }
+
+    private fun cacheLibraryItems(
+        kind: LibraryKind,
+        genreId: Long,
+        items: List<LoomItem>,
+    ) {
+        when {
+            kind == LibraryKind.Shows -> homeContent = homeContent.copy(shows = items)
+            genreId == 0L -> {
+                movieGenreItems = null
+                homeContent = homeContent.copy(movies = items)
+            }
+            else -> movieGenreItems = genreId to items
+        }
     }
 
     private fun selectShow(item: LoomItem, origin: BrowseOrigin) {
@@ -738,11 +816,16 @@ internal class MainViewModel(
     private fun showBrowseState(serverUrl: String, origin: BrowseOrigin) {
         _uiState.value = when (origin) {
             BrowseOrigin.Home -> MainUiState.Home(serverUrl = serverUrl, content = homeContent)
-            BrowseOrigin.Movies -> MainUiState.Library(
-                serverUrl = serverUrl,
-                kind = LibraryKind.Movies,
-                items = homeContent.movies,
-            )
+            BrowseOrigin.Movies -> {
+                val selection = movieGenreItems
+                MainUiState.Library(
+                    serverUrl = serverUrl,
+                    kind = LibraryKind.Movies,
+                    items = selection?.second ?: homeContent.movies,
+                    genres = movieGenres,
+                    selectedGenreId = selection?.first ?: 0,
+                )
+            }
             BrowseOrigin.Shows -> MainUiState.Library(
                 serverUrl = serverUrl,
                 kind = LibraryKind.Shows,
@@ -795,6 +878,7 @@ internal class MainViewModel(
             movies = homeContent.movies.replaceItem(updated),
             shows = homeContent.shows.replaceItem(updated),
         )
+        movieGenreItems = movieGenreItems?.let { it.first to it.second.replaceItem(updated) }
         showContent = showContent?.let {
             it.copy(
                 show = if (it.show.id == updated.id) updated else it.show,

@@ -28,8 +28,11 @@ internal class LoomRepository(
         )
     }
 
-    suspend fun movies(serverUrl: String): List<LoomItem> =
-        client.movies(ServerAddress.parse(serverUrl))
+    suspend fun movies(serverUrl: String, genreId: Long = 0): List<LoomItem> =
+        client.movies(ServerAddress.parse(serverUrl), genreId)
+
+    suspend fun genres(serverUrl: String): List<GenreSummary> =
+        client.genres(ServerAddress.parse(serverUrl))
 
     suspend fun shows(serverUrl: String): List<LoomItem> =
         client.shows(ServerAddress.parse(serverUrl))

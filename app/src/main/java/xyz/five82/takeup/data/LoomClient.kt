@@ -16,8 +16,17 @@ internal class LoomClient(
         LoomJson.requireHealthy(body)
     }
 
-    suspend fun movies(server: ServerAddress): List<LoomItem> =
-        pagedItems(server, "api/v1/items", "library=movies&kind=movie")
+    suspend fun movies(server: ServerAddress, genreId: Long = 0): List<LoomItem> {
+        val query = if (genreId > 0) {
+            "library=movies&kind=movie&genre_id=$genreId"
+        } else {
+            "library=movies&kind=movie"
+        }
+        return pagedItems(server, "api/v1/items", query)
+    }
+
+    suspend fun genres(server: ServerAddress): List<GenreSummary> =
+        LoomJson.genres(request(server.api("api/v1/genres")))
 
     suspend fun shows(server: ServerAddress): List<LoomItem> =
         pagedItems(server, "api/v1/items", "library=tv&kind=show")

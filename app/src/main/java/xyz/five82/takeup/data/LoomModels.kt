@@ -25,6 +25,7 @@ data class LoomItem(
     val progress: PlaybackProgress? = null,
     val seriesTitle: String = "",
     val seasonTitle: String = "",
+    val genres: List<Genre> = emptyList(),
 ) {
     fun posterUrl(serverUrl: String): String? =
         imageUrl(serverUrl, posterImageId, posterImageTag)
@@ -67,6 +68,17 @@ data class LoomItem(
             .toString()
     }
 }
+
+data class Genre(
+    val id: Long,
+    val name: String,
+)
+
+data class GenreSummary(
+    val id: Long,
+    val name: String,
+    val itemCount: Int,
+)
 
 data class MediaStream(
     val kind: String,

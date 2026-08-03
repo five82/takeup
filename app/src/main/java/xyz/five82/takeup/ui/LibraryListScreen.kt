@@ -12,16 +12,19 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items as rowItems
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MediumFlexibleTopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -38,6 +41,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import xyz.five82.takeup.R
+import xyz.five82.takeup.data.GenreSummary
 import xyz.five82.takeup.data.LoomItem
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -46,6 +50,7 @@ internal fun LibraryListScreen(
     state: MainUiState.Library,
     onRetry: () -> Unit,
     onBack: () -> Unit,
+    onGenreSelected: (Long) -> Unit,
     onItemSelected: (LoomItem) -> Unit,
 ) {
     BackHandler(onBack = onBack)
@@ -80,11 +85,15 @@ internal fun LibraryListScreen(
                 message = state.error,
                 onRetry = onRetry,
             )
-            state.items.isEmpty() -> EmptyLibraryList(contentPadding, state.kind)
+            state.items.isEmpty() && state.genres.isEmpty() -> EmptyLibraryList(
+                contentPadding,
+                state.kind,
+            )
             else -> LibraryGrid(
                 contentPadding = contentPadding,
                 state = state,
                 onRetry = onRetry,
+                onGenreSelected = onGenreSelected,
                 onItemSelected = onItemSelected,
             )
         }
@@ -170,6 +179,7 @@ private fun LibraryGrid(
     contentPadding: PaddingValues,
     state: MainUiState.Library,
     onRetry: () -> Unit,
+    onGenreSelected: (Long) -> Unit,
     onItemSelected: (LoomItem) -> Unit,
 ) {
     PullToRefreshBox(
@@ -186,6 +196,24 @@ private fun LibraryGrid(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            if (state.genres.isNotEmpty()) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    GenreFilterRow(
+                        genres = state.genres,
+                        selectedGenreId = state.selectedGenreId,
+                        onGenreSelected = onGenreSelected,
+                    )
+                }
+            }
+            if (state.items.isEmpty()) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    Text(
+                        text = stringResource(R.string.no_movies_for_genre),
+                        modifier = Modifier.padding(12.dp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
             state.error?.let { error ->
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     Card(
@@ -217,6 +245,32 @@ private fun LibraryGrid(
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun GenreFilterRow(
+    genres: List<GenreSummary>,
+    selectedGenreId: Long,
+    onGenreSelected: (Long) -> Unit,
+) {
+    LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        item(key = 0L) {
+            FilterChip(
+                selected = selectedGenreId == 0L,
+                onClick = { onGenreSelected(0L) },
+                label = { Text(stringResource(R.string.all_genres)) },
+            )
+        }
+        rowItems(genres, key = { it.id }) { genre ->
+            FilterChip(
+                selected = selectedGenreId == genre.id,
+                onClick = { onGenreSelected(genre.id) },
+                label = { Text(genre.name) },
+            )
         }
     }
 }

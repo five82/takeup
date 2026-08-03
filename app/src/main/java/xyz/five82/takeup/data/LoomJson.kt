@@ -24,6 +24,23 @@ internal object LoomJson {
 
     fun item(body: String): LoomItem = item(objectFrom(body))
 
+    fun genres(body: String): List<GenreSummary> {
+        val value = objectFrom(body).get("items")
+            ?: throw JsonParseException("Loom response is missing items")
+        if (value.isJsonNull) return emptyList()
+        if (!value.isJsonArray) {
+            throw JsonParseException("Loom response items must be an array")
+        }
+        return value.asJsonArray.map { element ->
+            val genre = element.asJsonObject
+            GenreSummary(
+                id = genre.long("id"),
+                name = genre.requiredString("name"),
+                itemCount = genre.int("item_count"),
+            )
+        }
+    }
+
     fun artworkOptions(body: String): List<ArtworkOption> {
         val value = objectFrom(body).get("items")
             ?: throw JsonParseException("Loom response is missing items")
@@ -80,6 +97,18 @@ internal object LoomJson {
                 resumePositionMs = it.long("resume_position_ms"),
             )
         }
+        val genreValues = value.get("genres")
+        val genres = when {
+            genreValues == null || genreValues.isJsonNull -> emptyList()
+            !genreValues.isJsonArray -> throw JsonParseException("Loom item genres must be an array")
+            else -> genreValues.asJsonArray.map { element ->
+                val genre = element.asJsonObject
+                Genre(
+                    id = genre.long("id"),
+                    name = genre.requiredString("name"),
+                )
+            }
+        }
         return LoomItem(
             id = value.long("id"),
             kind = value.requiredString("kind"),
@@ -101,6 +130,7 @@ internal object LoomJson {
             mediaDurationMs = media?.long("duration_ms") ?: 0L,
             mediaStreams = streams,
             progress = progress,
+            genres = genres,
         )
     }
 

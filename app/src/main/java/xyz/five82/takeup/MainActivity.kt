@@ -197,6 +197,7 @@ private fun TakeupApp(viewModel: MainViewModel) {
                 state = current,
                 onRetry = viewModel::retryLibrary,
                 onBack = viewModel::backToHome,
+                onGenreSelected = viewModel::selectGenre,
                 onItemSelected = viewModel::selectLibraryItem,
             )
         }

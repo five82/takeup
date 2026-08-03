@@ -183,6 +183,8 @@ internal fun DetailsScreen(
                             val metadata = listOfNotNull(
                                 state.item.subtitle(),
                                 state.item.mediaDurationMs.takeIf { it > 0 }?.let(::formatRuntime),
+                                state.item.genres.takeIf { it.isNotEmpty() }
+                                    ?.joinToString(", ") { it.name },
                                 state.item.releaseDate
                                     .takeIf { state.item.kind == "episode" && it.isNotBlank() }
                                     ?.let(::formatReleaseDate),

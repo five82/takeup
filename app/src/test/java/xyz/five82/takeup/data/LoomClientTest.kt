@@ -128,9 +128,33 @@ class LoomClientTest {
         )
     }
 
+    @Test
+    fun `loads movie genres`() = runBlocking {
+        val genres = LoomClient().genres(address)
+
+        assertEquals(
+            listOf(
+                GenreSummary(28, "Action", 12),
+                GenreSummary(878, "Science Fiction", 4),
+            ),
+            genres,
+        )
+    }
+
+    @Test
+    fun `filters movies by genre`() = runBlocking {
+        LoomClient().movies(address, genreId = 878)
+
+        assertEquals(
+            listOf("library=movies&kind=movie&genre_id=878&limit=200&offset=0"),
+            moviesQueries,
+        )
+    }
+
     private fun handle(exchange: HttpExchange) {
         val response = when (exchange.requestURI.path) {
             "/api/v1/health" -> """{"status":"ok"}"""
+            "/api/v1/genres" -> """{"items":[{"id":28,"name":"Action","item_count":12},{"id":878,"name":"Science Fiction","item_count":4}]}"""
             "/api/v1/items" -> {
                 if (exchange.requestURI.query.startsWith("library=tv")) {
                     showsQueries += exchange.requestURI.query

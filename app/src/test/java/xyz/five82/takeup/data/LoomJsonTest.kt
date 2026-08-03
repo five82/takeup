@@ -72,6 +72,62 @@ class LoomJsonTest {
     }
 
     @Test
+    fun `parses item genres`() {
+        val item = LoomJson.item(
+            """
+            {
+              "id": 42,
+              "kind": "movie",
+              "title": "Arrival",
+              "genres": [
+                {"id": 878, "name": "Science Fiction"},
+                {"id": 53, "name": "Thriller"}
+              ]
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals(
+            listOf(Genre(878, "Science Fiction"), Genre(53, "Thriller")),
+            item.genres,
+        )
+    }
+
+    @Test
+    fun `treats missing item genres as empty`() {
+        val item = LoomJson.item("""{"id":42,"kind":"show","title":"Test Show"}""")
+
+        assertEquals(emptyList<Genre>(), item.genres)
+    }
+
+    @Test
+    fun `parses genre summaries`() {
+        val genres = LoomJson.genres(
+            """
+            {
+              "items": [
+                {"id": 28, "name": "Action", "item_count": 12},
+                {"id": 878, "name": "Science Fiction", "item_count": 4}
+              ]
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals(
+            listOf(
+                GenreSummary(28, "Action", 12),
+                GenreSummary(878, "Science Fiction", 4),
+            ),
+            genres,
+        )
+    }
+
+    @Test
+    fun `treats a null genre list as empty`() {
+        assertEquals(emptyList<GenreSummary>(), LoomJson.genres("""{"items":null}"""))
+    }
+
+    @Test
     fun `parses item progress`() {
         val item = LoomJson.item(
             """
