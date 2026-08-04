@@ -20,9 +20,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import xyz.five82.takeup.R
 import xyz.five82.takeup.data.LoomItem
 
 // Cards are intentionally containerless: the artwork carries the visual weight
@@ -34,6 +36,9 @@ internal fun MediaCard(
     item: LoomItem,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    // Only enable on screens where the item appears at most once (grids,
+    // search); duplicate shared keys on one screen break the transition.
+    sharedArtwork: Boolean = false,
 ) {
     val subtitle = item.cardSubtitle()
     Card(
@@ -46,6 +51,7 @@ internal fun MediaCard(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .let { if (sharedArtwork) it.itemArtworkSharedBounds(item.id) else it }
                     .clip(MaterialTheme.shapes.large),
             ) {
                 MediaArtwork(
@@ -84,7 +90,15 @@ internal fun LandscapeMediaCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val subtitle = item.cardSubtitle()
+    // In-progress items say how much is left; everything else keeps the
+    // regular subtitle.
+    val progress = item.progress
+    val remainingMs = progress
+        ?.takeIf { !it.played && it.resumePositionMs > 0 && it.durationMs > 0 }
+        ?.let { (it.durationMs - it.positionMs).coerceAtLeast(60_000) }
+    val subtitle = remainingMs
+        ?.let { stringResource(R.string.time_left, formatRuntime(it)) }
+        ?: item.cardSubtitle()
     Card(
         onClick = onClick,
         modifier = modifier.semantics(mergeDescendants = true) {},

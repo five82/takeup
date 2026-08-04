@@ -54,7 +54,11 @@ internal fun SeasonScreen(
     BackHandler(onBack = onBack)
     UseLightStatusBarIcons()
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
-    DetailBackground {
+    Box(Modifier.fillMaxSize()) {
+    AmbientGlow(
+        url = state.show.backdropUrl(state.serverUrl)
+            ?: state.season.posterUrl(state.serverUrl),
+    )
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = Color.Transparent,
@@ -211,7 +215,10 @@ private fun SeasonHero(state: MainUiState.Season) {
         FadingBackdropArtwork(
             url = state.show.backdropUrl(state.serverUrl)
                 ?: state.season.backdropUrl(state.serverUrl),
-            modifier = Modifier.fillMaxSize(),
+            // Shares the show's key so ShowDetails -> Season morphs the hero.
+            modifier = Modifier
+                .fillMaxSize()
+                .itemArtworkSharedBounds(state.show.id),
             darkenBottomForText = true,
         )
         Row(

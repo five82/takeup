@@ -38,6 +38,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.BlendMode
@@ -45,7 +47,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -58,12 +59,13 @@ import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import coil3.size.Size
 import java.util.Locale
 import xyz.five82.takeup.R
 import xyz.five82.takeup.data.LoomItem
 import xyz.five82.takeup.data.MediaDynamicRange
 import xyz.five82.takeup.data.MediaStream
-import xyz.five82.takeup.ui.theme.OverlayPillColor
+import xyz.five82.takeup.ui.theme.overlayPillColor
 import xyz.five82.takeup.ui.theme.topScrim
 
 @Composable
@@ -93,8 +95,8 @@ internal fun MediaOverlayIconButton(
         onClick = onClick,
         shapes = IconButtonDefaults.shapes(),
         colors = IconButtonDefaults.iconButtonColors(
-            containerColor = OverlayPillColor,
-            contentColor = Color.White,
+            containerColor = overlayPillColor(),
+            contentColor = MaterialTheme.colorScheme.onSurface,
         ),
     ) {
         Icon(
@@ -183,31 +185,46 @@ internal fun PulsingPlaceholder(modifier: Modifier = Modifier) {
 }
 
 /**
- * Screen-wide backdrop for detail screens: a wash of the seeded primary fading
- * into surface, so bodies visibly carry the artwork's palette instead of
- * collapsing to near-black.
+ * The one ambient background: a heavily blurred copy of the screen's artwork
+ * glowing at the top and dissolving into the neutral stage. Real artwork
+ * color carries the screen instead of a derived tint, so it can never go
+ * muddy. Used behind Home and every detail screen.
  */
 @Composable
-internal fun DetailBackground(
+internal fun AmbientGlow(
+    url: String?,
     modifier: Modifier = Modifier,
-    content: @Composable () -> Unit,
 ) {
-    val scheme = MaterialTheme.colorScheme
+    if (url == null) return
     Box(
         modifier = modifier
-            .fillMaxSize()
-            .background(
-                // Strong enough to read as the artwork's color, not black: the
-                // hero dissolves around the top third, so the tint holds there
-                // and even the bottom keeps a visible trace.
-                Brush.verticalGradient(
-                    0f to lerp(scheme.surface, scheme.primaryContainer, 0.8f),
-                    0.35f to lerp(scheme.surface, scheme.primaryContainer, 0.45f),
-                    1f to lerp(scheme.surface, scheme.primaryContainer, 0.12f),
-                ),
-            ),
+            .fillMaxWidth()
+            .height(480.dp),
     ) {
-        content()
+        AsyncImage(
+            // A tiny decode is all a heavy blur needs; keeps the effect cheap.
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(url)
+                .size(Size(64, 64))
+                .crossfade(true)
+                .build(),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .fillMaxSize()
+                .blur(40.dp)
+                .alpha(0.55f),
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        0f to Color.Transparent,
+                        1f to MaterialTheme.colorScheme.surface,
+                    ),
+                ),
+        )
     }
 }
 
@@ -251,7 +268,8 @@ internal fun FadingBackdropArtwork(
                     .background(
                         Brush.verticalGradient(
                             0.45f to Color.Transparent,
-                            1f to Color.Black.copy(alpha = 0.4f),
+                            1f to MaterialTheme.colorScheme.surfaceContainerLowest
+                                .copy(alpha = 0.45f),
                         ),
                     ),
             )

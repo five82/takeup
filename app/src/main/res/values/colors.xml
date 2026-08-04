@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="takeup_background">#131114</color>
-    <color name="launcher_background">#3F51B5</color>
+    <!-- Pre-Compose window background; matches the stage surface in TakeupTheme. -->
+    <color name="takeup_background">#111318</color>
+    <!-- Matches TakeupBrandSeed so the icon carries the brand red. -->
+    <color name="launcher_background">#FF4D55</color>
 </resources>

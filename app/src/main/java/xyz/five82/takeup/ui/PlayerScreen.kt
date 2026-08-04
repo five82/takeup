@@ -111,7 +111,7 @@ import kotlinx.coroutines.isActive
 import xyz.five82.takeup.R
 import xyz.five82.takeup.data.LoomItem
 import xyz.five82.takeup.data.PreparedPlayback
-import xyz.five82.takeup.ui.theme.OverlayPillColor
+import xyz.five82.takeup.ui.theme.overlayPillColor
 import xyz.five82.takeup.ui.theme.playerBottomScrim
 import xyz.five82.takeup.ui.theme.topScrim
 import java.util.Locale
@@ -520,7 +520,7 @@ private fun VideoPlayer(
                     .padding(top = 56.dp, end = 16.dp),
             ) {
                 Surface(
-                    color = OverlayPillColor,
+                    color = overlayPillColor(),
                     shape = MaterialTheme.shapes.small,
                 ) {
                     Text(

@@ -1,4 +1,7 @@
-@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+@file:OptIn(
+    androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class,
+    androidx.compose.animation.ExperimentalSharedTransitionApi::class,
+)
 
 package xyz.five82.takeup
 
@@ -19,6 +22,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -33,11 +37,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.FloatingToolbarDefaults
+import androidx.compose.material3.FloatingToolbarExitDirection
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -47,6 +54,7 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -58,11 +66,15 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import xyz.five82.takeup.ui.ArtworkScreen
 import xyz.five82.takeup.ui.SettingsScreen
 import xyz.five82.takeup.ui.DetailsScreen
+import xyz.five82.takeup.ui.GenreHubScreen
+import xyz.five82.takeup.ui.GenreLandingScreen
 import xyz.five82.takeup.ui.HomeScreen
 import xyz.five82.takeup.ui.LibraryListScreen
 import xyz.five82.takeup.ui.LocalNetworkPermissionScreen
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
+import xyz.five82.takeup.ui.LocalNavAnimatedContentScope
+import xyz.five82.takeup.ui.LocalSharedTransitionScope
 import xyz.five82.takeup.ui.MainUiState
 import xyz.five82.takeup.ui.MainViewModel
 import xyz.five82.takeup.ui.NavigationToolbar
@@ -193,6 +205,14 @@ private fun TakeupApp(
 
     val motionScheme = MaterialTheme.motionScheme
     val hazeState = rememberHazeState()
+    // Hides the toolbar on scroll-down and springs it back on scroll-up; the
+    // top-level screens feed it through their nestedScroll modifiers.
+    val toolbarScrollBehavior = FloatingToolbarDefaults.exitAlwaysScrollBehavior(
+        exitDirection = FloatingToolbarExitDirection.Bottom,
+    )
+    val topScreenModifier = Modifier.nestedScroll(toolbarScrollBehavior)
+    SharedTransitionLayout(modifier = Modifier.fillMaxSize()) {
+    CompositionLocalProvider(LocalSharedTransitionScope provides this) {
     Box(modifier = Modifier.fillMaxSize()) {
     AnimatedContent(
         targetState = state,
@@ -209,6 +229,7 @@ private fun TakeupApp(
         modifier = Modifier.hazeSource(hazeState),
         label = "screen",
     ) { animatedState ->
+        CompositionLocalProvider(LocalNavAnimatedContentScope provides this) {
         when (val current = animatedState) {
         MainUiState.Starting -> StartingScreen()
         is MainUiState.Connect -> SettingsScreen(
@@ -222,12 +243,15 @@ private fun TakeupApp(
         ) {
             HomeScreen(
                 state = current,
+                modifier = topScreenModifier,
                 onRetry = viewModel::retryHome,
                 onOpenSettings = viewModel::openSettings,
                 onShowMovies = viewModel::showMovies,
                 onShowShows = viewModel::showShows,
                 onItemSelected = viewModel::selectHomeItem,
                 onPlayItem = viewModel::playHomeItem,
+                onGenreSelected = viewModel::openGenre,
+                onOpenGenreHub = viewModel::openGenreHub,
                 onHeroSeedUrlChanged = onHeroSeedUrlChanged,
             )
         }
@@ -236,6 +260,7 @@ private fun TakeupApp(
         ) {
             LibraryListScreen(
                 state = current,
+                modifier = topScreenModifier,
                 onRetry = viewModel::retryLibrary,
                 onBack = viewModel::backToHome,
                 onGenreSelected = viewModel::selectGenre,
@@ -244,11 +269,30 @@ private fun TakeupApp(
         }
         is MainUiState.Search -> SearchScreen(
             state = current,
+            modifier = topScreenModifier,
             onQueryChanged = viewModel::updateSearchQuery,
             onRetry = viewModel::retrySearch,
             onBack = viewModel::backFromSearch,
             onItemSelected = viewModel::selectSearchItem,
+            onGenreSelected = viewModel::openGenre,
         )
+        is MainUiState.GenreHub -> GenreHubScreen(
+            state = current,
+            onBack = viewModel::backFromGenreHub,
+            onRetry = viewModel::retryGenreHub,
+            onGenreSelected = viewModel::openGenre,
+        )
+        is MainUiState.GenreLanding -> saveableStateHolder.SaveableStateProvider(
+            key = "genre:${current.genre.id}",
+        ) {
+            GenreLandingScreen(
+                state = current,
+                onBack = viewModel::backFromGenreLanding,
+                onRetry = viewModel::retryGenreLanding,
+                onItemSelected = viewModel::selectGenreItem,
+                onPlayItem = viewModel::playGenreItem,
+            )
+        }
         is MainUiState.ShowDetails -> saveableStateHolder.SaveableStateProvider(
             key = "show:${current.show.id}",
         ) {
@@ -277,6 +321,7 @@ private fun TakeupApp(
             onRetry = viewModel::retryDetails,
             onEditArtwork = viewModel::editArtwork,
             onPlay = viewModel::playDetails,
+            onGenreSelected = viewModel::openGenre,
         )
         is MainUiState.Artwork -> ArtworkScreen(
             state = current,
@@ -302,6 +347,7 @@ private fun TakeupApp(
             },
         )
         }
+        }
     }
     AnimatedVisibility(
         visible = state.topDestination() != null,
@@ -319,7 +365,10 @@ private fun TakeupApp(
             current = state.topDestination(),
             onSelect = viewModel::selectTopDestination,
             hazeState = hazeState,
+            scrollBehavior = toolbarScrollBehavior,
         )
+    }
+    }
     }
     }
 }

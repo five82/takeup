@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.FilledIconToggleButton
 import androidx.compose.material3.FloatingToolbarDefaults
+import androidx.compose.material3.FloatingToolbarScrollBehavior
 import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
@@ -35,6 +36,7 @@ internal fun NavigationToolbar(
     onSelect: (TopDestination) -> Unit,
     hazeState: HazeState,
     modifier: Modifier = Modifier,
+    scrollBehavior: FloatingToolbarScrollBehavior? = null,
 ) {
     HorizontalFloatingToolbar(
         expanded = true,
@@ -45,6 +47,7 @@ internal fun NavigationToolbar(
             // The haze glass provides the container; the toolbar itself stays clear.
             toolbarContainerColor = Color.Transparent,
         ),
+        scrollBehavior = scrollBehavior,
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             NavigationToolbarItem(

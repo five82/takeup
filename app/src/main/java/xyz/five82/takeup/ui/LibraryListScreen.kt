@@ -40,6 +40,7 @@ import xyz.five82.takeup.data.LoomItem
 @Composable
 internal fun LibraryListScreen(
     state: MainUiState.Library,
+    modifier: Modifier = Modifier,
     onRetry: () -> Unit,
     onBack: () -> Unit,
     onGenreSelected: (Long) -> Unit,
@@ -48,7 +49,7 @@ internal fun LibraryListScreen(
     BackHandler(onBack = onBack)
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             MediumFlexibleTopAppBar(
                 title = {
@@ -196,6 +197,7 @@ private fun LibraryGrid(
                     item = item,
                     onClick = { onItemSelected(item) },
                     modifier = Modifier.fillMaxWidth(),
+                    sharedArtwork = true,
                 )
             }
         }

@@ -26,6 +26,7 @@
         <item quantity="other">%d episodes</item>
     </plurals>
     <string name="continue_watching">Continue Watching</string>
+    <string name="time_left">%1$s left</string>
     <string name="recently_added">Recently Added</string>
     <string name="see_all">See all</string>
     <string name="search">Search</string>
@@ -35,6 +36,15 @@
     <string name="no_search_results">Loom did not find anything matching \"%1$s\".</string>
     <string name="all_genres">All</string>
     <string name="no_movies_for_genre">Loom did not return any movies for this genre.</string>
+    <string name="browse_by_genre">Browse by genre</string>
+    <string name="genres">Genres</string>
+    <string name="genre_spotlight">%1$s spotlight</string>
+    <string name="loading_genres">Loading genres&#8230;</string>
+    <string name="no_genres">Loom did not return any genres.</string>
+    <plurals name="title_count">
+        <item quantity="one">%d title</item>
+        <item quantity="other">%d titles</item>
+    </plurals>
     <string name="retry">Retry</string>
     <string name="no_home_items">Loom did not return any media.</string>
     <string name="no_movies">Loom did not return any movies.</string>

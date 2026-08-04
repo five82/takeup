@@ -3,6 +3,7 @@
 package xyz.five82.takeup.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -16,6 +17,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
@@ -52,19 +57,24 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import xyz.five82.takeup.R
+import xyz.five82.takeup.data.Genre
+import xyz.five82.takeup.data.GenreSummary
 import xyz.five82.takeup.data.LoomItem
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun SearchScreen(
     state: MainUiState.Search,
+    modifier: Modifier = Modifier,
     onQueryChanged: (String) -> Unit,
     onRetry: () -> Unit,
     onBack: () -> Unit,
     onItemSelected: (LoomItem) -> Unit,
+    onGenreSelected: (Genre) -> Unit,
 ) {
     BackHandler(onBack = onBack)
     Scaffold(
+        modifier = modifier,
         topBar = {
             TopAppBar(
                 title = { SearchField(query = state.query, onQueryChanged = onQueryChanged) },
@@ -91,7 +101,10 @@ internal fun SearchScreen(
                     onRetry = onRetry,
                 )
                 state.query.isBlank() || !state.searched && !state.isLoading ->
-                    SearchIdleHint()
+                    SearchBrowse(
+                        genres = state.genres,
+                        onGenreSelected = onGenreSelected,
+                    )
                 state.results.isEmpty() && state.searched && !state.isLoading -> NoSearchResults(
                     query = state.query,
                 )
@@ -153,6 +166,51 @@ private fun SearchField(
             unfocusedIndicatorColor = Color.Transparent,
         ),
     )
+}
+
+/**
+ * Empty-query state: browse-by-genre cards (a la streaming search pages),
+ * falling back to a plain hint until genres are known.
+ */
+@Composable
+private fun SearchBrowse(
+    genres: List<GenreSummary>,
+    onGenreSelected: (Genre) -> Unit,
+) {
+    if (genres.isEmpty()) {
+        SearchIdleHint()
+        return
+    }
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(minSize = 156.dp),
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(
+            start = 12.dp,
+            top = 8.dp,
+            end = 12.dp,
+            bottom = BottomToolbarInset,
+        ),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        item(span = { GridItemSpan(maxLineSpan) }) {
+            Text(
+                text = stringResource(R.string.browse_by_genre),
+                modifier = Modifier.padding(start = 4.dp, bottom = 2.dp),
+                style = MaterialTheme.typography.titleLargeEmphasized,
+            )
+        }
+        items(genres, key = { it.id }) { genre ->
+            GenreCard(
+                name = genre.name,
+                itemCount = genre.itemCount,
+                onClick = { onGenreSelected(Genre(id = genre.id, name = genre.name)) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1.8f),
+            )
+        }
+    }
 }
 
 @Composable
@@ -256,6 +314,7 @@ private fun SearchResultItem(
                         modifier = Modifier
                             .width(120.dp)
                             .aspectRatio(16f / 9f)
+                            .itemArtworkSharedBounds(item.id)
                             .clip(MaterialTheme.shapes.medium),
                     )
                 } else {
@@ -264,6 +323,7 @@ private fun SearchResultItem(
                         modifier = Modifier
                             .width(56.dp)
                             .aspectRatio(2f / 3f)
+                            .itemArtworkSharedBounds(item.id)
                             .clip(MaterialTheme.shapes.medium),
                     )
                 }

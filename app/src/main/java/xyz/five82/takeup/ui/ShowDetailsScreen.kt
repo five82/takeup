@@ -4,6 +4,7 @@ package xyz.five82.takeup.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -47,7 +48,10 @@ internal fun ShowDetailsScreen(
     BackHandler(onBack = onBack)
     UseLightStatusBarIcons()
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
-    DetailBackground {
+    Box(Modifier.fillMaxSize()) {
+    AmbientGlow(
+        url = state.show.backdropUrl(state.serverUrl) ?: state.show.posterUrl(state.serverUrl),
+    )
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = Color.Transparent,
@@ -90,7 +94,8 @@ internal fun ShowDetailsScreen(
                     url = state.show.backdropUrl(state.serverUrl),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .aspectRatio(16f / 9f),
+                        .aspectRatio(16f / 9f)
+                        .itemArtworkSharedBounds(state.show.id),
                 )
             }
             if (state.isLoading) {

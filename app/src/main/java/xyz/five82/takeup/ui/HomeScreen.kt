@@ -38,43 +38,40 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
-import coil3.request.ImageRequest
-import coil3.request.crossfade
-import coil3.size.Size
+import java.time.LocalDate
 import xyz.five82.takeup.R
+import xyz.five82.takeup.data.Genre
+import xyz.five82.takeup.data.GenreSummary
 import xyz.five82.takeup.data.LoomItem
 import xyz.five82.takeup.ui.theme.heroBottomScrim
 
 @Composable
 internal fun HomeScreen(
     state: MainUiState.Home,
+    modifier: Modifier = Modifier,
     onRetry: () -> Unit,
     onOpenSettings: () -> Unit,
     onShowMovies: () -> Unit,
     onShowShows: () -> Unit,
     onItemSelected: (LoomItem) -> Unit,
     onPlayItem: (LoomItem) -> Unit,
+    onGenreSelected: (Genre) -> Unit,
+    onOpenGenreHub: () -> Unit,
     onHeroSeedUrlChanged: (String?) -> Unit,
 ) {
     UseLightStatusBarIcons()
     val content = state.content
     val isEmpty = content.continueWatching.isEmpty() &&
         content.recentlyAdded.isEmpty() && content.movies.isEmpty() && content.shows.isEmpty()
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = modifier.fillMaxSize()) {
         when {
             state.isLoading && isEmpty -> LoadingHome()
             state.error != null && isEmpty -> FullScreenError(
@@ -90,6 +87,8 @@ internal fun HomeScreen(
                 onShowShows = onShowShows,
                 onItemSelected = onItemSelected,
                 onPlayItem = onPlayItem,
+                onGenreSelected = onGenreSelected,
+                onOpenGenreHub = onOpenGenreHub,
                 onHeroSeedUrlChanged = onHeroSeedUrlChanged,
             )
         }
@@ -149,10 +148,15 @@ private fun HomeList(
     onShowShows: () -> Unit,
     onItemSelected: (LoomItem) -> Unit,
     onPlayItem: (LoomItem) -> Unit,
+    onGenreSelected: (Genre) -> Unit,
+    onOpenGenreHub: () -> Unit,
     onHeroSeedUrlChanged: (String?) -> Unit,
 ) {
     val content = state.content
     val heroes = remember(content) { state.heroItems() }
+    val dayOfYear = remember { LocalDate.now().dayOfYear }
+    val spotlights = remember(content, dayOfYear) { state.genreSpotlights(dayOfYear) }
+    val genreEntries = remember(content) { state.genreBrowseEntries() }
     val carouselState = rememberCarouselState { heroes.size }
     val heroItem = heroes.getOrNull(carouselState.currentItem)
     val heroBackdropUrl = heroItem?.let {
@@ -165,7 +169,8 @@ private fun HomeList(
         onRefresh = onRetry,
         modifier = Modifier.fillMaxSize(),
     ) {
-        AmbientBackdrop(url = heroBackdropUrl)
+        AmbientGlow(url = heroBackdropUrl)
+        var entranceIndex = 0
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = BottomToolbarInset),
@@ -183,19 +188,23 @@ private fun HomeList(
                 }
             }
             if (heroes.isNotEmpty()) {
+                val entrance = entranceIndex++
                 item {
-                    HeroCarousel(
-                        serverUrl = state.serverUrl,
-                        heroes = heroes,
-                        continueWatchingIds = content.continueWatching.map { it.id }.toSet(),
-                        recentlyAddedIds = content.recentlyAdded.map { it.id }.toSet(),
-                        carouselState = carouselState,
-                        onPlayItem = onPlayItem,
-                        onItemSelected = onItemSelected,
-                    )
+                    Box(Modifier.staggeredEntrance(entrance)) {
+                        HeroCarousel(
+                            serverUrl = state.serverUrl,
+                            heroes = heroes,
+                            continueWatchingIds = content.continueWatching.map { it.id }.toSet(),
+                            recentlyAddedIds = content.recentlyAdded.map { it.id }.toSet(),
+                            carouselState = carouselState,
+                            onPlayItem = onPlayItem,
+                            onItemSelected = onItemSelected,
+                        )
+                    }
                 }
             }
             if (content.continueWatching.isNotEmpty()) {
+                val entrance = entranceIndex++
                 item {
                     MediaRow(
                         title = stringResource(R.string.continue_watching),
@@ -203,20 +212,38 @@ private fun HomeList(
                         items = content.continueWatching,
                         landscape = true,
                         onItemSelected = onItemSelected,
+                        modifier = Modifier.staggeredEntrance(entrance),
                     )
                 }
             }
             if (content.recentlyAdded.isNotEmpty()) {
+                val entrance = entranceIndex++
                 item {
                     MediaRow(
                         title = stringResource(R.string.recently_added),
                         serverUrl = state.serverUrl,
                         items = content.recentlyAdded,
                         onItemSelected = onItemSelected,
+                        modifier = Modifier.staggeredEntrance(entrance),
+                    )
+                }
+            }
+            spotlights.forEach { (genre, items) ->
+                val entrance = entranceIndex++
+                item(key = "spotlight:${genre.id}") {
+                    MediaRow(
+                        title = stringResource(R.string.genre_spotlight, genre.name),
+                        serverUrl = state.serverUrl,
+                        items = items,
+                        actionText = stringResource(R.string.see_all),
+                        onAction = { onGenreSelected(genre) },
+                        onItemSelected = onItemSelected,
+                        modifier = Modifier.staggeredEntrance(entrance),
                     )
                 }
             }
             if (content.movies.isNotEmpty()) {
+                val entrance = entranceIndex++
                 item {
                     MediaRow(
                         title = stringResource(R.string.movies),
@@ -225,10 +252,12 @@ private fun HomeList(
                         actionText = stringResource(R.string.see_all),
                         onAction = onShowMovies,
                         onItemSelected = onItemSelected,
+                        modifier = Modifier.staggeredEntrance(entrance),
                     )
                 }
             }
             if (content.shows.isNotEmpty()) {
+                val entrance = entranceIndex++
                 item {
                     MediaRow(
                         title = stringResource(R.string.shows),
@@ -237,6 +266,18 @@ private fun HomeList(
                         actionText = stringResource(R.string.see_all),
                         onAction = onShowShows,
                         onItemSelected = onItemSelected,
+                        modifier = Modifier.staggeredEntrance(entrance),
+                    )
+                }
+            }
+            if (genreEntries.isNotEmpty()) {
+                val entrance = entranceIndex++
+                item(key = "genreBrowse") {
+                    GenreBrowseRow(
+                        entries = genreEntries,
+                        onGenreSelected = onGenreSelected,
+                        onOpenGenreHub = onOpenGenreHub,
+                        modifier = Modifier.staggeredEntrance(entrance),
                     )
                 }
             }
@@ -252,45 +293,6 @@ private fun HomeList(
                 }
             }
         }
-    }
-}
-
-/**
- * Blurred copy of the hero backdrop dissolving into the surface, so the top of
- * Home glows with the artwork's palette instead of sitting on a flat field.
- */
-@Composable
-private fun AmbientBackdrop(url: String?, modifier: Modifier = Modifier) {
-    if (url == null) return
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(480.dp),
-    ) {
-        AsyncImage(
-            // A tiny decode is all a heavy blur needs; keeps the effect cheap.
-            model = ImageRequest.Builder(LocalContext.current)
-                .data(url)
-                .size(Size(64, 64))
-                .crossfade(true)
-                .build(),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .fillMaxSize()
-                .blur(40.dp)
-                .alpha(0.55f),
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        0f to Color.Transparent,
-                        1f to MaterialTheme.colorScheme.surface,
-                    ),
-                ),
-        )
     }
 }
 
@@ -441,17 +443,65 @@ private fun HeroItem(
     }
 }
 
+/** Horizontal strip of genre cards with a "See all" entry into the hub. */
+@Composable
+private fun GenreBrowseRow(
+    entries: List<GenreSummary>,
+    onGenreSelected: (Genre) -> Unit,
+    onOpenGenreHub: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.browse_by_genre),
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.titleLargeEmphasized,
+            )
+            TextButton(
+                onClick = onOpenGenreHub,
+                shapes = ButtonDefaults.shapes(),
+            ) {
+                Text(stringResource(R.string.see_all))
+            }
+        }
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            items(entries.take(8), key = { it.id }) { entry ->
+                GenreCard(
+                    name = entry.name,
+                    itemCount = entry.itemCount,
+                    onClick = { onGenreSelected(Genre(id = entry.id, name = entry.name)) },
+                    modifier = Modifier
+                        .width(156.dp)
+                        .height(88.dp),
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun MediaRow(
     title: String,
     serverUrl: String,
     items: List<LoomItem>,
     onItemSelected: (LoomItem) -> Unit,
+    modifier: Modifier = Modifier,
     actionText: String? = null,
     onAction: (() -> Unit)? = null,
     landscape: Boolean = false,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()

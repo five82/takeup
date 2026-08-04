@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import xyz.five82.takeup.data.Genre
 import xyz.five82.takeup.data.HomeContent
 import xyz.five82.takeup.data.LoomItem
 
@@ -70,16 +71,37 @@ class SeedArtworkUrlTest {
     }
 
     @Test
+    fun `playback seeds from the item being watched`() {
+        assertEquals(
+            imageUrl(41),
+            seedArtworkUrl(
+                MainUiState.Playback(serverUrl, item(1, backdropId = 41), BrowseOrigin.Home),
+            ),
+        )
+    }
+
+    @Test
+    fun `genre landing seeds from its first item`() {
+        val state = MainUiState.GenreLanding(
+            serverUrl = serverUrl,
+            genre = Genre(id = 7, name = "Sci-Fi"),
+            items = listOf(item(1, backdropId = 41), item(2, backdropId = 42)),
+        )
+        assertEquals(imageUrl(41), seedArtworkUrl(state))
+        assertNull(
+            seedArtworkUrl(
+                MainUiState.GenreLanding(serverUrl, Genre(id = 7, name = "Sci-Fi")),
+            ),
+        )
+    }
+
+    @Test
     fun `states without dominant artwork use the brand seed`() {
         assertNull(seedArtworkUrl(MainUiState.Starting))
         assertNull(seedArtworkUrl(MainUiState.Connect()))
         assertNull(seedArtworkUrl(MainUiState.Library(serverUrl, LibraryKind.Movies)))
         assertNull(seedArtworkUrl(MainUiState.Search(serverUrl)))
-        assertNull(
-            seedArtworkUrl(
-                MainUiState.Playback(serverUrl, item(1, backdropId = 41), BrowseOrigin.Home),
-            ),
-        )
+        assertNull(seedArtworkUrl(MainUiState.GenreHub(serverUrl)))
         assertNull(seedArtworkUrl(home()))
     }
 

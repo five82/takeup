@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import xyz.five82.takeup.data.ArtworkKind
 import xyz.five82.takeup.data.ArtworkOption
+import xyz.five82.takeup.data.Genre
 import xyz.five82.takeup.data.GenreSummary
 import xyz.five82.takeup.data.HomeContent
 import xyz.five82.takeup.data.LoomHttpException
@@ -38,6 +39,7 @@ internal enum class BrowseOrigin {
     Shows,
     Season,
     Search,
+    Genre,
 }
 
 // Destinations reachable from the floating navigation toolbar.
@@ -91,6 +93,23 @@ internal sealed interface MainUiState {
         val results: List<LoomItem> = emptyList(),
         // True once a search for the current query has completed.
         val searched: Boolean = false,
+        val isLoading: Boolean = false,
+        val error: String? = null,
+        // Shown as browse cards while the query is empty.
+        val genres: List<GenreSummary> = emptyList(),
+    ) : MainUiState
+
+    data class GenreHub(
+        val serverUrl: String,
+        val genres: List<GenreSummary> = emptyList(),
+        val isLoading: Boolean = false,
+        val error: String? = null,
+    ) : MainUiState
+
+    data class GenreLanding(
+        val serverUrl: String,
+        val genre: Genre,
+        val items: List<LoomItem> = emptyList(),
         val isLoading: Boolean = false,
         val error: String? = null,
     ) : MainUiState
@@ -153,6 +172,45 @@ internal fun MainUiState.Home.heroItems(): List<LoomItem> {
     return listOfNotNull(content.movies.firstOrNull() ?: content.shows.firstOrNull())
 }
 
+// Spotlight rows for Home: the library's richest genres, rotated by day so
+// Home doesn't fossilize. Derived from the movies the home load already
+// carries - no extra server calls.
+internal fun MainUiState.Home.genreSpotlights(
+    dayOfYear: Int,
+    rowCount: Int = 2,
+    minItems: Int = 4,
+): List<Pair<Genre, List<LoomItem>>> {
+    val byGenre = LinkedHashMap<Long, Pair<Genre, MutableList<LoomItem>>>()
+    content.movies.forEach { item ->
+        item.genres.forEach { genre ->
+            byGenre.getOrPut(genre.id) { genre to mutableListOf() }.second.add(item)
+        }
+    }
+    val eligible = byGenre.values
+        .filter { it.second.size >= minItems }
+        .sortedByDescending { it.second.size }
+    if (eligible.isEmpty()) return emptyList()
+    val start = dayOfYear % eligible.size
+    return (0 until minOf(rowCount, eligible.size)).map { offset ->
+        val (genre, items) = eligible[(start + offset) % eligible.size]
+        genre to items.take(12)
+    }
+}
+
+// Cards for Home's "Browse by genre" row, largest genres first.
+internal fun MainUiState.Home.genreBrowseEntries(): List<GenreSummary> {
+    val byGenre = LinkedHashMap<Long, Pair<Genre, Int>>()
+    content.movies.forEach { item ->
+        item.genres.forEach { genre ->
+            val current = byGenre[genre.id]
+            byGenre[genre.id] = genre to ((current?.second ?: 0) + 1)
+        }
+    }
+    return byGenre.values
+        .sortedByDescending { it.second }
+        .map { (genre, count) -> GenreSummary(id = genre.id, name = genre.name, itemCount = count) }
+}
+
 // Artwork that seeds the app-wide color scheme for a given destination.
 // Screens without dominant artwork return null and use the brand seed.
 internal fun seedArtworkUrl(state: MainUiState): String? = when (state) {
@@ -166,6 +224,12 @@ internal fun seedArtworkUrl(state: MainUiState): String? = when (state) {
     is MainUiState.Season ->
         state.show.backdropUrl(state.serverUrl) ?: state.season.posterUrl(state.serverUrl)
     is MainUiState.Artwork ->
+        state.item.backdropUrl(state.serverUrl) ?: state.item.posterUrl(state.serverUrl)
+    is MainUiState.GenreLanding -> state.items.firstOrNull()?.let {
+        it.backdropUrl(state.serverUrl) ?: it.posterUrl(state.serverUrl)
+    }
+    // The player accent follows the item being watched.
+    is MainUiState.Playback ->
         state.item.backdropUrl(state.serverUrl) ?: state.item.posterUrl(state.serverUrl)
     else -> null
 }
@@ -213,6 +277,10 @@ internal class MainViewModel(
     private var artworkReturnState: MainUiState? = null
     private var settingsReturnState: MainUiState.Home? = null
     private var searchReturnState: MainUiState.Search? = null
+    // Landing content survives a round trip into item details (origin Genre),
+    // and the return state remembers where the landing was opened from.
+    private var genreLandingContent: Pair<Genre, List<LoomItem>>? = null
+    private var genreReturnState: MainUiState? = null
 
     fun start() {
         if (started) return
@@ -248,6 +316,8 @@ internal class MainViewModel(
                     homeContent = EMPTY_HOME_CONTENT
                     movieGenres = emptyList()
                     movieGenreItems = null
+                    genreLandingContent = null
+                    genreReturnState = null
                     showContent = null
                     seasonContent = null
                     loadHome(it)
@@ -287,7 +357,10 @@ internal class MainViewModel(
             TopDestination.Shows -> showLibraryContent(serverUrl, LibraryKind.Shows)
             TopDestination.Search -> {
                 searchReturnState = null
-                _uiState.value = MainUiState.Search(serverUrl = serverUrl)
+                _uiState.value = MainUiState.Search(serverUrl = serverUrl, genres = movieGenres)
+                if (movieGenres.isEmpty()) {
+                    activeJob = viewModelScope.launch { loadSearchGenres(serverUrl) }
+                }
             }
         }
     }
@@ -359,6 +432,94 @@ internal class MainViewModel(
         val state = _uiState.value as? MainUiState.Library ?: return
         activeJob?.cancel()
         _uiState.value = MainUiState.Home(serverUrl = state.serverUrl, content = homeContent)
+    }
+
+    fun openGenreHub() {
+        val serverUrl = currentServerUrl() ?: return
+        activeJob?.cancel()
+        activeJob = viewModelScope.launch {
+            _uiState.value = MainUiState.GenreHub(
+                serverUrl = serverUrl,
+                genres = movieGenres,
+                isLoading = movieGenres.isEmpty(),
+            )
+            loadGenreHub(serverUrl)
+        }
+    }
+
+    fun retryGenreHub() {
+        val state = _uiState.value as? MainUiState.GenreHub ?: return
+        activeJob?.cancel()
+        activeJob = viewModelScope.launch {
+            _uiState.value = state.copy(isLoading = true, error = null)
+            loadGenreHub(state.serverUrl)
+        }
+    }
+
+    fun backFromGenreHub() {
+        val state = _uiState.value as? MainUiState.GenreHub ?: return
+        activeJob?.cancel()
+        _uiState.value = MainUiState.Home(serverUrl = state.serverUrl, content = homeContent)
+    }
+
+    // Opens a genre landing from anywhere genres appear: Home rows, the hub,
+    // search browse cards, or detail chips. Remembers the state it was opened
+    // from so back returns there.
+    fun openGenre(genre: Genre) {
+        val serverUrl = currentServerUrl() ?: return
+        val current = _uiState.value
+        if (current !is MainUiState.GenreLanding) {
+            genreReturnState = when (current) {
+                is MainUiState.Search -> current.copy(isLoading = false)
+                else -> current
+            }
+        }
+        activeJob?.cancel()
+        activeJob = viewModelScope.launch {
+            val cached = genreLandingContent?.takeIf { it.first.id == genre.id }
+            _uiState.value = MainUiState.GenreLanding(
+                serverUrl = serverUrl,
+                genre = genre,
+                items = cached?.second.orEmpty(),
+                isLoading = true,
+            )
+            loadGenreLanding(serverUrl, genre)
+        }
+    }
+
+    fun retryGenreLanding() {
+        val state = _uiState.value as? MainUiState.GenreLanding ?: return
+        activeJob?.cancel()
+        activeJob = viewModelScope.launch {
+            _uiState.value = state.copy(isLoading = true, error = null)
+            loadGenreLanding(state.serverUrl, state.genre)
+        }
+    }
+
+    fun backFromGenreLanding() {
+        val state = _uiState.value as? MainUiState.GenreLanding ?: return
+        activeJob?.cancel()
+        _uiState.value = genreReturnState
+            ?: MainUiState.Home(serverUrl = state.serverUrl, content = homeContent)
+        genreReturnState = null
+    }
+
+    fun selectGenreItem(item: LoomItem) {
+        if (_uiState.value !is MainUiState.GenreLanding) return
+        if (item.kind == "show") {
+            selectShow(item, BrowseOrigin.Genre)
+        } else {
+            selectItem(item, BrowseOrigin.Genre)
+        }
+    }
+
+    fun playGenreItem(item: LoomItem) {
+        val state = _uiState.value as? MainUiState.GenreLanding ?: return
+        if (item.kind == "show") {
+            selectShow(item, BrowseOrigin.Genre)
+        } else {
+            startPlayback(state.serverUrl, item, BrowseOrigin.Genre)
+        }
     }
 
     fun updateSearchQuery(query: String) {
@@ -736,6 +897,46 @@ internal class MainViewModel(
         // Genre chips are optional; leave them hidden on failure.
     }
 
+    private suspend fun loadSearchGenres(serverUrl: String) {
+        runCatching { repository.genres(serverUrl) }
+            .onSuccess { genres ->
+                movieGenres = genres
+                val state = _uiState.value as? MainUiState.Search ?: return@onSuccess
+                _uiState.value = state.copy(genres = genres)
+            }
+        // Browse cards are optional; search still works without them.
+    }
+
+    private suspend fun loadGenreHub(serverUrl: String) {
+        runCatching { repository.genres(serverUrl) }
+            .onSuccess { genres ->
+                movieGenres = genres
+                val state = _uiState.value as? MainUiState.GenreHub ?: return@onSuccess
+                _uiState.value = state.copy(genres = genres, isLoading = false, error = null)
+            }
+            .onFailure {
+                val state = _uiState.value as? MainUiState.GenreHub ?: return@onFailure
+                _uiState.value = state.copy(isLoading = false, error = readableError(it))
+            }
+    }
+
+    private suspend fun loadGenreLanding(serverUrl: String, genre: Genre) {
+        runCatching { repository.movies(serverUrl, genre.id) }
+            .onSuccess { items ->
+                genreLandingContent = genre to items
+                val state = _uiState.value as? MainUiState.GenreLanding ?: return@onSuccess
+                if (state.genre.id == genre.id) {
+                    _uiState.value = state.copy(items = items, isLoading = false, error = null)
+                }
+            }
+            .onFailure {
+                val state = _uiState.value as? MainUiState.GenreLanding ?: return@onFailure
+                if (state.genre.id == genre.id) {
+                    _uiState.value = state.copy(isLoading = false, error = readableError(it))
+                }
+            }
+    }
+
     private fun cacheLibraryItems(
         kind: LibraryKind,
         genreId: Long,
@@ -1005,6 +1206,13 @@ internal class MainViewModel(
             } ?: MainUiState.Home(serverUrl = serverUrl, content = homeContent)
             BrowseOrigin.Search -> searchReturnState
                 ?: MainUiState.Home(serverUrl = serverUrl, content = homeContent)
+            BrowseOrigin.Genre -> genreLandingContent?.let { (genre, items) ->
+                MainUiState.GenreLanding(
+                    serverUrl = serverUrl,
+                    genre = genre,
+                    items = items,
+                )
+            } ?: MainUiState.Home(serverUrl = serverUrl, content = homeContent)
         }
     }
 
@@ -1087,6 +1295,8 @@ internal class MainViewModel(
         is MainUiState.Details -> state.serverUrl
         is MainUiState.Artwork -> state.serverUrl
         is MainUiState.Playback -> state.serverUrl
+        is MainUiState.GenreHub -> state.serverUrl
+        is MainUiState.GenreLanding -> state.serverUrl
         else -> null
     }
 

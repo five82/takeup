@@ -1,5 +1,6 @@
 package xyz.five82.takeup.ui
 
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -49,6 +50,21 @@ private fun LandscapeMediaCardPreview() {
             item = previewItem,
             onClick = {},
             modifier = Modifier.width(240.dp),
+        )
+    }
+}
+
+@Preview
+@Composable
+private fun GenreCardPreview() {
+    TakeupTheme {
+        GenreCard(
+            name = "Science Fiction",
+            itemCount = 42,
+            onClick = {},
+            modifier = Modifier
+                .width(156.dp)
+                .height(88.dp),
         )
     }
 }

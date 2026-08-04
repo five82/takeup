@@ -6,9 +6,11 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -16,8 +18,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.progressSemantics
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -38,6 +42,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import xyz.five82.takeup.R
+import xyz.five82.takeup.data.Genre
 import xyz.five82.takeup.data.PlaybackProgress
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -52,11 +57,15 @@ internal fun DetailsScreen(
     onRetry: () -> Unit,
     onEditArtwork: () -> Unit,
     onPlay: () -> Unit,
+    onGenreSelected: (Genre) -> Unit,
 ) {
     BackHandler(onBack = onBack)
     UseLightStatusBarIcons()
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
-    DetailBackground {
+    Box(Modifier.fillMaxSize()) {
+    AmbientGlow(
+        url = state.item.backdropUrl(state.serverUrl) ?: state.item.posterUrl(state.serverUrl),
+    )
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = Color.Transparent,
@@ -69,15 +78,6 @@ internal fun DetailsScreen(
                         contentDescription = stringResource(R.string.navigate_back),
                         onClick = onBack,
                     )
-                },
-                actions = {
-                    if (state.item.kind == "movie" && state.item.tmdbId > 0) {
-                        MediaOverlayIconButton(
-                            iconResource = R.drawable.ic_artwork,
-                            contentDescription = stringResource(R.string.artwork),
-                            onClick = onEditArtwork,
-                        )
-                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color.Transparent,
@@ -99,7 +99,8 @@ internal fun DetailsScreen(
                     url = state.item.backdropUrl(state.serverUrl),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .aspectRatio(16f / 9f),
+                        .aspectRatio(16f / 9f)
+                        .itemArtworkSharedBounds(state.item.id),
                 )
             }
             if (state.isLoading) {
@@ -167,8 +168,6 @@ internal fun DetailsScreen(
                             val metadata = listOfNotNull(
                                 state.item.subtitle(),
                                 state.item.mediaDurationMs.takeIf { it > 0 }?.let(::formatRuntime),
-                                state.item.genres.takeIf { it.isNotEmpty() }
-                                    ?.joinToString(", ") { it.name },
                                 state.item.releaseDate
                                     .takeIf { state.item.kind == "episode" && it.isNotBlank() }
                                     ?.let(::formatReleaseDate),
@@ -183,35 +182,31 @@ internal fun DetailsScreen(
                             state.item.progress?.let { progress ->
                                 PlaybackStatus(progress)
                             }
-                            Button(
-                                onClick = onPlay,
-                                shapes = ButtonDefaults.shapesFor(
-                                    ButtonDefaults.MediumContainerHeight,
+                            DetailActionRow(
+                                playLabel = stringResource(
+                                    if ((state.item.progress?.resumePositionMs ?: 0L) > 0) {
+                                        R.string.resume
+                                    } else {
+                                        R.string.play
+                                    },
                                 ),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(ButtonDefaults.MediumContainerHeight),
                                 enabled = !state.isLoading,
-                                contentPadding = ButtonDefaults.contentPaddingFor(
-                                    ButtonDefaults.MediumContainerHeight,
-                                ),
-                            ) {
-                                Icon(
-                                    painter = painterResource(R.drawable.ic_play),
-                                    contentDescription = null,
-                                )
-                                Text(
-                                    stringResource(
-                                        if ((state.item.progress?.resumePositionMs ?: 0L) > 0) {
-                                            R.string.resume
-                                        } else {
-                                            R.string.play
-                                        },
-                                    ),
-                                )
-                            }
+                                onPlay = onPlay,
+                                onEditArtwork = onEditArtwork.takeIf {
+                                    state.item.kind == "movie" && state.item.tmdbId > 0
+                                },
+                            )
                         }
                     }
+                }
+            }
+            if (state.item.genres.isNotEmpty()) {
+                item {
+                    GenreChipRow(
+                        genres = state.item.genres,
+                        onGenreSelected = onGenreSelected,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    )
                 }
             }
             val mediaBadges = state.item.mediaBadges()
@@ -244,6 +239,100 @@ internal fun DetailsScreen(
             item { Box(Modifier.padding(bottom = 4.dp)) }
         }
     }
+    }
+}
+
+/**
+ * Connected action group: Play carries the outer pill corners and the artwork
+ * action completes the pill, reading as one control split in two.
+ */
+@Composable
+private fun DetailActionRow(
+    playLabel: String,
+    enabled: Boolean,
+    onPlay: () -> Unit,
+    onEditArtwork: (() -> Unit)?,
+) {
+    val height = ButtonDefaults.MediumContainerHeight
+    val outer = 28.dp
+    val inner = 8.dp
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(height),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Button(
+            onClick = onPlay,
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight(),
+            enabled = enabled,
+            shape = if (onEditArtwork == null) {
+                RoundedCornerShape(outer)
+            } else {
+                RoundedCornerShape(
+                    topStart = outer,
+                    bottomStart = outer,
+                    topEnd = inner,
+                    bottomEnd = inner,
+                )
+            },
+            contentPadding = ButtonDefaults.contentPaddingFor(height),
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.ic_play),
+                contentDescription = null,
+            )
+            Text(playLabel)
+        }
+        if (onEditArtwork != null) {
+            FilledTonalButton(
+                onClick = onEditArtwork,
+                modifier = Modifier.fillMaxHeight(),
+                shape = RoundedCornerShape(
+                    topStart = inner,
+                    bottomStart = inner,
+                    topEnd = outer,
+                    bottomEnd = outer,
+                ),
+                contentPadding = PaddingValues(horizontal = 18.dp),
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_artwork),
+                    contentDescription = stringResource(R.string.artwork),
+                )
+            }
+        }
+    }
+}
+
+/** Tappable genre pills linking into the genre landing. */
+@Composable
+internal fun GenreChipRow(
+    genres: List<Genre>,
+    onGenreSelected: (Genre) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    FlowRow(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        genres.forEach { genre ->
+            Surface(
+                onClick = { onGenreSelected(genre) },
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                shape = MaterialTheme.shapes.extraLarge,
+            ) {
+                Text(
+                    text = genre.name,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                    style = MaterialTheme.typography.labelLargeEmphasized,
+                )
+            }
+        }
     }
 }
 
