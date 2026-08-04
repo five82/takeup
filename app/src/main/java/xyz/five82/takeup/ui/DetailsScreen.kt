@@ -18,8 +18,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.progressSemantics
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -28,7 +26,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -59,8 +56,10 @@ internal fun DetailsScreen(
     BackHandler(onBack = onBack)
     UseLightStatusBarIcons()
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+    DetailBackground {
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 title = {},
@@ -82,7 +81,7 @@ internal fun DetailsScreen(
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color.Transparent,
-                    scrolledContainerColor = Color(0xE6000000),
+                    scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
                 ),
                 scrollBehavior = scrollBehavior,
             )
@@ -108,26 +107,11 @@ internal fun DetailsScreen(
             }
             state.error?.let { error ->
                 item {
-                    Card(
+                    ErrorCard(
+                        message = error,
+                        onRetry = onRetry,
                         modifier = Modifier.padding(horizontal = 16.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer,
-                        ),
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                        ) {
-                            Text(error, color = MaterialTheme.colorScheme.onErrorContainer)
-                            TextButton(
-                                onClick = onRetry,
-                                shapes = ButtonDefaults.shapes(),
-                            ) {
-                                Text(stringResource(R.string.retry))
-                            }
-                        }
-                    }
+                    )
                 }
             }
             item {
@@ -259,6 +243,7 @@ internal fun DetailsScreen(
             }
             item { Box(Modifier.padding(bottom = 4.dp)) }
         }
+    }
     }
 }
 

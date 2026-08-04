@@ -110,22 +110,11 @@ internal fun ArtworkScreen(
                 LinearProgressIndicator(Modifier.fillMaxWidth())
             }
             state.error?.let { error ->
-                Surface(
+                ErrorCard(
+                    message = error,
+                    onRetry = onRetry,
                     modifier = Modifier.padding(12.dp),
-                    color = MaterialTheme.colorScheme.errorContainer,
-                    shape = MaterialTheme.shapes.large,
-                ) {
-                    Column(Modifier.padding(16.dp)) {
-                        Text(error, color = MaterialTheme.colorScheme.onErrorContainer)
-                        TextButton(
-                            onClick = onRetry,
-                            shapes = ButtonDefaults.shapes(),
-                            enabled = !state.isSaving,
-                        ) {
-                            Text(stringResource(R.string.retry))
-                        }
-                    }
-                }
+                )
             }
             when {
                 state.options.isNotEmpty() -> ArtworkGrid(

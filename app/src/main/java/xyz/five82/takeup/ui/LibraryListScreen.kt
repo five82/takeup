@@ -5,12 +5,9 @@ package xyz.five82.takeup.ui
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -18,10 +15,6 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items as rowItems
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilterChip
@@ -30,7 +23,6 @@ import androidx.compose.material3.MediumFlexibleTopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -70,7 +62,6 @@ internal fun LibraryListScreen(
                         ),
                     )
                 },
-                navigationIcon = { NavigationBackButton(onClick = onBack) },
                 scrollBehavior = scrollBehavior,
             )
         },
@@ -80,10 +71,10 @@ internal fun LibraryListScreen(
                 contentPadding,
                 state.kind,
             )
-            state.error != null && state.items.isEmpty() -> LibraryListError(
-                contentPadding = contentPadding,
+            state.error != null && state.items.isEmpty() -> FullScreenError(
                 message = state.error,
                 onRetry = onRetry,
+                modifier = Modifier.padding(contentPadding),
             )
             state.items.isEmpty() && state.genres.isEmpty() -> EmptyLibraryList(
                 contentPadding,
@@ -114,42 +105,17 @@ private fun LoadingLibrary(
             .fillMaxSize()
             .padding(contentPadding)
             .semantics { contentDescription = description },
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
+        contentPadding = PaddingValues(
+            start = 12.dp,
+            top = 12.dp,
+            end = 12.dp,
+            bottom = BottomToolbarInset,
+        ),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         items(6) {
             PosterCardPlaceholder()
-        }
-    }
-}
-
-@Composable
-private fun LibraryListError(
-    contentPadding: PaddingValues,
-    message: String,
-    onRetry: () -> Unit,
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(contentPadding)
-            .padding(24.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = message,
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodyLarge,
-            )
-            Spacer(Modifier.height(16.dp))
-            Button(
-                onClick = onRetry,
-                shapes = ButtonDefaults.shapes(),
-            ) {
-                Text(stringResource(R.string.retry))
-            }
         }
     }
 }
@@ -192,7 +158,12 @@ private fun LibraryGrid(
         LazyVerticalGrid(
             columns = GridCells.Adaptive(minSize = 132.dp),
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
+            contentPadding = PaddingValues(
+            start = 12.dp,
+            top = 12.dp,
+            end = 12.dp,
+            bottom = BottomToolbarInset,
+        ),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -216,25 +187,7 @@ private fun LibraryGrid(
             }
             state.error?.let { error ->
                 item(span = { GridItemSpan(maxLineSpan) }) {
-                    Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer,
-                        ),
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                        ) {
-                            Text(error, color = MaterialTheme.colorScheme.onErrorContainer)
-                            TextButton(
-                                onClick = onRetry,
-                                shapes = ButtonDefaults.shapes(),
-                            ) {
-                                Text(stringResource(R.string.retry))
-                            }
-                        }
-                    }
+                    ErrorCard(message = error, onRetry = onRetry)
                 }
             }
             items(state.items, key = { it.id }) { item ->

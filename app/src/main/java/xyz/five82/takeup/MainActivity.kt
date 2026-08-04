@@ -18,16 +18,25 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -39,6 +48,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -50,13 +61,19 @@ import xyz.five82.takeup.ui.DetailsScreen
 import xyz.five82.takeup.ui.HomeScreen
 import xyz.five82.takeup.ui.LibraryListScreen
 import xyz.five82.takeup.ui.LocalNetworkPermissionScreen
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 import xyz.five82.takeup.ui.MainUiState
 import xyz.five82.takeup.ui.MainViewModel
+import xyz.five82.takeup.ui.NavigationToolbar
 import xyz.five82.takeup.ui.PlaybackScreen
+import xyz.five82.takeup.ui.topDestination
 import xyz.five82.takeup.ui.SearchScreen
 import xyz.five82.takeup.ui.SeasonScreen
 import xyz.five82.takeup.ui.ShowDetailsScreen
+import xyz.five82.takeup.ui.seedArtworkUrl
 import xyz.five82.takeup.ui.theme.TakeupTheme
+import xyz.five82.takeup.ui.theme.rememberSeedColor
 
 private const val LOCAL_NETWORK_PERMISSION = "android.permission.ACCESS_LOCAL_NETWORK"
 
@@ -73,12 +90,24 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
         )
         setContent {
-            TakeupTheme {
+            val state by viewModel.uiState.collectAsStateWithLifecycle()
+            // The Home hero carousel reports its focused item so the theme can
+            // follow swipes; every other screen derives its seed from state.
+            var heroSeedUrl by remember { mutableStateOf<String?>(null) }
+            val seedUrl = if (state is MainUiState.Home) {
+                heroSeedUrl ?: seedArtworkUrl(state)
+            } else {
+                seedArtworkUrl(state)
+            }
+            TakeupTheme(seedColor = rememberSeedColor(seedUrl)) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
                 ) {
-                    PermissionAwareApp(viewModel)
+                    PermissionAwareApp(
+                        viewModel = viewModel,
+                        onHeroSeedUrlChanged = { heroSeedUrl = it },
+                    )
                 }
             }
         }
@@ -86,7 +115,10 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun PermissionAwareApp(viewModel: MainViewModel) {
+private fun PermissionAwareApp(
+    viewModel: MainViewModel,
+    onHeroSeedUrlChanged: (String?) -> Unit,
+) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val requiresLocalNetworkPermission = Build.VERSION.SDK_INT >= 37
@@ -122,7 +154,7 @@ private fun PermissionAwareApp(viewModel: MainViewModel) {
 
     if (permissionGranted) {
         LaunchedEffect(viewModel) { viewModel.start() }
-        TakeupApp(viewModel)
+        TakeupApp(viewModel, onHeroSeedUrlChanged)
     } else {
         LocalNetworkPermissionScreen(
             wasDenied = permissionDenied,
@@ -142,7 +174,10 @@ private fun PermissionAwareApp(viewModel: MainViewModel) {
 }
 
 @Composable
-private fun TakeupApp(viewModel: MainViewModel) {
+private fun TakeupApp(
+    viewModel: MainViewModel,
+    onHeroSeedUrlChanged: (String?) -> Unit,
+) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val activity = LocalActivity.current
     val isPlaying = state is MainUiState.Playback
@@ -157,6 +192,8 @@ private fun TakeupApp(viewModel: MainViewModel) {
     }
 
     val motionScheme = MaterialTheme.motionScheme
+    val hazeState = rememberHazeState()
+    Box(modifier = Modifier.fillMaxSize()) {
     AnimatedContent(
         targetState = state,
         contentKey = { it::class },
@@ -169,6 +206,7 @@ private fun TakeupApp(viewModel: MainViewModel) {
                     scaleOut(motionScheme.fastSpatialSpec(), targetScale = 1.01f)
                 )
         },
+        modifier = Modifier.hazeSource(hazeState),
         label = "screen",
     ) { animatedState ->
         when (val current = animatedState) {
@@ -186,10 +224,11 @@ private fun TakeupApp(viewModel: MainViewModel) {
                 state = current,
                 onRetry = viewModel::retryHome,
                 onOpenSettings = viewModel::openSettings,
-                onOpenSearch = viewModel::openSearch,
                 onShowMovies = viewModel::showMovies,
                 onShowShows = viewModel::showShows,
                 onItemSelected = viewModel::selectHomeItem,
+                onPlayItem = viewModel::playHomeItem,
+                onHeroSeedUrlChanged = onHeroSeedUrlChanged,
             )
         }
         is MainUiState.Library -> saveableStateHolder.SaveableStateProvider(
@@ -264,6 +303,25 @@ private fun TakeupApp(viewModel: MainViewModel) {
         )
         }
     }
+    AnimatedVisibility(
+        visible = state.topDestination() != null,
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .navigationBarsPadding()
+            .padding(bottom = 16.dp),
+        enter = fadeIn(motionScheme.defaultEffectsSpec()) +
+            slideInVertically(motionScheme.defaultSpatialSpec()) { it * 2 },
+        exit = fadeOut(motionScheme.fastEffectsSpec()) +
+            slideOutVertically(motionScheme.fastSpatialSpec()) { it * 2 },
+        label = "toolbar",
+    ) {
+        NavigationToolbar(
+            current = state.topDestination(),
+            onSelect = viewModel::selectTopDestination,
+            hazeState = hazeState,
+        )
+    }
+    }
 }
 
 @Composable
@@ -272,6 +330,14 @@ private fun StartingScreen() {
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center,
     ) {
-        LoadingIndicator()
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = stringResource(R.string.app_name),
+                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.displaySmallEmphasized,
+            )
+            Spacer(Modifier.height(24.dp))
+            LoadingIndicator()
+        }
     }
 }

@@ -18,9 +18,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LinearProgressIndicator
@@ -30,7 +27,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedListItem
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -58,8 +54,10 @@ internal fun SeasonScreen(
     BackHandler(onBack = onBack)
     UseLightStatusBarIcons()
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+    DetailBackground {
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 title = {
@@ -116,6 +114,7 @@ internal fun SeasonScreen(
             onEpisodeSelected = onEpisodeSelected,
         )
     }
+    }
 }
 
 @Composable
@@ -170,26 +169,11 @@ private fun EpisodeList(
         }
         state.error?.let { error ->
             item {
-                Card(
+                ErrorCard(
+                    message = error,
+                    onRetry = onRetry,
                     modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer,
-                    ),
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                    ) {
-                        Text(error, color = MaterialTheme.colorScheme.onErrorContainer)
-                        TextButton(
-                            onClick = onRetry,
-                            shapes = ButtonDefaults.shapes(),
-                        ) {
-                            Text(stringResource(R.string.retry))
-                        }
-                    }
-                }
+                )
             }
         }
         if (state.isLoading && state.episodes.isEmpty()) {
@@ -228,6 +212,7 @@ private fun SeasonHero(state: MainUiState.Season) {
             url = state.show.backdropUrl(state.serverUrl)
                 ?: state.season.backdropUrl(state.serverUrl),
             modifier = Modifier.fillMaxSize(),
+            darkenBottomForText = true,
         )
         Row(
             modifier = Modifier

@@ -18,7 +18,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -48,7 +47,8 @@ import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilledTonalIconToggleButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.SegmentedListItem
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -72,7 +72,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -112,6 +111,9 @@ import kotlinx.coroutines.isActive
 import xyz.five82.takeup.R
 import xyz.five82.takeup.data.LoomItem
 import xyz.five82.takeup.data.PreparedPlayback
+import xyz.five82.takeup.ui.theme.OverlayPillColor
+import xyz.five82.takeup.ui.theme.playerBottomScrim
+import xyz.five82.takeup.ui.theme.topScrim
 import java.util.Locale
 
 @Composable
@@ -518,7 +520,7 @@ private fun VideoPlayer(
                     .padding(top = 56.dp, end = 16.dp),
             ) {
                 Surface(
-                    color = Color(0xCC000000),
+                    color = OverlayPillColor,
                     shape = MaterialTheme.shapes.small,
                 ) {
                     Text(
@@ -567,11 +569,7 @@ private fun PlaybackControls(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(Color.Transparent, Color.Black.copy(alpha = 0.88f)),
-                    ),
-                )
+                .background(playerBottomScrim())
                 .windowInsetsPadding(
                     WindowInsets.safeDrawing.only(
                         WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal,
@@ -585,11 +583,18 @@ private fun PlaybackControls(
                 onValueChange = { onInteraction() },
                 onValueChangeFinished = onInteraction,
             )
-            ProvideTextStyle(MaterialTheme.typography.labelLargeEmphasized) {
-                PositionAndDurationText(
-                    player = player,
-                    color = Color.White,
-                )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                ProvideTextStyle(MaterialTheme.typography.labelLargeEmphasized) {
+                    PositionAndDurationText(
+                        player = player,
+                        color = Color.White,
+                    )
+                }
             }
         }
     }
@@ -742,27 +747,32 @@ private fun PlaybackOptionsSheet(
             )
             if (audioOptions.isNotEmpty()) {
                 PlaybackOptionsHeading(stringResource(R.string.audio))
-                audioOptions.forEach { option ->
-                    PlaybackTrackRow(
+                PlaybackTrackGroup(
+                    audioOptions.map { option ->
+                        PlaybackTrackChoice(
+                            label = option.label,
+                            selected = option.selected,
+                            onClick = { onSelectTrack(option.group, option.trackIndex) },
+                        )
+                    },
+                )
+            }
+            PlaybackOptionsHeading(stringResource(R.string.subtitles))
+            PlaybackTrackGroup(
+                listOf(
+                    PlaybackTrackChoice(
+                        label = stringResource(R.string.off),
+                        selected = !tracks.isTypeSelected(C.TRACK_TYPE_TEXT),
+                        onClick = onDisableSubtitles,
+                    ),
+                ) + subtitleOptions.map { option ->
+                    PlaybackTrackChoice(
                         label = option.label,
                         selected = option.selected,
                         onClick = { onSelectTrack(option.group, option.trackIndex) },
                     )
-                }
-            }
-            PlaybackOptionsHeading(stringResource(R.string.subtitles))
-            PlaybackTrackRow(
-                label = stringResource(R.string.off),
-                selected = !tracks.isTypeSelected(C.TRACK_TYPE_TEXT),
-                onClick = onDisableSubtitles,
+                },
             )
-            subtitleOptions.forEach { option ->
-                PlaybackTrackRow(
-                    label = option.label,
-                    selected = option.selected,
-                    onClick = { onSelectTrack(option.group, option.trackIndex) },
-                )
-            }
         }
     }
 }
@@ -771,30 +781,40 @@ private fun PlaybackOptionsSheet(
 private fun PlaybackOptionsHeading(text: String) {
     Text(
         text = text,
-        modifier = Modifier.padding(start = 24.dp, top = 16.dp, end = 24.dp, bottom = 4.dp),
+        modifier = Modifier.padding(start = 24.dp, top = 16.dp, end = 24.dp, bottom = 8.dp),
         color = MaterialTheme.colorScheme.primary,
         style = MaterialTheme.typography.titleMediumEmphasized,
     )
 }
 
+private data class PlaybackTrackChoice(
+    val label: String,
+    val selected: Boolean,
+    val onClick: () -> Unit,
+)
+
 @Composable
-private fun PlaybackTrackRow(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    ListItem(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        trailingContent = {
-            RadioButton(
-                selected = selected,
-                onClick = onClick,
-            )
-        },
-    ) {
-        Text(label)
+private fun PlaybackTrackGroup(choices: List<PlaybackTrackChoice>) {
+    choices.forEachIndexed { index, choice ->
+        SegmentedListItem(
+            onClick = choice.onClick,
+            shapes = ListItemDefaults.segmentedShapes(index = index, count = choices.size),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(
+                    start = 16.dp,
+                    end = 16.dp,
+                    bottom = if (index == choices.size - 1) 0.dp else ListItemDefaults.SegmentedGap,
+                ),
+            trailingContent = {
+                RadioButton(
+                    selected = choice.selected,
+                    onClick = choice.onClick,
+                )
+            },
+        ) {
+            Text(choice.label)
+        }
     }
 }
 
@@ -1015,14 +1035,14 @@ private fun PlaybackHeader(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0x99000000))
+            .background(topScrim())
             .windowInsetsPadding(
                 WindowInsets.safeDrawing.only(
                     WindowInsetsSides.Top + WindowInsetsSides.Horizontal,
                 ),
             )
             .heightIn(min = 72.dp)
-            .padding(start = 8.dp, top = 4.dp, end = 56.dp, bottom = 4.dp),
+            .padding(horizontal = 8.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

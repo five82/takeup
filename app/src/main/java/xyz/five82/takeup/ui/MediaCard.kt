@@ -2,6 +2,7 @@
 
 package xyz.five82.takeup.ui
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
@@ -17,10 +18,15 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import xyz.five82.takeup.data.LoomItem
+
+// Cards are intentionally containerless: the artwork carries the visual weight
+// and text sits directly on the screen surface, keeping browse rows light.
 
 @Composable
 internal fun MediaCard(
@@ -33,65 +39,39 @@ internal fun MediaCard(
     Card(
         onClick = onClick,
         modifier = modifier.semantics(mergeDescendants = true) {},
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-        ),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
         shape = MaterialTheme.shapes.large,
     ) {
-        Column {
-            Box(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(MaterialTheme.shapes.large),
+            ) {
                 MediaArtwork(
                     url = item.posterUrl(serverUrl),
                     modifier = Modifier
                         .fillMaxWidth()
                         .aspectRatio(2f / 3f),
                 )
-                val progress = item.progress
-                if (progress?.played == true) {
-                    WatchedBadge(
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(8.dp),
-                    )
-                } else if (
-                    progress != null &&
-                    progress.resumePositionMs > 0 &&
-                    progress.durationMs > 0
-                ) {
-                    val fraction = (progress.positionMs.toFloat() / progress.durationMs)
-                        .coerceIn(0f, 1f)
-                    LinearProgressIndicator(
-                        progress = { fraction },
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
-                            .height(4.dp)
-                            .progressSemantics(fraction),
-                    )
-                }
+                MediaCardProgressOverlay(item, Modifier.matchParentSize())
             }
-            Text(
-                text = item.title,
-                modifier = Modifier.padding(
-                    start = 10.dp,
-                    top = 10.dp,
-                    end = 10.dp,
-                    bottom = if (subtitle == null) 10.dp else 0.dp,
-                ),
-                maxLines = 2,
-                minLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.titleSmall,
-            )
-            subtitle?.let {
+            Column(modifier = Modifier.padding(horizontal = 4.dp, vertical = 0.dp)) {
                 Text(
-                    text = it,
-                    modifier = Modifier.padding(start = 10.dp, end = 10.dp, bottom = 10.dp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    text = item.title,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.labelMedium,
+                    style = MaterialTheme.typography.titleSmall,
                 )
+                subtitle?.let {
+                    Text(
+                        text = it,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                }
             }
         }
     }
@@ -108,58 +88,68 @@ internal fun LandscapeMediaCard(
     Card(
         onClick = onClick,
         modifier = modifier.semantics(mergeDescendants = true) {},
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-        ),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
         shape = MaterialTheme.shapes.extraLarge,
     ) {
-        Column {
-            Box(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(MaterialTheme.shapes.extraLarge),
+            ) {
                 MediaArtwork(
                     url = item.backdropUrl(serverUrl) ?: item.posterUrl(serverUrl),
                     modifier = Modifier
                         .fillMaxWidth()
                         .aspectRatio(16f / 9f),
                 )
-                val progress = item.progress
-                if (progress?.played == true) {
-                    WatchedBadge(
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(8.dp),
-                    )
-                } else if (
-                    progress != null &&
-                    progress.resumePositionMs > 0 &&
-                    progress.durationMs > 0
-                ) {
-                    val fraction = (progress.positionMs.toFloat() / progress.durationMs)
-                        .coerceIn(0f, 1f)
-                    LinearProgressIndicator(
-                        progress = { fraction },
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
-                            .height(4.dp)
-                            .progressSemantics(fraction),
+                MediaCardProgressOverlay(item, Modifier.matchParentSize())
+            }
+            Column(modifier = Modifier.padding(horizontal = 6.dp)) {
+                Text(
+                    text = item.title,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.titleMediumEmphasized,
+                )
+                subtitle?.let {
+                    Text(
+                        text = it,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.labelMedium,
                     )
                 }
             }
-            Text(
-                text = item.title,
-                modifier = Modifier.padding(start = 12.dp, top = 12.dp, end = 12.dp),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.titleMediumEmphasized,
+        }
+    }
+}
+
+@Composable
+private fun MediaCardProgressOverlay(item: LoomItem, modifier: Modifier = Modifier) {
+    val progress = item.progress
+    Box(modifier = modifier) {
+        if (progress?.played == true) {
+            WatchedBadge(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp),
             )
-            Text(
-                text = subtitle.orEmpty(),
-                modifier = Modifier.padding(start = 12.dp, top = 2.dp, end = 12.dp, bottom = 12.dp),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                minLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.labelMedium,
+        } else if (
+            progress != null &&
+            progress.resumePositionMs > 0 &&
+            progress.durationMs > 0
+        ) {
+            val fraction = (progress.positionMs.toFloat() / progress.durationMs)
+                .coerceIn(0f, 1f)
+            LinearProgressIndicator(
+                progress = { fraction },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(4.dp)
+                    .progressSemantics(fraction),
             )
         }
     }

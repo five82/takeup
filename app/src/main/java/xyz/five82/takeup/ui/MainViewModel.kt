@@ -40,6 +40,24 @@ internal enum class BrowseOrigin {
     Search,
 }
 
+// Destinations reachable from the floating navigation toolbar.
+internal enum class TopDestination {
+    Home,
+    Movies,
+    Shows,
+    Search,
+}
+
+internal fun MainUiState.topDestination(): TopDestination? = when (this) {
+    is MainUiState.Home -> TopDestination.Home
+    is MainUiState.Library -> when (kind) {
+        LibraryKind.Movies -> TopDestination.Movies
+        LibraryKind.Shows -> TopDestination.Shows
+    }
+    is MainUiState.Search -> TopDestination.Search
+    else -> null
+}
+
 internal sealed interface MainUiState {
     data object Starting : MainUiState
 
@@ -122,6 +140,34 @@ internal sealed interface MainUiState {
         val isLoading: Boolean = false,
         val error: String? = null,
     ) : MainUiState
+}
+
+// Pool of items the home hero features: in-progress items first, then fresh
+// arrivals, with a plain library item as a last resort so the hero never
+// renders empty on a populated server.
+internal fun MainUiState.Home.heroItems(): List<LoomItem> {
+    val pool = (content.continueWatching.take(3) + content.recentlyAdded)
+        .distinctBy { it.id }
+        .take(6)
+    if (pool.isNotEmpty()) return pool
+    return listOfNotNull(content.movies.firstOrNull() ?: content.shows.firstOrNull())
+}
+
+// Artwork that seeds the app-wide color scheme for a given destination.
+// Screens without dominant artwork return null and use the brand seed.
+internal fun seedArtworkUrl(state: MainUiState): String? = when (state) {
+    is MainUiState.Home -> state.heroItems().firstOrNull()?.let {
+        it.backdropUrl(state.serverUrl) ?: it.posterUrl(state.serverUrl)
+    }
+    is MainUiState.Details ->
+        state.item.backdropUrl(state.serverUrl) ?: state.item.posterUrl(state.serverUrl)
+    is MainUiState.ShowDetails ->
+        state.show.backdropUrl(state.serverUrl) ?: state.show.posterUrl(state.serverUrl)
+    is MainUiState.Season ->
+        state.show.backdropUrl(state.serverUrl) ?: state.season.posterUrl(state.serverUrl)
+    is MainUiState.Artwork ->
+        state.item.backdropUrl(state.serverUrl) ?: state.item.posterUrl(state.serverUrl)
+    else -> null
 }
 
 internal val EMPTY_HOME_CONTENT = HomeContent(
@@ -225,6 +271,27 @@ internal class MainViewModel(
 
     fun showShows() = showLibrary(LibraryKind.Shows)
 
+    // Toolbar navigation: works from any top-level destination, unlike the
+    // Home-only entry points above.
+    fun selectTopDestination(destination: TopDestination) {
+        val current = _uiState.value
+        if (current.topDestination() == null || current.topDestination() == destination) return
+        val serverUrl = currentServerUrl() ?: return
+        activeJob?.cancel()
+        when (destination) {
+            TopDestination.Home -> {
+                searchReturnState = null
+                _uiState.value = MainUiState.Home(serverUrl = serverUrl, content = homeContent)
+            }
+            TopDestination.Movies -> showLibraryContent(serverUrl, LibraryKind.Movies)
+            TopDestination.Shows -> showLibraryContent(serverUrl, LibraryKind.Shows)
+            TopDestination.Search -> {
+                searchReturnState = null
+                _uiState.value = MainUiState.Search(serverUrl = serverUrl)
+            }
+        }
+    }
+
     fun retryLibrary() {
         val state = _uiState.value as? MainUiState.Library ?: return
         activeJob?.cancel()
@@ -294,13 +361,6 @@ internal class MainViewModel(
         _uiState.value = MainUiState.Home(serverUrl = state.serverUrl, content = homeContent)
     }
 
-    fun openSearch() {
-        val state = _uiState.value as? MainUiState.Home ?: return
-        activeJob?.cancel()
-        searchReturnState = null
-        _uiState.value = MainUiState.Search(serverUrl = state.serverUrl)
-    }
-
     fun updateSearchQuery(query: String) {
         val state = _uiState.value as? MainUiState.Search ?: return
         activeJob?.cancel()
@@ -366,6 +426,17 @@ internal class MainViewModel(
             selectShow(item, BrowseOrigin.Home)
         } else {
             selectItem(item, BrowseOrigin.Home)
+        }
+    }
+
+    // Hero CTA: playable items start immediately; shows open their details
+    // since there is no single obvious episode to play.
+    fun playHomeItem(item: LoomItem) {
+        val state = _uiState.value as? MainUiState.Home ?: return
+        if (item.kind == "show") {
+            selectShow(item, BrowseOrigin.Home)
+        } else {
+            startPlayback(state.serverUrl, item, BrowseOrigin.Home)
         }
     }
 
@@ -609,16 +680,20 @@ internal class MainViewModel(
 
     private fun showLibrary(kind: LibraryKind) {
         val state = _uiState.value as? MainUiState.Home ?: return
+        showLibraryContent(state.serverUrl, kind)
+    }
+
+    private fun showLibraryContent(serverUrl: String, kind: LibraryKind) {
         if (kind == LibraryKind.Movies) movieGenreItems = null
         _uiState.value = MainUiState.Library(
-            serverUrl = state.serverUrl,
+            serverUrl = serverUrl,
             kind = kind,
             items = homeContent.items(kind),
             genres = if (kind == LibraryKind.Movies) movieGenres else emptyList(),
         )
         if (kind == LibraryKind.Movies && movieGenres.isEmpty()) {
             activeJob?.cancel()
-            activeJob = viewModelScope.launch { loadMovieGenres(state.serverUrl) }
+            activeJob = viewModelScope.launch { loadMovieGenres(serverUrl) }
         }
     }
 

@@ -3,7 +3,6 @@
 package xyz.five82.takeup.ui
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -14,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -67,7 +67,6 @@ internal fun SearchScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                navigationIcon = { NavigationBackButton(onClick = onBack) },
                 title = { SearchField(query = state.query, onQueryChanged = onQueryChanged) },
             )
         },
@@ -87,12 +86,12 @@ internal fun SearchScreen(
                 )
             }
             when {
-                state.error != null && state.results.isEmpty() -> SearchError(
+                state.error != null && state.results.isEmpty() -> FullScreenError(
                     message = state.error,
                     onRetry = onRetry,
                 )
                 state.query.isBlank() || !state.searched && !state.isLoading ->
-                    Box(modifier = Modifier.fillMaxSize())
+                    SearchIdleHint()
                 state.results.isEmpty() && state.searched && !state.isLoading -> NoSearchResults(
                     query = state.query,
                 )
@@ -112,7 +111,11 @@ private fun SearchField(
     onQueryChanged: (String) -> Unit,
 ) {
     val focusRequester = remember { FocusRequester() }
-    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+    // Autofocus only for a fresh search; returning to an existing query via the
+    // toolbar should not pop the keyboard.
+    LaunchedEffect(Unit) {
+        if (query.isEmpty()) focusRequester.requestFocus()
+    }
     TextField(
         value = query,
         onValueChange = onQueryChanged,
@@ -153,10 +156,7 @@ private fun SearchField(
 }
 
 @Composable
-private fun SearchError(
-    message: String,
-    onRetry: () -> Unit,
-) {
+private fun SearchIdleHint() {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -164,18 +164,18 @@ private fun SearchError(
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(
+                painter = painterResource(R.drawable.ic_search),
+                contentDescription = null,
+                modifier = Modifier.size(48.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(12.dp))
             Text(
-                text = message,
-                color = MaterialTheme.colorScheme.error,
+                text = stringResource(R.string.search_hint),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodyLarge,
             )
-            Spacer(Modifier.height(16.dp))
-            Button(
-                onClick = onRetry,
-                shapes = ButtonDefaults.shapes(),
-            ) {
-                Text(stringResource(R.string.retry))
-            }
         }
     }
 }
@@ -204,7 +204,7 @@ private fun SearchResults(
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 24.dp),
+        contentPadding = PaddingValues(bottom = BottomToolbarInset),
     ) {
         itemsIndexed(results, key = { _, item -> item.id }) { index, item ->
             SearchResultItem(
