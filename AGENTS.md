@@ -6,6 +6,7 @@ This file provides guidance when working with code in this repository.
 
 - Do not create git branches unless explicitly instructed.
 - Run `./check-ci.sh` before handing work back.
+- Use the emulator for UI work; verify playback on the physical Pixel.
 
 ## Project
 
@@ -25,7 +26,6 @@ Loom and Takeup are developed and deployed together for one user. Do not preserv
 - When troubleshooting, gather evidence and test rather than guessing.
 - Add focused tests for new behavior and regressions.
 - Follow established Android and project conventions. Do not add libraries, frameworks, or architectural layers without a concrete need.
-- Follow Material 3 Expressive design standards. Research them if needed.
 
 ## Build, Test, Lint
 
@@ -40,3 +40,21 @@ Run device tests separately when an emulator or device is available:
 ```bash
 ./gradlew connectedCheck
 ```
+
+## Emulator
+
+The `takeup_pixel10pro` AVD (API 37, arm64) matches the physical device geometry. Neither `java` nor the SDK is on PATH by default:
+
+```bash
+export JAVA_HOME="$(brew --prefix openjdk@17)/libexec/openjdk.jdk/Contents/Home"
+export PATH="$JAVA_HOME/bin:$PATH"
+export ANDROID_HOME="$HOME/Library/Android/sdk"
+
+$ANDROID_HOME/emulator/emulator -avd takeup_pixel10pro &
+ANDROID_SERIAL=emulator-5554 ./gradlew installDebug
+$ANDROID_HOME/platform-tools/adb -s emulator-5554 emu kill
+```
+
+Always target a device explicitly with `ANDROID_SERIAL` or `adb -s`; the Pixel is often connected over USB at the same time.
+
+Use the emulator for UI, layout, and navigation work. Verify playback on the Pixel: the emulator has no HDR or Dolby Vision, no audio passthrough, and stutters on high-bitrate HEVC and AV1. Multicast does not cross the emulator NAT, so enter Loom's IP and port rather than an mDNS name.
