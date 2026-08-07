@@ -60,6 +60,7 @@ internal fun HomeScreen(
     onRetry: () -> Unit,
     onOpenSettings: () -> Unit,
     onShowMovies: () -> Unit,
+    onShowShorts: () -> Unit,
     onShowShows: () -> Unit,
     onItemSelected: (LoomItem) -> Unit,
     onPlayItem: (LoomItem) -> Unit,
@@ -69,8 +70,8 @@ internal fun HomeScreen(
 ) {
     UseLightStatusBarIcons()
     val content = state.content
-    val isEmpty = content.continueWatching.isEmpty() &&
-        content.recentlyAdded.isEmpty() && content.movies.isEmpty() && content.shows.isEmpty()
+    val isEmpty = content.continueWatching.isEmpty() && content.recentlyAdded.isEmpty() &&
+        content.movies.isEmpty() && content.shorts.isEmpty() && content.shows.isEmpty()
     Box(modifier = modifier.fillMaxSize()) {
         when {
             state.isLoading && isEmpty -> LoadingHome()
@@ -84,6 +85,7 @@ internal fun HomeScreen(
                 state = state,
                 onRetry = onRetry,
                 onShowMovies = onShowMovies,
+                onShowShorts = onShowShorts,
                 onShowShows = onShowShows,
                 onItemSelected = onItemSelected,
                 onPlayItem = onPlayItem,
@@ -145,6 +147,7 @@ private fun HomeList(
     state: MainUiState.Home,
     onRetry: () -> Unit,
     onShowMovies: () -> Unit,
+    onShowShorts: () -> Unit,
     onShowShows: () -> Unit,
     onItemSelected: (LoomItem) -> Unit,
     onPlayItem: (LoomItem) -> Unit,
@@ -251,6 +254,20 @@ private fun HomeList(
                         items = content.movies.take(12),
                         actionText = stringResource(R.string.see_all),
                         onAction = onShowMovies,
+                        onItemSelected = onItemSelected,
+                        modifier = Modifier.staggeredEntrance(entrance),
+                    )
+                }
+            }
+            if (content.shorts.isNotEmpty()) {
+                val entrance = entranceIndex++
+                item {
+                    MediaRow(
+                        title = stringResource(R.string.shorts),
+                        serverUrl = state.serverUrl,
+                        items = content.shorts.take(12),
+                        actionText = stringResource(R.string.see_all),
+                        onAction = onShowShorts,
                         onItemSelected = onItemSelected,
                         modifier = Modifier.staggeredEntrance(entrance),
                     )

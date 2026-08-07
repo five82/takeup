@@ -36,6 +36,10 @@ internal class LoomClient(
         return pagedItems(server, "api/v1/search", "q=$encoded")
     }
 
+    // Short films carry item kind "movie" but live in their own Loom library.
+    suspend fun shorts(server: ServerAddress): List<LoomItem> =
+        pagedItems(server, "api/v1/items", "library=shorts&kind=movie")
+
     suspend fun shows(server: ServerAddress): List<LoomItem> =
         pagedItems(server, "api/v1/items", "library=tv&kind=show")
 

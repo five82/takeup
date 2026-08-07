@@ -247,6 +247,7 @@ private fun TakeupApp(
                 onRetry = viewModel::retryHome,
                 onOpenSettings = viewModel::openSettings,
                 onShowMovies = viewModel::showMovies,
+                onShowShorts = viewModel::showShorts,
                 onShowShows = viewModel::showShows,
                 onItemSelected = viewModel::selectHomeItem,
                 onPlayItem = viewModel::playHomeItem,

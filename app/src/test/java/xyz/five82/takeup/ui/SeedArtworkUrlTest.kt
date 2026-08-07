@@ -116,6 +116,7 @@ class SeedArtworkUrlTest {
             continueWatching = continueWatching,
             recentlyAdded = recentlyAdded,
             movies = movies,
+            shorts = emptyList(),
             shows = shows,
         ),
     )

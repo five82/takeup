@@ -77,6 +77,7 @@ class GenreBrowsingTest {
             continueWatching = emptyList(),
             recentlyAdded = emptyList(),
             movies = movies,
+            shorts = emptyList(),
             shows = emptyList(),
         ),
     )

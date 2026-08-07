@@ -19,6 +19,10 @@ class TopDestinationTest {
             MainUiState.Library(serverUrl, LibraryKind.Movies).topDestination(),
         )
         assertEquals(
+            TopDestination.Shorts,
+            MainUiState.Library(serverUrl, LibraryKind.Shorts).topDestination(),
+        )
+        assertEquals(
             TopDestination.Shows,
             MainUiState.Library(serverUrl, LibraryKind.Shows).topDestination(),
         )

@@ -16,6 +16,7 @@
     <string name="open_settings">Open settings</string>
     <string name="movie">Movie</string>
     <string name="movies">Movies</string>
+    <string name="shorts">Short Films</string>
     <string name="tv_show">TV show</string>
     <string name="shows">Shows</string>
     <string name="seasons">Seasons</string>
@@ -48,11 +49,13 @@
     <string name="retry">Retry</string>
     <string name="no_home_items">Loom did not return any media.</string>
     <string name="no_movies">Loom did not return any movies.</string>
+    <string name="no_shorts">Loom did not return any short films.</string>
     <string name="no_shows">Loom did not return any shows.</string>
     <string name="no_seasons">Loom did not return any seasons for this show.</string>
     <string name="no_episodes">Loom did not return any episodes for this season.</string>
     <string name="loading_home">Loading your library&#8230;</string>
     <string name="loading_movies">Loading movies&#8230;</string>
+    <string name="loading_shorts">Loading short films&#8230;</string>
     <string name="loading_shows">Loading shows&#8230;</string>
     <string name="loading_episodes">Loading episodes&#8230;</string>
     <string name="navigate_back">Navigate back</string>

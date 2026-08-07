@@ -30,12 +30,14 @@ import java.net.UnknownHostException
 
 internal enum class LibraryKind {
     Movies,
+    Shorts,
     Shows,
 }
 
 internal enum class BrowseOrigin {
     Home,
     Movies,
+    Shorts,
     Shows,
     Season,
     Search,
@@ -46,6 +48,7 @@ internal enum class BrowseOrigin {
 internal enum class TopDestination {
     Home,
     Movies,
+    Shorts,
     Shows,
     Search,
 }
@@ -54,6 +57,7 @@ internal fun MainUiState.topDestination(): TopDestination? = when (this) {
     is MainUiState.Home -> TopDestination.Home
     is MainUiState.Library -> when (kind) {
         LibraryKind.Movies -> TopDestination.Movies
+        LibraryKind.Shorts -> TopDestination.Shorts
         LibraryKind.Shows -> TopDestination.Shows
     }
     is MainUiState.Search -> TopDestination.Search
@@ -169,7 +173,11 @@ internal fun MainUiState.Home.heroItems(): List<LoomItem> {
         .distinctBy { it.id }
         .take(6)
     if (pool.isNotEmpty()) return pool
-    return listOfNotNull(content.movies.firstOrNull() ?: content.shows.firstOrNull())
+    return listOfNotNull(
+        content.movies.firstOrNull()
+            ?: content.shows.firstOrNull()
+            ?: content.shorts.firstOrNull(),
+    )
 }
 
 // Spotlight rows for Home: the library's richest genres, rotated by day so
@@ -238,6 +246,7 @@ internal val EMPTY_HOME_CONTENT = HomeContent(
     continueWatching = emptyList(),
     recentlyAdded = emptyList(),
     movies = emptyList(),
+    shorts = emptyList(),
     shows = emptyList(),
 )
 
@@ -339,6 +348,8 @@ internal class MainViewModel(
 
     fun showMovies() = showLibrary(LibraryKind.Movies)
 
+    fun showShorts() = showLibrary(LibraryKind.Shorts)
+
     fun showShows() = showLibrary(LibraryKind.Shows)
 
     // Toolbar navigation: works from any top-level destination, unlike the
@@ -354,6 +365,7 @@ internal class MainViewModel(
                 _uiState.value = MainUiState.Home(serverUrl = serverUrl, content = homeContent)
             }
             TopDestination.Movies -> showLibraryContent(serverUrl, LibraryKind.Movies)
+            TopDestination.Shorts -> showLibraryContent(serverUrl, LibraryKind.Shorts)
             TopDestination.Shows -> showLibraryContent(serverUrl, LibraryKind.Shows)
             TopDestination.Search -> {
                 searchReturnState = null
@@ -374,6 +386,7 @@ internal class MainViewModel(
                 LibraryKind.Movies -> runCatching {
                     repository.movies(state.serverUrl, state.selectedGenreId)
                 }
+                LibraryKind.Shorts -> runCatching { repository.shorts(state.serverUrl) }
                 LibraryKind.Shows -> runCatching { repository.shows(state.serverUrl) }
             }
             result
@@ -605,6 +618,7 @@ internal class MainViewModel(
         val state = _uiState.value as? MainUiState.Library ?: return
         when (state.kind) {
             LibraryKind.Movies -> selectItem(item, BrowseOrigin.Movies)
+            LibraryKind.Shorts -> selectItem(item, BrowseOrigin.Shorts)
             LibraryKind.Shows -> selectShow(item, BrowseOrigin.Shows)
         }
     }
@@ -943,6 +957,7 @@ internal class MainViewModel(
         items: List<LoomItem>,
     ) {
         when {
+            kind == LibraryKind.Shorts -> homeContent = homeContent.copy(shorts = items)
             kind == LibraryKind.Shows -> homeContent = homeContent.copy(shows = items)
             genreId == 0L -> {
                 movieGenreItems = null
@@ -1191,6 +1206,11 @@ internal class MainViewModel(
                     selectedGenreId = selection?.first ?: 0,
                 )
             }
+            BrowseOrigin.Shorts -> MainUiState.Library(
+                serverUrl = serverUrl,
+                kind = LibraryKind.Shorts,
+                items = homeContent.shorts,
+            )
             BrowseOrigin.Shows -> MainUiState.Library(
                 serverUrl = serverUrl,
                 kind = LibraryKind.Shows,
@@ -1250,6 +1270,7 @@ internal class MainViewModel(
             continueWatching = homeContent.continueWatching.replaceItem(updated),
             recentlyAdded = homeContent.recentlyAdded.replaceItem(updated),
             movies = homeContent.movies.replaceItem(updated),
+            shorts = homeContent.shorts.replaceItem(updated),
             shows = homeContent.shows.replaceItem(updated),
         )
         movieGenreItems = movieGenreItems?.let { it.first to it.second.replaceItem(updated) }
@@ -1271,6 +1292,7 @@ internal class MainViewModel(
     private fun findCachedItem(itemId: Long): LoomItem? =
         seasonContent?.episodes?.firstOrNull { it.id == itemId }
             ?: homeContent.movies.firstOrNull { it.id == itemId }
+            ?: homeContent.shorts.firstOrNull { it.id == itemId }
             ?: homeContent.shows.firstOrNull { it.id == itemId }
             ?: homeContent.continueWatching.firstOrNull { it.id == itemId }
             ?: homeContent.recentlyAdded.firstOrNull { it.id == itemId }
@@ -1280,6 +1302,7 @@ internal class MainViewModel(
 
     private fun HomeContent.items(kind: LibraryKind): List<LoomItem> = when (kind) {
         LibraryKind.Movies -> movies
+        LibraryKind.Shorts -> shorts
         LibraryKind.Shows -> shows
     }
 

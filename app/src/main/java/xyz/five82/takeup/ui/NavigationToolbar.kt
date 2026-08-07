@@ -65,6 +65,13 @@ internal fun NavigationToolbar(
                 onSelect = onSelect,
             )
             NavigationToolbarItem(
+                destination = TopDestination.Shorts,
+                iconResource = R.drawable.ic_shorts,
+                label = stringResource(R.string.shorts),
+                current = current,
+                onSelect = onSelect,
+            )
+            NavigationToolbarItem(
                 destination = TopDestination.Shows,
                 iconResource = R.drawable.ic_tv,
                 label = stringResource(R.string.shows),

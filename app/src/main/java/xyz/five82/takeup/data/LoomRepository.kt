@@ -24,6 +24,7 @@ internal class LoomRepository(
             continueWatching = continueWatching.map { contextualItems[it.id] ?: it },
             recentlyAdded = recentlyAdded.map { contextualItems[it.id] ?: it },
             movies = client.movies(server),
+            shorts = client.shorts(server),
             shows = client.shows(server),
         )
     }
@@ -36,6 +37,9 @@ internal class LoomRepository(
 
     suspend fun search(serverUrl: String, query: String): List<LoomItem> =
         client.search(ServerAddress.parse(serverUrl), query)
+
+    suspend fun shorts(serverUrl: String): List<LoomItem> =
+        client.shorts(ServerAddress.parse(serverUrl))
 
     suspend fun shows(serverUrl: String): List<LoomItem> =
         client.shows(ServerAddress.parse(serverUrl))

@@ -4,7 +4,9 @@ Native Android client for the [Loom](../loom) media server.
 
 Takeup connects to a Loom server and provides a phone-focused home screen with
 Continue Watching, Recently Added, movie, show, and season poster artwork,
-backdrops, title logos, and complete movie and TV show libraries. Shows can be
+backdrops, title logos, and complete movie, short film, and TV show libraries.
+Short films are browsed as their own top-level library rather than by genre,
+matching how Loom catalogs them. Shows can be
 browsed by season and episode, with runtime, playback progress, and source
 video/audio badges shown for each episode. Movie and episode details report
 codec, resolution class, dynamic range, audio codec,

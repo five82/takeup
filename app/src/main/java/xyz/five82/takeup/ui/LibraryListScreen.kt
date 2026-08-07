@@ -55,10 +55,10 @@ internal fun LibraryListScreen(
                 title = {
                     Text(
                         text = stringResource(
-                            if (state.kind == LibraryKind.Movies) {
-                                R.string.movies
-                            } else {
-                                R.string.shows
+                            when (state.kind) {
+                                LibraryKind.Movies -> R.string.movies
+                                LibraryKind.Shorts -> R.string.shorts
+                                LibraryKind.Shows -> R.string.shows
                             },
                         ),
                     )
@@ -98,7 +98,11 @@ private fun LoadingLibrary(
     kind: LibraryKind,
 ) {
     val description = stringResource(
-        if (kind == LibraryKind.Movies) R.string.loading_movies else R.string.loading_shows,
+        when (kind) {
+            LibraryKind.Movies -> R.string.loading_movies
+            LibraryKind.Shorts -> R.string.loading_shorts
+            LibraryKind.Shows -> R.string.loading_shows
+        },
     )
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = 132.dp),
@@ -135,7 +139,11 @@ private fun EmptyLibraryList(
     ) {
         Text(
             stringResource(
-                if (kind == LibraryKind.Movies) R.string.no_movies else R.string.no_shows,
+                when (kind) {
+                    LibraryKind.Movies -> R.string.no_movies
+                    LibraryKind.Shorts -> R.string.no_shorts
+                    LibraryKind.Shows -> R.string.no_shows
+                },
             ),
         )
     }

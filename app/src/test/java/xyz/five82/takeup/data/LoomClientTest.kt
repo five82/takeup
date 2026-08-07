@@ -16,6 +16,7 @@ class LoomClientTest {
     private lateinit var server: HttpServer
     private var address = ServerAddress.parse("http://127.0.0.1")
     private val moviesQueries = CopyOnWriteArrayList<String>()
+    private val shortsQueries = CopyOnWriteArrayList<String>()
     private val showsQueries = CopyOnWriteArrayList<String>()
     private val childrenQueries = CopyOnWriteArrayList<String>()
     private val paginateMovies = AtomicBoolean(false)
@@ -67,6 +68,20 @@ class LoomClientTest {
             "{\"position_ms\":15000,\"duration_ms\":120000}",
             progressRequest.get(),
         )
+    }
+
+    // Short films are their own library but carry item kind "movie", so the
+    // request must pin both or Loom answers with the feature library.
+    @Test
+    fun `loads short films from their own library`() = runBlocking {
+        val shorts = LoomClient().shorts(address)
+
+        assertEquals("Test Short", shorts.single().title)
+        assertEquals(
+            listOf("library=shorts&kind=movie&limit=200&offset=0"),
+            shortsQueries,
+        )
+        assertEquals(emptyList<String>(), moviesQueries)
     }
 
     @Test
@@ -183,6 +198,9 @@ class LoomClientTest {
                 if (exchange.requestURI.query.startsWith("library=tv")) {
                     showsQueries += exchange.requestURI.query
                     """{"items":[{"id":50,"kind":"show","title":"Test Show","year":2026}]}"""
+                } else if (exchange.requestURI.query.startsWith("library=shorts")) {
+                    shortsQueries += exchange.requestURI.query
+                    """{"items":[{"id":60,"kind":"movie","title":"Test Short","year":2008}]}"""
                 } else {
                     moviesQueries += exchange.requestURI.query
                     if (paginateMovies.get()) {
