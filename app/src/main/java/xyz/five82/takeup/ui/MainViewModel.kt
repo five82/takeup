@@ -23,6 +23,7 @@ import xyz.five82.takeup.data.HomeContent
 import xyz.five82.takeup.data.LoomHttpException
 import xyz.five82.takeup.data.LoomItem
 import xyz.five82.takeup.data.LoomRepository
+import xyz.five82.takeup.data.NetworkMonitor
 import xyz.five82.takeup.data.OfflineProgressStore
 import xyz.five82.takeup.data.PlaybackProgress
 import xyz.five82.takeup.data.PreparedPlayback
@@ -281,6 +282,7 @@ internal class MainViewModel(
     private val repository: LoomRepository,
     private val downloads: DownloadStore? = null,
     private val offlineProgress: OfflineProgressStore? = null,
+    private val networkMonitor: NetworkMonitor? = null,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow<MainUiState>(MainUiState.Starting)
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
@@ -305,6 +307,7 @@ internal class MainViewModel(
     fun start() {
         if (started) return
         started = true
+        watchForLoomComingBack()
         activeJob = viewModelScope.launch {
             val serverUrl = runCatching { repository.savedServerUrl() }
                 .getOrElse {
@@ -315,6 +318,24 @@ internal class MainViewModel(
                 _uiState.value = MainUiState.Connect()
             } else {
                 loadHome(serverUrl)
+            }
+        }
+    }
+
+    /**
+     * Joining a local network is the moment Loom might be reachable again, so retry
+     * rather than making the user pull to refresh. Only while already offline: a
+     * network change proves nothing on its own, and re-checking otherwise would
+     * reload a library that is working fine.
+     */
+    private fun watchForLoomComingBack() {
+        val monitor = networkMonitor ?: return
+        viewModelScope.launch {
+            monitor.networksAvailable.collect {
+                val state = _uiState.value
+                if (state is MainUiState.Home && state.isOffline && !state.isLoading) {
+                    loadHome(state.serverUrl)
+                }
             }
         }
     }
@@ -1428,8 +1449,11 @@ internal class MainViewModel(
             repository: LoomRepository,
             downloads: DownloadStore,
             offlineProgress: OfflineProgressStore,
+            networkMonitor: NetworkMonitor,
         ): ViewModelProvider.Factory = viewModelFactory {
-            initializer { MainViewModel(repository, downloads, offlineProgress) }
+            initializer {
+                MainViewModel(repository, downloads, offlineProgress, networkMonitor)
+            }
         }
     }
 }

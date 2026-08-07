@@ -12,6 +12,7 @@ import kotlinx.coroutines.launch
 import xyz.five82.takeup.data.DownloadStore
 import xyz.five82.takeup.data.LoomClient
 import xyz.five82.takeup.data.LoomRepository
+import xyz.five82.takeup.data.NetworkMonitor
 import xyz.five82.takeup.data.OfflineArtwork
 import xyz.five82.takeup.data.OfflineProgressStore
 import xyz.five82.takeup.data.ServerPreferences
@@ -37,6 +38,7 @@ internal class AppContainer(application: Application) {
 
     val offlineArtwork = OfflineArtwork(application, client)
     val offlineProgress = OfflineProgressStore(application)
+    val networkMonitor = NetworkMonitor(application)
 
     // SimpleCache refuses a second instance over the same directory, so this single
     // owner is what keeps the download cache valid for the whole process.

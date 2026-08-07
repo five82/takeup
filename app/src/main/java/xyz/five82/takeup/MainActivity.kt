@@ -98,6 +98,7 @@ class MainActivity : ComponentActivity() {
             repository = container.loomRepository,
             downloads = container.downloadStore,
             offlineProgress = container.offlineProgress,
+            networkMonitor = container.networkMonitor,
         )
     }
 
