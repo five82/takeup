@@ -6,7 +6,7 @@ This file provides guidance when working with code in this repository.
 
 - Do not create git branches unless explicitly instructed.
 - Run `./check-ci.sh` before handing work back.
-- Use the emulator for UI work; verify playback on the physical Pixel.
+- Test on the emulator, not the Pixel. Start the emulator yourself if it is not running. The Pixel is only for playback verification.
 
 ## Project
 
@@ -43,18 +43,35 @@ Run device tests separately when an emulator or device is available:
 
 ## Emulator
 
+The emulator is the default target for everything: UI, layout, navigation, `connectedCheck`, install-and-poke smoke checks, and reproducing bugs. It is faster and less cumbersome to drive than the Pixel. Playback verification is the only exception - see below.
+
+A Pixel connected over USB is not a reason to skip the emulator, and neither is a stopped emulator. If `takeup_pixel10pro` is not running, start it and wait for boot; the one-time boot cost is worth it.
+
 The `takeup_pixel10pro` AVD (API 37, arm64) matches the physical device geometry. Neither `java` nor the SDK is on PATH by default:
 
 ```bash
 export JAVA_HOME="$(brew --prefix openjdk@17)/libexec/openjdk.jdk/Contents/Home"
-export PATH="$JAVA_HOME/bin:$PATH"
 export ANDROID_HOME="$HOME/Library/Android/sdk"
+export PATH="$JAVA_HOME/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
 
-$ANDROID_HOME/emulator/emulator -avd takeup_pixel10pro &
+# Start it if emulator-5554 is not already listed by `adb devices`.
+emulator -avd takeup_pixel10pro &
+# wait-for-device alone returns before boot finishes, so poll sys.boot_completed.
+adb -s emulator-5554 wait-for-device shell \
+  'while [ "$(getprop sys.boot_completed)" != 1 ]; do sleep 1; done'
 ANDROID_SERIAL=emulator-5554 ./gradlew installDebug
-$ANDROID_HOME/platform-tools/adb -s emulator-5554 emu kill
 ```
 
-Always target a device explicitly with `ANDROID_SERIAL` or `adb -s`; the Pixel is often connected over USB at the same time.
+Leave the emulator running between tasks. Only kill it when the user asks:
 
-Use the emulator for UI, layout, and navigation work. Verify playback on the Pixel: the emulator has no HDR or Dolby Vision, no audio passthrough, and stutters on high-bitrate HEVC and AV1. Multicast does not cross the emulator NAT, so enter Loom's IP and port rather than an mDNS name.
+```bash
+adb -s emulator-5554 emu kill
+```
+
+Always target a device explicitly with `ANDROID_SERIAL` or `adb -s`; the Pixel is often connected over USB at the same time, so a bare `adb` command or `./gradlew installDebug` can land on the wrong one.
+
+Multicast does not cross the emulator NAT, so enter Loom's IP and port rather than an mDNS name.
+
+## Pixel
+
+Use the physical Pixel only to verify playback, and say so when you do. The emulator has no HDR or Dolby Vision, no audio passthrough, and stutters on high-bitrate HEVC and AV1, so anything that depends on decode, HDR, or audio output has to run on the Pixel. Everything else stays on the emulator.
