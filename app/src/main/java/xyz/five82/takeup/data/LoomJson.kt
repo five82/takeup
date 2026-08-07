@@ -131,7 +131,11 @@ internal object LoomJson {
             logoImageTag = value.string("logo_image_tag"),
             mediaDurationMs = media?.long("duration_ms") ?: 0L,
             mediaStreams = streams,
-            mediaTag = media?.string("tag").orEmpty(),
+            // A single-item response nests the version in media; every response,
+            // list endpoints included, also carries it as media_tag. Both are the
+            // version the last scan recorded, and reading the flat one is what
+            // lets a list notice that a download has been superseded.
+            mediaTag = media?.string("tag").orEmpty().ifBlank { value.string("media_tag") },
             mediaSizeBytes = media?.long("size") ?: 0L,
             progress = progress,
             seriesTitle = value.string("series_title"),

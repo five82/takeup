@@ -20,11 +20,13 @@ data class LoomItem(
     val backdropImageTag: String = "",
     val logoImageId: Long = 0,
     val logoImageTag: String = "",
+    // Loom only attaches the media object to single-item responses, so duration,
+    // streams, and size stay empty for items that came from a list endpoint.
+    // mediaTag is the exception: every item response carries the version the last
+    // scan recorded. A download whose tag no longer matches the item's was taken
+    // from a superseded copy of the file.
     val mediaDurationMs: Long = 0,
     val mediaStreams: List<MediaStream> = emptyList(),
-    // Loom only attaches media to single-item responses, so these stay empty for
-    // items that came from a list endpoint. A download whose tag no longer matches
-    // the item's was taken from a superseded copy of the file.
     val mediaTag: String = "",
     val mediaSizeBytes: Long = 0,
     val progress: PlaybackProgress? = null,

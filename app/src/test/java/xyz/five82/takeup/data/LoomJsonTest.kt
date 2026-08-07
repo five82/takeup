@@ -71,6 +71,65 @@ class LoomJsonTest {
         assertEquals(emptyList<LoomItem>(), LoomJson.items("""{"items":null}"""))
     }
 
+    // Without the flat media_tag a listed item has no version to compare against,
+    // and a superseded download goes unflagged everywhere except the detail screen.
+    @Test
+    fun `reads the media version from a list item`() {
+        val movies = LoomJson.items(
+            """
+            {
+              "items": [
+                {
+                  "id": 42,
+                  "kind": "movie",
+                  "title": "Arrival",
+                  "year": 2016,
+                  "media_tag": "list-tag",
+                  "added_at": "2026-01-01T00:00:00Z",
+                  "updated_at": "2026-01-01T00:00:00Z"
+                }
+              ]
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals("list-tag", movies.single().mediaTag)
+    }
+
+    // A single-item response carries both; they describe the same file version.
+    @Test
+    fun `prefers the nested media version when a response carries both`() {
+        val item = LoomJson.item(
+            """
+            {
+              "id": 42,
+              "kind": "movie",
+              "title": "Arrival",
+              "year": 2016,
+              "media_tag": "flat-tag",
+              "media": {
+                "id": 7,
+                "tag": "nested-tag",
+                "size": 100,
+                "duration_ms": 600000,
+                "streams": [
+                  {
+                    "kind": "video",
+                    "codec": "hevc",
+                    "width": 3840,
+                    "height": 1604,
+                    "dynamic_range": "hdr",
+                    "is_default": true
+                  }
+                ]
+              }
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals("nested-tag", item.mediaTag)
+    }
+
     @Test
     fun `parses item genres`() {
         val item = LoomJson.item(

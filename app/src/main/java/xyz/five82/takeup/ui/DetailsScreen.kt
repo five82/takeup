@@ -213,9 +213,9 @@ internal fun DetailsScreen(
                                 enabled = !state.isLoading,
                                 onPlay = onPlay,
                                 downloadEntry = downloadEntry,
-                                // Loom's current version for this item, which only a
-                                // single-item response carries. Comparing against the
-                                // download's own snapshot would always match.
+                                // Loom's current version for this item. Comparing
+                                // against the download's own snapshot would always
+                                // match.
                                 itemTag = state.item.mediaTag,
                                 onDownload = {
                                     when (downloadAction(downloadEntry, state.item.mediaTag)) {
