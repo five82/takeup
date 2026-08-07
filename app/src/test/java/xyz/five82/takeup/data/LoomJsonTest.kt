@@ -138,6 +138,7 @@ class LoomJsonTest {
               "year": 2016,
               "media": {
                 "id": 7,
+                "tag": "9f86d081884c7d65",
                 "duration_ms": 6960000,
                 "streams": [
                   {
@@ -178,6 +179,7 @@ class LoomJsonTest {
         assertEquals("7.1", item.mediaStreams[1].channelLayout)
         assertEquals(600000L, item.progress?.resumePositionMs)
         assertFalse(item.progress?.played ?: true)
+        assertEquals("9f86d081884c7d65", item.mediaTag)
     }
 
     @Test
@@ -292,16 +294,41 @@ class LoomJsonTest {
                 "id": 7,
                 "item_id": 42,
                 "filename": "Arrival.mkv",
+                "size": 42949672960,
+                "tag": "9f86d081884c7d65",
                 "duration_ms": 6960000,
                 "container": "matroska"
               },
-              "stream_url": "/api/v1/media/7"
+              "stream_url": "/api/v1/media/7?tag=9f86d081884c7d65"
             }
             """.trimIndent(),
         )
 
-        assertEquals("/api/v1/media/7", playback.streamPath)
+        assertEquals("/api/v1/media/7?tag=9f86d081884c7d65", playback.streamPath)
         assertEquals(6960000L, playback.durationMs)
         assertEquals("matroska", playback.container)
+        assertEquals("9f86d081884c7d65", playback.tag)
+        assertEquals(42_949_672_960L, playback.sizeBytes)
+    }
+
+    @Test
+    fun `rejects a playback response without a media version tag`() {
+        assertThrows(JsonParseException::class.java) {
+            LoomJson.playback(
+                """
+                {
+                  "item_id": 42,
+                  "media": {
+                    "id": 7,
+                    "filename": "Arrival.mkv",
+                    "size": 42949672960,
+                    "duration_ms": 6960000,
+                    "container": "matroska"
+                  },
+                  "stream_url": "/api/v1/media/7"
+                }
+                """.trimIndent(),
+            )
+        }
     }
 }

@@ -1,0 +1,215 @@
+@file:androidx.annotation.OptIn(markerClass = [androidx.media3.common.util.UnstableApi::class])
+
+package xyz.five82.takeup.data
+
+import android.content.Context
+import androidx.core.net.toUri
+import androidx.media3.database.StandaloneDatabaseProvider
+import androidx.media3.datasource.DataSource
+import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.cache.CacheDataSource
+import androidx.media3.datasource.cache.NoOpCacheEvictor
+import androidx.media3.datasource.cache.SimpleCache
+import androidx.media3.exoplayer.offline.Download
+import androidx.media3.exoplayer.offline.DownloadManager
+import androidx.media3.exoplayer.offline.DownloadRequest
+import androidx.media3.exoplayer.offline.DownloadService
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.util.concurrent.Executors
+
+/**
+ * Owns the single process-wide Media3 download cache. [SimpleCache] refuses a second
+ * instance over the same directory, so this must stay a singleton in AppContainer.
+ */
+internal class DownloadStore(
+    context: Context,
+    private val scope: CoroutineScope,
+    private val artwork: OfflineArtwork,
+) {
+    private val appContext = context.applicationContext
+
+    // Internal storage: a Pixel has no removable volume to gain capacity from, and
+    // keeping the cache out of user-visible storage stops a file manager from
+    // deleting spans behind SimpleCache's index. allowBackup="false" already keeps
+    // multi-gigabyte media out of cloud backup.
+    private val downloadDirectory = File(appContext.filesDir, "downloads")
+    private val databaseProvider = StandaloneDatabaseProvider(appContext)
+    private val cache = SimpleCache(downloadDirectory, NoOpCacheEvictor(), databaseProvider)
+    private val upstreamFactory = DefaultHttpDataSource.Factory()
+        .setUserAgent(LoomClient.USER_AGENT)
+        .setAllowCrossProtocolRedirects(false)
+
+    val downloadManager = DownloadManager(
+        appContext,
+        databaseProvider,
+        cache,
+        upstreamFactory,
+        Executors.newSingleThreadExecutor(),
+    ).apply { maxParallelDownloads = 1 }
+
+    /**
+     * Reads cached bytes but never writes them. Without the null sink, ordinary
+     * streaming would fill a cache whose NoOpCacheEvictor never reclaims anything.
+     */
+    val playbackDataSourceFactory: DataSource.Factory = CacheDataSource.Factory()
+        .setCache(cache)
+        .setUpstreamDataSourceFactory(upstreamFactory)
+        .setCacheWriteDataSinkFactory(null)
+        .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
+
+    private val _downloads = MutableStateFlow<List<DownloadEntry>>(emptyList())
+    val downloads: StateFlow<List<DownloadEntry>> = _downloads.asStateFlow()
+
+    // A replacement download must not be added until the superseded one is gone, or
+    // Media3 merges the requests and the removal frees the new cache key instead.
+    private val pendingReplacements = mutableMapOf<String, DownloadRequest>()
+    private var progressTicker: kotlinx.coroutines.Job? = null
+
+    init {
+        downloadManager.addListener(
+            object : DownloadManager.Listener {
+                override fun onInitialized(manager: DownloadManager) = refresh()
+
+                override fun onDownloadChanged(
+                    manager: DownloadManager,
+                    download: Download,
+                    finalException: Exception?,
+                ) = refresh()
+
+                override fun onDownloadRemoved(manager: DownloadManager, download: Download) {
+                    pendingReplacements.remove(download.request.id)?.let { request ->
+                        DownloadService.sendAddDownload(
+                            appContext,
+                            MediaDownloadService::class.java,
+                            request,
+                            false,
+                        )
+                    }
+                    refresh()
+                }
+            },
+        )
+        refresh()
+    }
+
+    fun entry(itemId: Long): DownloadEntry? =
+        _downloads.value.firstOrNull { it.item.id == itemId }
+
+    fun usableSpaceBytes(): Long = downloadDirectory.parentFile?.usableSpace ?: 0L
+
+    fun enqueue(itemId: Long, streamUrl: String, itemJson: String) {
+        val id = itemId.toString()
+        // No custom cache key: playback builds its MediaItem from the URI alone, so
+        // any key set here would silently miss the cache and re-stream the file.
+        val request = DownloadRequest.Builder(id, streamUrl.toUri())
+            .setData(itemJson.toByteArray(Charsets.UTF_8))
+            .build()
+        val existing = entry(itemId)
+        if (existing != null && existing.uri != streamUrl) {
+            pendingReplacements[id] = request
+            DownloadService.sendRemoveDownload(appContext, MediaDownloadService::class.java, id, false)
+        } else {
+            DownloadService.sendAddDownload(appContext, MediaDownloadService::class.java, request, false)
+        }
+    }
+
+    fun remove(itemId: Long) {
+        pendingReplacements.remove(itemId.toString())
+        DownloadService.sendRemoveDownload(
+            appContext,
+            MediaDownloadService::class.java,
+            itemId.toString(),
+            false,
+        )
+        scope.launch { artwork.delete(itemId) }
+    }
+
+    fun removeAll() {
+        pendingReplacements.clear()
+        val ids = _downloads.value.map { it.item.id }
+        DownloadService.sendRemoveAllDownloads(appContext, MediaDownloadService::class.java, false)
+        scope.launch { ids.forEach { artwork.delete(it) } }
+    }
+
+    /** Resumes work interrupted by a process death. No scheduler runs while dead. */
+    fun resumeQueued() {
+        runCatching {
+            DownloadService.sendResumeDownloads(appContext, MediaDownloadService::class.java, false)
+        }
+    }
+
+    private fun refresh() {
+        scope.launch {
+            val entries = withContext(Dispatchers.IO) { readIndex() }
+            _downloads.value = entries
+            if (entries.any { it.state == DownloadState.Downloading }) startProgressTicker()
+        }
+    }
+
+    private fun readIndex(): List<DownloadEntry> = runCatching {
+        downloadManager.downloadIndex.getDownloads().use { cursor ->
+            buildList {
+                while (cursor.moveToNext()) {
+                    toEntry(cursor.download)?.let { add(it) }
+                }
+            }
+        }
+    }.getOrDefault(emptyList())
+
+    private fun toEntry(download: Download): DownloadEntry? {
+        val item = runCatching {
+            LoomJson.item(String(download.request.data, Charsets.UTF_8))
+        }.getOrNull() ?: return null
+        return DownloadEntry(
+            item = item,
+            state = when (download.state) {
+                Download.STATE_COMPLETED -> DownloadState.Completed
+                Download.STATE_FAILED -> DownloadState.Failed
+                Download.STATE_REMOVING -> DownloadState.Removing
+                Download.STATE_DOWNLOADING -> DownloadState.Downloading
+                else -> DownloadState.Queued
+            },
+            uri = download.request.uri.toString(),
+            bytesDownloaded = download.bytesDownloaded,
+            totalBytes = download.contentLength,
+            posterPath = artwork.posterPath(item.id),
+            backdropPath = artwork.backdropPath(item.id),
+            logoPath = artwork.logoPath(item.id),
+        )
+    }
+
+    /**
+     * Media3's listener only fires on state transitions, so live byte counts have to
+     * be polled the way its own foreground notification does.
+     */
+    private fun startProgressTicker() {
+        if (progressTicker?.isActive == true) return
+        progressTicker = scope.launch {
+            while (true) {
+                val active = downloadManager.currentDownloads
+                if (active.isEmpty()) break
+                delay(PROGRESS_INTERVAL_MS)
+                val byId = active.associateBy { it.request.id }
+                _downloads.value = _downloads.value.map { entry ->
+                    val live = byId[entry.item.id.toString()] ?: return@map entry
+                    entry.copy(
+                        bytesDownloaded = live.bytesDownloaded,
+                        totalBytes = live.contentLength,
+                    )
+                }
+            }
+        }
+    }
+
+    private companion object {
+        const val PROGRESS_INTERVAL_MS = 1_000L
+    }
+}

@@ -15,7 +15,25 @@ pull-to-refresh and preserve existing content when a refresh fails. Artwork is
 requested at Loom's resized width buckets sized to the slot it fills, so a
 poster card never pulls a full-size original. Takeup
 direct-plays selected media with Media3 and saves playback progress every 15
-seconds and when playback stops.
+seconds and when playback stops. Movies, short films, and episodes can be
+downloaded for offline viewing.
+
+## Offline downloads
+
+The details screen offers a download alongside Play. Downloads use Loom's
+versioned media URL, so a transfer resumes with an HTTP range request and can
+never combine bytes from two versions of a file; if the source file is replaced
+mid-transfer Loom rejects the stale version rather than corrupting the result.
+Because Loom never transcodes, a download is always a full-size copy of the
+original, so expect multiple gigabytes per title.
+
+Downloaded titles appear in a Downloads row on the home screen and are listed
+with their sizes under Settings, where they can be removed individually or all at
+once. Each download stores the item's metadata and artwork on the phone, so the
+home row, the details screen, and playback all work with Loom unreachable.
+Progress watched offline is queued and sent to Loom the next time the home screen
+loads successfully. When Loom reports a newer version of a downloaded file, the
+download button offers to replace it.
 
 ## Requirements
 

@@ -70,6 +70,8 @@ internal object LoomJson {
             streamPath = root.requiredString("stream_url"),
             durationMs = media.long("duration_ms"),
             container = media.string("container"),
+            tag = media.requiredString("tag"),
+            sizeBytes = media.long("size"),
         )
     }
 
@@ -129,6 +131,8 @@ internal object LoomJson {
             logoImageTag = value.string("logo_image_tag"),
             mediaDurationMs = media?.long("duration_ms") ?: 0L,
             mediaStreams = streams,
+            mediaTag = media?.string("tag").orEmpty(),
+            mediaSizeBytes = media?.long("size") ?: 0L,
             progress = progress,
             seriesTitle = value.string("series_title"),
             seasonTitle = value.string("season_title"),

@@ -22,6 +22,11 @@ data class LoomItem(
     val logoImageTag: String = "",
     val mediaDurationMs: Long = 0,
     val mediaStreams: List<MediaStream> = emptyList(),
+    // Loom only attaches media to single-item responses, so these stay empty for
+    // items that came from a list endpoint. A download whose tag no longer matches
+    // the item's was taken from a superseded copy of the file.
+    val mediaTag: String = "",
+    val mediaSizeBytes: Long = 0,
     val progress: PlaybackProgress? = null,
     val seriesTitle: String = "",
     val seasonTitle: String = "",
@@ -151,6 +156,8 @@ data class PlaybackResponse(
     val streamPath: String,
     val durationMs: Long,
     val container: String,
+    val tag: String,
+    val sizeBytes: Long,
 )
 
 data class PreparedPlayback(

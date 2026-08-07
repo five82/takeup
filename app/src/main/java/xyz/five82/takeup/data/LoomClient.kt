@@ -54,9 +54,30 @@ internal class LoomClient(
     suspend fun recentlyAdded(server: ServerAddress): List<LoomItem> =
         LoomJson.items(request(server.api("api/v1/recently-added?limit=20")))
 
-    suspend fun item(server: ServerAddress, itemId: Long): LoomItem {
+    suspend fun item(server: ServerAddress, itemId: Long): LoomItem =
+        LoomJson.item(itemJson(server, itemId))
+
+    // Downloads keep the raw response as their offline snapshot so LoomJson stays the
+    // single decoder and there is no second metadata format to drift out of sync.
+    suspend fun itemJson(server: ServerAddress, itemId: Long): String {
         require(itemId > 0)
-        return LoomJson.item(request(server.api("api/v1/items/$itemId")))
+        return request(server.api("api/v1/items/$itemId"))
+    }
+
+    suspend fun fetchBytes(uri: URI): ByteArray = withContext(Dispatchers.IO) {
+        val connection = uri.toURL().openConnection() as HttpURLConnection
+        try {
+            connection.connectTimeout = connectTimeoutMs
+            connection.readTimeout = readTimeoutMs
+            connection.setRequestProperty("User-Agent", USER_AGENT)
+            val status = connection.responseCode
+            if (status !in 200..299) {
+                throw LoomHttpException(status, connection.responseMessage.orEmpty())
+            }
+            connection.inputStream.use { it.readBytes() }
+        } finally {
+            connection.disconnect()
+        }
     }
 
     suspend fun playback(server: ServerAddress, itemId: Long): PlaybackResponse {
@@ -152,7 +173,7 @@ internal class LoomClient(
             connection.connectTimeout = connectTimeoutMs
             connection.readTimeout = readTimeoutMs
             connection.setRequestProperty("Accept", "application/json")
-            connection.setRequestProperty("User-Agent", "Takeup/0.7.0")
+            connection.setRequestProperty("User-Agent", USER_AGENT)
             if (requestBody != null) {
                 connection.doOutput = true
                 connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
@@ -176,8 +197,9 @@ internal class LoomClient(
         }
     }
 
-    private companion object {
+    internal companion object {
         const val PAGE_SIZE = 200
+        const val USER_AGENT = "Takeup/0.7.0"
     }
 }
 

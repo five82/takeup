@@ -98,7 +98,9 @@ import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import androidx.media3.ui.compose.material3.indicator.PositionAndDurationText
@@ -119,6 +121,7 @@ import java.util.Locale
 @Composable
 internal fun PlaybackScreen(
     state: MainUiState.Playback,
+    dataSourceFactory: DataSource.Factory,
     onRetry: () -> Unit,
     onBack: () -> Unit,
     onPlayNext: () -> Unit,
@@ -141,6 +144,7 @@ internal fun PlaybackScreen(
             )
             state.prepared != null -> VideoPlayer(
                 playback = state.prepared,
+                dataSourceFactory = dataSourceFactory,
                 nextEpisode = state.nextEpisode,
                 canReturnToSeason = state.origin == BrowseOrigin.Season,
                 onBack = onBack,
@@ -219,6 +223,7 @@ private fun PlaybackError(
 @Composable
 private fun VideoPlayer(
     playback: PreparedPlayback,
+    dataSourceFactory: DataSource.Factory,
     nextEpisode: LoomItem?,
     canReturnToSeason: Boolean,
     onBack: () -> Unit,
@@ -249,7 +254,12 @@ private fun VideoPlayer(
         AspectRatioFrameLayout.RESIZE_MODE_FIT
     }
     val player = remember(playback.streamUrl) {
-        ExoPlayer.Builder(context).build().apply {
+        // The cache-backed source serves a downloaded title entirely from disk. The
+        // MediaItem below must keep using the plain URI: the cache is keyed by that
+        // string, so a custom cache key here would silently re-stream the file.
+        ExoPlayer.Builder(context)
+            .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
+            .build().apply {
             setAudioAttributes(
                 AudioAttributes.Builder()
                     .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)

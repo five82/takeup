@@ -48,14 +48,17 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import java.time.LocalDate
 import xyz.five82.takeup.R
+import xyz.five82.takeup.data.DownloadEntry
 import xyz.five82.takeup.data.Genre
 import xyz.five82.takeup.data.GenreSummary
 import xyz.five82.takeup.data.LoomItem
+import xyz.five82.takeup.data.downloadedRowItems
 import xyz.five82.takeup.ui.theme.heroBottomScrim
 
 @Composable
 internal fun HomeScreen(
     state: MainUiState.Home,
+    downloads: List<DownloadEntry>,
     modifier: Modifier = Modifier,
     onRetry: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -70,8 +73,11 @@ internal fun HomeScreen(
 ) {
     UseLightStatusBarIcons()
     val content = state.content
+    // Downloads are playable without Loom, so a library that is empty only because
+    // the server is unreachable is not empty as far as the user is concerned.
     val isEmpty = content.continueWatching.isEmpty() && content.recentlyAdded.isEmpty() &&
-        content.movies.isEmpty() && content.shorts.isEmpty() && content.shows.isEmpty()
+        content.movies.isEmpty() && content.shorts.isEmpty() && content.shows.isEmpty() &&
+        downloads.isEmpty()
     Box(modifier = modifier.fillMaxSize()) {
         when {
             state.isLoading && isEmpty -> LoadingHome()
@@ -83,6 +89,7 @@ internal fun HomeScreen(
             )
             else -> HomeList(
                 state = state,
+                downloads = downloads,
                 onRetry = onRetry,
                 onShowMovies = onShowMovies,
                 onShowShorts = onShowShorts,
@@ -145,6 +152,7 @@ private fun LoadingHome() {
 @Composable
 private fun HomeList(
     state: MainUiState.Home,
+    downloads: List<DownloadEntry>,
     onRetry: () -> Unit,
     onShowMovies: () -> Unit,
     onShowShorts: () -> Unit,
@@ -214,6 +222,16 @@ private fun HomeList(
                         serverUrl = state.serverUrl,
                         items = content.continueWatching,
                         landscape = true,
+                        onItemSelected = onItemSelected,
+                        modifier = Modifier.staggeredEntrance(entrance),
+                    )
+                }
+            }
+            if (downloads.isNotEmpty()) {
+                val entrance = entranceIndex++
+                item {
+                    DownloadRow(
+                        entries = remember(downloads) { downloadedRowItems(downloads) },
                         onItemSelected = onItemSelected,
                         modifier = Modifier.staggeredEntrance(entrance),
                     )
@@ -298,7 +316,7 @@ private fun HomeList(
                     )
                 }
             }
-            if (heroes.isEmpty()) {
+            if (heroes.isEmpty() && downloads.isEmpty()) {
                 item {
                     Text(
                         text = stringResource(R.string.no_home_items),
@@ -501,6 +519,38 @@ private fun GenreBrowseRow(
                     modifier = Modifier
                         .width(156.dp)
                         .height(88.dp),
+                )
+            }
+        }
+    }
+}
+
+/** Mirrors [MediaRow] but renders locally stored artwork and transfer state. */
+@Composable
+private fun DownloadRow(
+    entries: List<DownloadEntry>,
+    onItemSelected: (LoomItem) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            text = stringResource(R.string.downloads),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            style = MaterialTheme.typography.titleLargeEmphasized,
+        )
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            items(entries, key = { it.item.id }) { entry ->
+                DownloadCard(
+                    entry = entry,
+                    onClick = { onItemSelected(entry.item) },
+                    modifier = Modifier.width(140.dp),
                 )
             }
         }

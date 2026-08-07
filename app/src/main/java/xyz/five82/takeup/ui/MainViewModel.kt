@@ -15,14 +15,18 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import xyz.five82.takeup.data.ArtworkKind
 import xyz.five82.takeup.data.ArtworkOption
+import xyz.five82.takeup.data.DownloadResult
+import xyz.five82.takeup.data.DownloadStore
 import xyz.five82.takeup.data.Genre
 import xyz.five82.takeup.data.GenreSummary
 import xyz.five82.takeup.data.HomeContent
 import xyz.five82.takeup.data.LoomHttpException
 import xyz.five82.takeup.data.LoomItem
 import xyz.five82.takeup.data.LoomRepository
+import xyz.five82.takeup.data.OfflineProgressStore
 import xyz.five82.takeup.data.PlaybackProgress
 import xyz.five82.takeup.data.PreparedPlayback
+import xyz.five82.takeup.data.isOfflineError
 import java.io.IOException
 import java.net.ConnectException
 import java.net.SocketTimeoutException
@@ -270,6 +274,8 @@ private data class SeasonContent(
 
 internal class MainViewModel(
     private val repository: LoomRepository,
+    private val downloads: DownloadStore? = null,
+    private val offlineProgress: OfflineProgressStore? = null,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow<MainUiState>(MainUiState.Starting)
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
@@ -849,7 +855,42 @@ internal class MainViewModel(
                     positionMs = position,
                     durationMs = durationMs,
                 )
+            }.onSuccess {
+                offlineProgress?.clear(itemId)
+            }.onFailure { error ->
+                // Hold the position locally so watching a download offline is not lost.
+                if (isOfflineError(error)) {
+                    offlineProgress?.enqueue(itemId, position, durationMs)
+                }
             }
+        }
+    }
+
+    fun startDownload(item: LoomItem) {
+        val serverUrl = (_uiState.value as? MainUiState.Details)?.serverUrl ?: return
+        viewModelScope.launch {
+            val result = runCatching { repository.startDownload(serverUrl, item) }
+            val message = when {
+                result.getOrNull() == DownloadResult.NotEnoughSpace -> NOT_ENOUGH_SPACE
+                result.isFailure -> readableError(result.exceptionOrNull()!!)
+                else -> null
+            }
+            if (message != null) showDownloadError(message)
+        }
+    }
+
+    fun cancelDownload(itemId: Long) {
+        downloads?.remove(itemId)
+    }
+
+    fun removeAllDownloads() {
+        downloads?.removeAll()
+    }
+
+    private fun showDownloadError(message: String) {
+        val state = _uiState.value
+        if (state is MainUiState.Details) {
+            _uiState.value = state.copy(error = message)
         }
     }
 
@@ -1024,12 +1065,20 @@ internal class MainViewModel(
             .onSuccess {
                 homeContent = it
                 _uiState.value = MainUiState.Home(serverUrl = serverUrl, content = it)
+                // Loom is reachable again, so hand it anything watched offline.
+                runCatching { repository.flushPendingProgress(serverUrl) }
             }
             .onFailure {
                 _uiState.value = MainUiState.Home(
                     serverUrl = serverUrl,
                     content = homeContent,
-                    error = readableError(it),
+                    // Downloads stay playable without Loom, so an unreachable server
+                    // is only an error when there is nothing to fall back on.
+                    error = if (downloads?.downloads?.value.isNullOrEmpty()) {
+                        readableError(it)
+                    } else {
+                        null
+                    },
                 )
             }
     }
@@ -1109,11 +1158,19 @@ internal class MainViewModel(
                 )
             }
             .onFailure {
+                val downloaded = downloads?.entry(item.id)
                 _uiState.value = MainUiState.Details(
                     serverUrl = serverUrl,
-                    item = item,
+                    // Prefer the download's snapshot: it carries the streams and
+                    // duration a list summary omits, so the screen stays complete.
+                    item = downloaded?.item?.copy(
+                        seriesTitle = item.seriesTitle.ifBlank { downloaded.item.seriesTitle },
+                        seasonTitle = item.seasonTitle.ifBlank { downloaded.item.seasonTitle },
+                    ) ?: item,
                     origin = origin,
-                    error = readableError(it),
+                    // A downloaded title needs nothing from Loom, so do not tell the
+                    // user something failed when everything they asked for is here.
+                    error = if (downloaded == null) readableError(it) else null,
                 )
             }
     }
@@ -1359,9 +1416,14 @@ internal class MainViewModel(
 
     companion object {
         private const val SEARCH_DEBOUNCE_MS = 300L
+        private const val NOT_ENOUGH_SPACE = "Not enough free space to download this title."
 
-        fun factory(repository: LoomRepository): ViewModelProvider.Factory = viewModelFactory {
-            initializer { MainViewModel(repository) }
+        fun factory(
+            repository: LoomRepository,
+            downloads: DownloadStore,
+            offlineProgress: OfflineProgressStore,
+        ): ViewModelProvider.Factory = viewModelFactory {
+            initializer { MainViewModel(repository, downloads, offlineProgress) }
         }
     }
 }

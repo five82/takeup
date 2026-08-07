@@ -98,4 +98,24 @@
     <string name="loading_playback">Preparing playback&#8230;</string>
     <string name="playback_failed_title">Playback stopped</string>
     <string name="playback_failed">Playback failed: %1$s</string>
+    <string name="download_channel_name">Downloads</string>
+    <string name="downloads">Downloads</string>
+    <string name="download">Download</string>
+    <string name="download_queued">Queued</string>
+    <string name="downloading">Downloading %1$d%%</string>
+    <string name="downloaded">Downloaded</string>
+    <string name="download_failed">Download failed</string>
+    <string name="download_update">Update available</string>
+    <string name="cancel_download">Cancel download</string>
+    <string name="remove_download">Remove download</string>
+    <string name="remove_all_downloads">Remove all</string>
+    <string name="remove_download_title">Remove download?</string>
+    <string name="remove_download_message">%1$s will be deleted from this phone. You can download it again from Loom.</string>
+    <string name="remove">Remove</string>
+    <string name="cancel">Cancel</string>
+    <string name="download_summary">%1$s &#183; %2$s</string>
+    <plurals name="download_count">
+        <item quantity="one">%d item</item>
+        <item quantity="other">%d items</item>
+    </plurals>
 </resources>

@@ -15,24 +15,33 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.progressSemantics
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,8 +51,11 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import xyz.five82.takeup.R
+import xyz.five82.takeup.data.DownloadEntry
+import xyz.five82.takeup.data.DownloadState
 import xyz.five82.takeup.data.Genre
 import xyz.five82.takeup.data.PlaybackProgress
+import xyz.five82.takeup.data.downloadProgressFraction
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -53,19 +65,27 @@ import kotlin.math.roundToInt
 @Composable
 internal fun DetailsScreen(
     state: MainUiState.Details,
+    downloadEntry: DownloadEntry?,
     onBack: () -> Unit,
     onRetry: () -> Unit,
     onEditArtwork: () -> Unit,
     onPlay: () -> Unit,
+    onDownload: () -> Unit,
+    onRemoveDownload: () -> Unit,
     onGenreSelected: (Genre) -> Unit,
 ) {
     BackHandler(onBack = onBack)
     UseLightStatusBarIcons()
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+    var confirmRemoval by remember(state.item.id) { mutableStateOf(false) }
+    // Downloaded artwork comes off local storage so the screen renders unchanged
+    // when Loom is unreachable.
+    val backdropUrl = downloadEntry?.backdropPath
+        ?: state.item.backdropUrl(state.serverUrl)
+        ?: downloadEntry?.posterPath
+        ?: state.item.posterUrl(state.serverUrl)
     Box(Modifier.fillMaxSize()) {
-    AmbientGlow(
-        url = state.item.backdropUrl(state.serverUrl) ?: state.item.posterUrl(state.serverUrl),
-    )
+    AmbientGlow(url = backdropUrl)
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = Color.Transparent,
@@ -192,6 +212,20 @@ internal fun DetailsScreen(
                                 ),
                                 enabled = !state.isLoading,
                                 onPlay = onPlay,
+                                downloadEntry = downloadEntry,
+                                // Loom's current version for this item, which only a
+                                // single-item response carries. Comparing against the
+                                // download's own snapshot would always match.
+                                itemTag = state.item.mediaTag,
+                                onDownload = {
+                                    when (downloadAction(downloadEntry, state.item.mediaTag)) {
+                                        // Deleting finished bytes is worth a prompt;
+                                        // abandoning a partial transfer is not.
+                                        DownloadAction.Remove -> confirmRemoval = true
+                                        DownloadAction.Cancel -> onRemoveDownload()
+                                        else -> onDownload()
+                                    }
+                                },
                                 onEditArtwork = onEditArtwork.takeIf {
                                     state.item.kind == "movie" && state.item.tmdbId > 0
                                 },
@@ -239,45 +273,71 @@ internal fun DetailsScreen(
             item { Box(Modifier.padding(bottom = 4.dp)) }
         }
     }
+    if (confirmRemoval) {
+        AlertDialog(
+            onDismissRequest = { confirmRemoval = false },
+            title = { Text(stringResource(R.string.remove_download_title)) },
+            text = {
+                Text(stringResource(R.string.remove_download_message, state.item.title))
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmRemoval = false
+                        onRemoveDownload()
+                    },
+                ) {
+                    Text(stringResource(R.string.remove))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmRemoval = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+        )
+    }
     }
 }
 
 /**
- * Connected action group: Play carries the outer pill corners and the artwork
- * action completes the pill, reading as one control split in two.
+ * Connected action group: Play carries the outer pill corners and the trailing
+ * actions complete the pill, reading as one control split into segments.
  */
 @Composable
 private fun DetailActionRow(
     playLabel: String,
     enabled: Boolean,
     onPlay: () -> Unit,
+    downloadEntry: DownloadEntry?,
+    itemTag: String,
+    onDownload: (() -> Unit)?,
     onEditArtwork: (() -> Unit)?,
 ) {
     val height = ButtonDefaults.MediumContainerHeight
     val outer = 28.dp
     val inner = 8.dp
+    val segments = 1 + (if (onDownload != null) 1 else 0) + (if (onEditArtwork != null) 1 else 0)
+    var segment = 0
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(height),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
+        val (playStart, playEnd) = segmentCorners(segment++, segments, outer, inner)
         Button(
             onClick = onPlay,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight(),
             enabled = enabled,
-            shape = if (onEditArtwork == null) {
-                RoundedCornerShape(outer)
-            } else {
-                RoundedCornerShape(
-                    topStart = outer,
-                    bottomStart = outer,
-                    topEnd = inner,
-                    bottomEnd = inner,
-                )
-            },
+            shape = RoundedCornerShape(
+                topStart = playStart,
+                bottomStart = playStart,
+                topEnd = playEnd,
+                bottomEnd = playEnd,
+            ),
             contentPadding = ButtonDefaults.contentPaddingFor(height),
         ) {
             Icon(
@@ -286,15 +346,31 @@ private fun DetailActionRow(
             )
             Text(playLabel)
         }
+        if (onDownload != null) {
+            val (start, end) = segmentCorners(segment++, segments, outer, inner)
+            DownloadActionButton(
+                entry = downloadEntry,
+                itemTag = itemTag,
+                enabled = enabled,
+                shape = RoundedCornerShape(
+                    topStart = start,
+                    bottomStart = start,
+                    topEnd = end,
+                    bottomEnd = end,
+                ),
+                onClick = onDownload,
+            )
+        }
         if (onEditArtwork != null) {
+            val (start, end) = segmentCorners(segment, segments, outer, inner)
             FilledTonalButton(
                 onClick = onEditArtwork,
                 modifier = Modifier.fillMaxHeight(),
                 shape = RoundedCornerShape(
-                    topStart = inner,
-                    bottomStart = inner,
-                    topEnd = outer,
-                    bottomEnd = outer,
+                    topStart = start,
+                    bottomStart = start,
+                    topEnd = end,
+                    bottomEnd = end,
                 ),
                 contentPadding = PaddingValues(horizontal = 18.dp),
             ) {
@@ -303,6 +379,50 @@ private fun DetailActionRow(
                     contentDescription = stringResource(R.string.artwork),
                 )
             }
+        }
+    }
+}
+
+/**
+ * One button covering every download state. A transfer in progress shows its
+ * fraction in place of the icon so the pill never changes width mid-download.
+ */
+@Composable
+private fun DownloadActionButton(
+    entry: DownloadEntry?,
+    itemTag: String,
+    enabled: Boolean,
+    shape: RoundedCornerShape,
+    onClick: () -> Unit,
+) {
+    val action = downloadAction(entry, itemTag)
+    val downloading = entry != null &&
+        (entry.state == DownloadState.Downloading || entry.state == DownloadState.Queued)
+    FilledTonalButton(
+        onClick = onClick,
+        modifier = Modifier.fillMaxHeight(),
+        enabled = enabled,
+        shape = shape,
+        contentPadding = PaddingValues(horizontal = 18.dp),
+    ) {
+        when {
+            downloading -> CircularProgressIndicator(
+                progress = { downloadProgressFraction(entry) },
+                modifier = Modifier.size(20.dp),
+            )
+            action == DownloadAction.Remove -> Icon(
+                painter = painterResource(R.drawable.ic_check),
+                contentDescription = stringResource(R.string.remove_download),
+            )
+            else -> Icon(
+                painter = painterResource(R.drawable.ic_download),
+                contentDescription = stringResource(R.string.download),
+                tint = if (action == DownloadAction.Retry) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    LocalContentColor.current
+                },
+            )
         }
     }
 }

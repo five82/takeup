@@ -90,13 +90,22 @@ import xyz.five82.takeup.ui.theme.rememberSeedColor
 private const val LOCAL_NETWORK_PERMISSION = "android.permission.ACCESS_LOCAL_NETWORK"
 
 class MainActivity : ComponentActivity() {
+    private val container: AppContainer
+        get() = (application as TakeupApplication).container
+
     private val viewModel: MainViewModel by viewModels {
-        val application = application as TakeupApplication
-        MainViewModel.factory(application.container.loomRepository)
+        MainViewModel.factory(
+            repository = container.loomRepository,
+            downloads = container.downloadStore,
+            offlineProgress = container.offlineProgress,
+        )
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Nothing runs downloads while the process is dead, so pick up where an
+        // interrupted transfer left off. Media3 resumes it with an HTTP range request.
+        container.downloadStore.resumeQueued()
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
@@ -118,6 +127,7 @@ class MainActivity : ComponentActivity() {
                 ) {
                     PermissionAwareApp(
                         viewModel = viewModel,
+                        container = container,
                         onHeroSeedUrlChanged = { heroSeedUrl = it },
                     )
                 }
@@ -129,6 +139,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun PermissionAwareApp(
     viewModel: MainViewModel,
+    container: AppContainer,
     onHeroSeedUrlChanged: (String?) -> Unit,
 ) {
     val context = LocalContext.current
@@ -166,7 +177,7 @@ private fun PermissionAwareApp(
 
     if (permissionGranted) {
         LaunchedEffect(viewModel) { viewModel.start() }
-        TakeupApp(viewModel, onHeroSeedUrlChanged)
+        TakeupApp(viewModel, container, onHeroSeedUrlChanged)
     } else {
         LocalNetworkPermissionScreen(
             wasDenied = permissionDenied,
@@ -188,9 +199,23 @@ private fun PermissionAwareApp(
 @Composable
 private fun TakeupApp(
     viewModel: MainViewModel,
+    container: AppContainer,
     onHeroSeedUrlChanged: (String?) -> Unit,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    // Downloads ride alongside the UI state rather than inside it: every one of the
+    // twelve MainUiState variants would otherwise need to carry and copy the list.
+    val downloads by container.downloadStore.downloads.collectAsStateWithLifecycle()
+    // Downloads run with or without the grant; only the progress notification needs
+    // it, so ask once at the first download and never gate the transfer on the answer.
+    val notificationPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) {}
+    val requestNotifications = {
+        if (Build.VERSION.SDK_INT >= 33) {
+            notificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
     val activity = LocalActivity.current
     val isPlaying = state is MainUiState.Playback
     val saveableStateHolder = rememberSaveableStateHolder()
@@ -234,8 +259,11 @@ private fun TakeupApp(
         MainUiState.Starting -> StartingScreen()
         is MainUiState.Connect -> SettingsScreen(
             state = current,
+            downloads = downloads,
             onServerUrlChanged = viewModel::updateServerUrl,
             onConnect = viewModel::connect,
+            onRemoveDownload = viewModel::cancelDownload,
+            onRemoveAllDownloads = viewModel::removeAllDownloads,
             onBack = viewModel::backFromSettings,
         )
         is MainUiState.Home -> saveableStateHolder.SaveableStateProvider(
@@ -243,6 +271,7 @@ private fun TakeupApp(
         ) {
             HomeScreen(
                 state = current,
+                downloads = downloads,
                 modifier = topScreenModifier,
                 onRetry = viewModel::retryHome,
                 onOpenSettings = viewModel::openSettings,
@@ -318,10 +347,16 @@ private fun TakeupApp(
         }
         is MainUiState.Details -> DetailsScreen(
             state = current,
+            downloadEntry = downloads.firstOrNull { it.item.id == current.item.id },
             onBack = viewModel::backFromDetails,
             onRetry = viewModel::retryDetails,
             onEditArtwork = viewModel::editArtwork,
             onPlay = viewModel::playDetails,
+            onDownload = {
+                requestNotifications()
+                viewModel.startDownload(current.item)
+            },
+            onRemoveDownload = { viewModel.cancelDownload(current.item.id) },
             onGenreSelected = viewModel::openGenre,
         )
         is MainUiState.Artwork -> ArtworkScreen(
@@ -334,6 +369,7 @@ private fun TakeupApp(
         )
         is MainUiState.Playback -> PlaybackScreen(
             state = current,
+            dataSourceFactory = container.downloadStore.playbackDataSourceFactory,
             onRetry = viewModel::retryPlayback,
             onBack = viewModel::backFromPlayback,
             onPlayNext = viewModel::playNextEpisode,

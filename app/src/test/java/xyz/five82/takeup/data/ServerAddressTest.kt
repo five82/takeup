@@ -36,8 +36,8 @@ class ServerAddressTest {
         val address = ServerAddress.parse("http://192.168.1.20:8097")
 
         assertEquals(
-            "http://192.168.1.20:8097/api/v1/media/42",
-            address.stream("/api/v1/media/42").toString(),
+            "http://192.168.1.20:8097/api/v1/media/42?tag=abc123",
+            address.stream("/api/v1/media/42?tag=abc123").toString(),
         )
     }
 

@@ -56,7 +56,9 @@ class LoomClientTest {
         assertEquals("Continue Movie", continuing.single().title)
         assertEquals("Recent Movie", recentlyAdded.single().title)
         assertEquals(30_000L, item.progress?.resumePositionMs)
-        assertEquals("/api/v1/media/7", playback.streamPath)
+        assertEquals("/api/v1/media/7?tag=abc123", playback.streamPath)
+        assertEquals("abc123", playback.tag)
+        assertEquals(8_123_456_789L, playback.sizeBytes)
         assertEquals(
             listOf("library=movies&kind=movie&limit=200&offset=0"),
             moviesQueries,
@@ -238,7 +240,7 @@ class LoomClientTest {
                 """{"id":42,"kind":"movie","title":"Test Movie","progress":{"position_ms":30000,"duration_ms":120000,"played":false,"resume_position_ms":30000}}"""
             }
             "/api/v1/items/42/playback" -> {
-                """{"item_id":42,"media":{"duration_ms":120000,"container":"matroska"},"stream_url":"/api/v1/media/7"}"""
+                """{"item_id":42,"media":{"id":7,"filename":"Test Movie.mkv","size":8123456789,"tag":"abc123","duration_ms":120000,"container":"matroska"},"stream_url":"/api/v1/media/7?tag=abc123"}"""
             }
             "/api/v1/items/42/progress" -> {
                 progressMethod.set(exchange.requestMethod)
