@@ -114,6 +114,7 @@ class SeedArtworkUrlTest {
         serverUrl = serverUrl,
         content = HomeContent(
             continueWatching = continueWatching,
+            nextUp = emptyList(),
             recentlyAdded = recentlyAdded,
             movies = movies,
             shorts = emptyList(),

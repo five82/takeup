@@ -75,9 +75,9 @@ internal fun HomeScreen(
     val content = state.content
     // Downloads are playable without Loom, so a library that is empty only because
     // the server is unreachable is not empty as far as the user is concerned.
-    val isEmpty = content.continueWatching.isEmpty() && content.recentlyAdded.isEmpty() &&
-        content.movies.isEmpty() && content.shorts.isEmpty() && content.shows.isEmpty() &&
-        downloads.isEmpty()
+    val isEmpty = content.continueWatching.isEmpty() && content.nextUp.isEmpty() &&
+        content.recentlyAdded.isEmpty() && content.movies.isEmpty() &&
+        content.shorts.isEmpty() && content.shows.isEmpty() && downloads.isEmpty()
     Box(modifier = modifier.fillMaxSize()) {
         when {
             state.isLoading && isEmpty -> LoadingHome()
@@ -224,6 +224,21 @@ private fun HomeList(
                         title = stringResource(R.string.continue_watching),
                         serverUrl = state.serverUrl,
                         items = content.continueWatching,
+                        landscape = true,
+                        onItemSelected = onItemSelected,
+                        modifier = Modifier.staggeredEntrance(entrance),
+                    )
+                }
+            }
+            // Directly below Continue Watching: the two rows are one story, and a
+            // show crosses from one to the other as an episode finishes.
+            if (content.nextUp.isNotEmpty()) {
+                val entrance = entranceIndex++
+                item {
+                    MediaRow(
+                        title = stringResource(R.string.next_up),
+                        serverUrl = state.serverUrl,
+                        items = content.nextUp,
                         landscape = true,
                         onItemSelected = onItemSelected,
                         modifier = Modifier.staggeredEntrance(entrance),

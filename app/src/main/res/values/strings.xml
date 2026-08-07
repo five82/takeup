@@ -28,6 +28,7 @@
     </plurals>
     <string name="continue_watching">Continue Watching</string>
     <string name="time_left">%1$s left</string>
+    <string name="next_up">Next Up</string>
     <string name="recently_added">Recently Added</string>
     <string name="see_all">See all</string>
     <string name="search">Search</string>

@@ -174,6 +174,10 @@ data class PreparedPlayback(
 
 data class HomeContent(
     val continueWatching: List<LoomItem>,
+    // Continue Watching holds only partially watched items, so a show leaves it
+    // the moment an episode finishes. Next Up carries the following episode, and
+    // Loom keeps a show out of one row while the other is offering it.
+    val nextUp: List<LoomItem>,
     val recentlyAdded: List<LoomItem>,
     val movies: List<LoomItem>,
     val shorts: List<LoomItem>,

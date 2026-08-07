@@ -302,10 +302,11 @@ private fun EpisodeListItem(
     count: Int,
     onClick: () -> Unit,
 ) {
-    val metadata = listOfNotNull(
-        episode.mediaDurationMs.takeIf { it > 0 }?.let(::formatRuntime),
-        episode.releaseDate.takeIf { it.isNotBlank() }?.let(::formatReleaseDate),
-    ).joinToString(" \u00B7 ")
+    // The listing this row comes from carries no media duration, so the runtime
+    // lives on the episode's details screen rather than costing a request each.
+    val metadata = episode.releaseDate.takeIf { it.isNotBlank() }
+        ?.let(::formatReleaseDate)
+        .orEmpty()
     val hasSupportingContent = metadata.isNotBlank() ||
         episode.overview.isNotBlank() || episode.progress != null
 

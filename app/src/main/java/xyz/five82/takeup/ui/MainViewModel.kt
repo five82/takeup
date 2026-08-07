@@ -254,6 +254,7 @@ internal fun seedArtworkUrl(state: MainUiState): String? = when (state) {
 
 internal val EMPTY_HOME_CONTENT = HomeContent(
     continueWatching = emptyList(),
+    nextUp = emptyList(),
     recentlyAdded = emptyList(),
     movies = emptyList(),
     shorts = emptyList(),
@@ -1346,12 +1347,19 @@ internal class MainViewModel(
         if (progress.resumePositionMs > 0) {
             continuing.add(0, cached)
         }
-        homeContent = homeContent.copy(continueWatching = continuing.take(20))
+        homeContent = homeContent.copy(
+            continueWatching = continuing.take(20),
+            // Watching an episode retires it from Next Up either way: a partial
+            // watch moves the show to Continue Watching, and a finished one
+            // leaves Loom to name the successor on the next home load.
+            nextUp = homeContent.nextUp.filterNot { it.id == itemId },
+        )
     }
 
     private fun updateCachedItem(updated: LoomItem) {
         homeContent = homeContent.copy(
             continueWatching = homeContent.continueWatching.replaceItem(updated),
+            nextUp = homeContent.nextUp.replaceItem(updated),
             recentlyAdded = homeContent.recentlyAdded.replaceItem(updated),
             movies = homeContent.movies.replaceItem(updated),
             shorts = homeContent.shorts.replaceItem(updated),
@@ -1379,6 +1387,7 @@ internal class MainViewModel(
             ?: homeContent.shorts.firstOrNull { it.id == itemId }
             ?: homeContent.shows.firstOrNull { it.id == itemId }
             ?: homeContent.continueWatching.firstOrNull { it.id == itemId }
+            ?: homeContent.nextUp.firstOrNull { it.id == itemId }
             ?: homeContent.recentlyAdded.firstOrNull { it.id == itemId }
 
     private fun List<LoomItem>.replaceItem(updated: LoomItem): List<LoomItem> =

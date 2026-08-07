@@ -51,6 +51,9 @@ internal class LoomClient(
     suspend fun continueWatching(server: ServerAddress): List<LoomItem> =
         LoomJson.items(request(server.api("api/v1/continue-watching?limit=20")))
 
+    suspend fun nextUp(server: ServerAddress): List<LoomItem> =
+        LoomJson.items(request(server.api("api/v1/next-up?limit=20")))
+
     suspend fun recentlyAdded(server: ServerAddress): List<LoomItem> =
         LoomJson.items(request(server.api("api/v1/recently-added?limit=20")))
 

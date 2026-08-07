@@ -21,6 +21,7 @@ class LoomClientTest {
     private val childrenQueries = CopyOnWriteArrayList<String>()
     private val paginateMovies = AtomicBoolean(false)
     private val continueQuery = AtomicReference<String>()
+    private val nextUpQuery = AtomicReference<String>()
     private val recentlyAddedQuery = AtomicReference<String>()
     private val progressMethod = AtomicReference<String>()
     private val progressRequest = AtomicReference<String>()
@@ -47,6 +48,7 @@ class LoomClientTest {
         client.checkHealth(address)
         val movies = client.movies(address)
         val continuing = client.continueWatching(address)
+        val nextUp = client.nextUp(address)
         val recentlyAdded = client.recentlyAdded(address)
         val item = client.item(address, 42)
         val playback = client.playback(address, 42)
@@ -54,6 +56,10 @@ class LoomClientTest {
 
         assertEquals("Test Movie", movies.single().title)
         assertEquals("Continue Movie", continuing.single().title)
+        // Next Up carries no series or season title; the repository resolves that
+        // from the parent chain the way it does for Continue Watching.
+        assertEquals("Next Episode", nextUp.single().title)
+        assertEquals(51L, nextUp.single().parentId)
         assertEquals("Recent Movie", recentlyAdded.single().title)
         assertEquals(30_000L, item.progress?.resumePositionMs)
         assertEquals("/api/v1/media/7?tag=abc123", playback.streamPath)
@@ -64,6 +70,7 @@ class LoomClientTest {
             moviesQueries,
         )
         assertEquals("limit=20", continueQuery.get())
+        assertEquals("limit=20", nextUpQuery.get())
         assertEquals("limit=20", recentlyAddedQuery.get())
         assertEquals("PUT", progressMethod.get())
         assertEquals(
@@ -97,6 +104,9 @@ class LoomClientTest {
         assertEquals("Test Show", shows.single().title)
         assertEquals("Specials", seasons.single().title)
         assertEquals("Pilot", episodes.single().title)
+        // Listings carry playback state, which is what lets a season draw watched
+        // markers without a request per episode.
+        assertEquals(true, episodes.single().progress?.played)
         assertEquals(
             listOf("library=tv&kind=show&limit=200&offset=0"),
             showsQueries,
@@ -218,7 +228,7 @@ class LoomClientTest {
             }
             "/api/v1/items/51/children" -> {
                 childrenQueries += "51:${exchange.requestURI.query}"
-                """{"items":[{"id":52,"kind":"episode","title":"Pilot","season_number":0,"episode_number":1}]}"""
+                """{"items":[{"id":52,"kind":"episode","title":"Pilot","season_number":0,"episode_number":1,"progress":{"position_ms":120000,"duration_ms":125000,"played":true,"resume_position_ms":0}}]}"""
             }
             "/api/v1/search" -> {
                 searchQueries += exchange.requestURI.rawQuery
@@ -231,6 +241,10 @@ class LoomClientTest {
             "/api/v1/continue-watching" -> {
                 continueQuery.set(exchange.requestURI.query)
                 """{"items":[{"id":43,"kind":"movie","title":"Continue Movie","year":2025}]}"""
+            }
+            "/api/v1/next-up" -> {
+                nextUpQuery.set(exchange.requestURI.query)
+                """{"items":[{"id":53,"kind":"episode","title":"Next Episode","parent_id":51,"season_number":1,"episode_number":2}]}"""
             }
             "/api/v1/recently-added" -> {
                 recentlyAddedQuery.set(exchange.requestURI.query)

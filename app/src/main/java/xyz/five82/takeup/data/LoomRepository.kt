@@ -22,13 +22,15 @@ internal class LoomRepository(
     suspend fun home(serverUrl: String): HomeContent {
         val server = ServerAddress.parse(serverUrl)
         val continueWatching = client.continueWatching(server)
+        val nextUp = client.nextUp(server)
         val recentlyAdded = client.recentlyAdded(server)
         val contextualItems = addEpisodeContext(
-            items = (continueWatching + recentlyAdded).distinctBy { it.id },
+            items = (continueWatching + nextUp + recentlyAdded).distinctBy { it.id },
             itemById = { id -> runCatching { client.item(server, id) }.getOrNull() },
         ).associateBy { it.id }
         return HomeContent(
             continueWatching = continueWatching.map { contextualItems[it.id] ?: it },
+            nextUp = nextUp.map { contextualItems[it.id] ?: it },
             recentlyAdded = recentlyAdded.map { contextualItems[it.id] ?: it },
             movies = client.movies(server),
             shorts = client.shorts(server),
@@ -56,22 +58,17 @@ internal class LoomRepository(
             .filter { it.kind == "season" }
             .map { it.copy(seriesTitle = show.title) }
 
+    // Listings carry playback progress, so the season draws its watched markers
+    // and resume bars from one request rather than one per episode. They still
+    // omit media duration; the details screen fetches the full item and is where
+    // an episode's runtime is shown.
     suspend fun episodes(
         serverUrl: String,
         show: LoomItem,
         season: LoomItem,
-    ): List<LoomItem> {
-        val server = ServerAddress.parse(serverUrl)
-        // Loom's child summaries omit media duration and playback progress.
-        return client.children(server, season.id)
-            .filter { it.kind == "episode" }
-            .map {
-                client.item(server, it.id).copy(
-                    seriesTitle = show.title,
-                    seasonTitle = season.title,
-                )
-            }
-    }
+    ): List<LoomItem> = client.children(ServerAddress.parse(serverUrl), season.id)
+        .filter { it.kind == "episode" }
+        .map { it.copy(seriesTitle = show.title, seasonTitle = season.title) }
 
     suspend fun item(serverUrl: String, summary: LoomItem): LoomItem =
         client.item(ServerAddress.parse(serverUrl), summary.id).withContextFrom(summary)

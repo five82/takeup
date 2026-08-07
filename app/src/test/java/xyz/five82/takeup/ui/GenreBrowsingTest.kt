@@ -75,6 +75,7 @@ class GenreBrowsingTest {
         serverUrl = "http://loom.local:8080",
         content = HomeContent(
             continueWatching = emptyList(),
+            nextUp = emptyList(),
             recentlyAdded = emptyList(),
             movies = movies,
             shorts = emptyList(),
