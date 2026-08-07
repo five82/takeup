@@ -184,7 +184,10 @@ private fun HomeList(
         var entranceIndex = 0
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = BottomToolbarInset),
+            // The toolbar is hidden offline, so its reserved space would be a gap.
+            contentPadding = PaddingValues(
+                bottom = if (state.isOffline) 24.dp else BottomToolbarInset,
+            ),
             verticalArrangement = Arrangement.spacedBy(28.dp),
         ) {
             state.error?.let { error ->
@@ -224,6 +227,18 @@ private fun HomeList(
                         landscape = true,
                         onItemSelected = onItemSelected,
                         modifier = Modifier.staggeredEntrance(entrance),
+                    )
+                }
+            }
+            if (state.isOffline) {
+                item {
+                    Text(
+                        text = stringResource(R.string.offline_downloads_only),
+                        modifier = Modifier
+                            .statusBarsPadding()
+                            .padding(horizontal = 16.dp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium,
                     )
                 }
             }

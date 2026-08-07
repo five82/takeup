@@ -2,7 +2,6 @@
 
 package xyz.five82.takeup.ui
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,10 +9,10 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -22,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -57,7 +57,12 @@ internal fun segmentCorners(index: Int, count: Int, outer: Dp, inner: Dp): Pair<
 
 @Composable
 internal fun downloadStatusLabel(entry: DownloadEntry): String = when (entry.state) {
-    DownloadState.Completed -> formatBytes(entry.totalBytes.coerceAtLeast(0))
+    // Name the state rather than only showing a size, so "ready to watch offline"
+    // never has to be inferred from a colour or a number.
+    DownloadState.Completed -> stringResource(
+        R.string.downloaded_size,
+        formatBytes(entry.totalBytes.coerceAtLeast(0)),
+    )
     DownloadState.Failed -> stringResource(R.string.download_failed)
     DownloadState.Queued -> stringResource(R.string.download_queued)
     DownloadState.Removing -> stringResource(R.string.remove_download)
@@ -124,18 +129,26 @@ internal fun DownloadCard(
     }
 }
 
-/** Small round swatch used by the Settings list to show transfer state at a glance. */
+/**
+ * Leading state indicator for the Settings list. Distinguished by icon rather than
+ * colour: this theme derives `primary` from the item's own artwork, so a red poster
+ * would otherwise paint "completed" in the same red that means "failed".
+ */
 @Composable
-internal fun DownloadStateDot(entry: DownloadEntry, modifier: Modifier = Modifier) {
-    val color = when (entry.state) {
-        DownloadState.Completed -> MaterialTheme.colorScheme.primary
-        DownloadState.Failed -> MaterialTheme.colorScheme.error
-        else -> MaterialTheme.colorScheme.outline
+internal fun DownloadStateIcon(entry: DownloadEntry, modifier: Modifier = Modifier) {
+    val icon = if (entry.state == DownloadState.Completed) {
+        R.drawable.ic_check
+    } else {
+        R.drawable.ic_download
     }
-    Box(
-        modifier = modifier
-            .size(10.dp)
-            .clip(RoundedCornerShape(50))
-            .background(color),
+    Icon(
+        painter = painterResource(icon),
+        contentDescription = null,
+        modifier = modifier.size(20.dp),
+        tint = if (entry.state == DownloadState.Failed) {
+            MaterialTheme.colorScheme.error
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
     )
 }

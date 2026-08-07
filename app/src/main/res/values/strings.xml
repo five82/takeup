@@ -104,6 +104,8 @@
     <string name="download_queued">Queued</string>
     <string name="downloading">Downloading %1$d%%</string>
     <string name="downloaded">Downloaded</string>
+    <string name="downloaded_size">Downloaded &#183; %1$s</string>
+    <string name="offline_downloads_only">Loom is unreachable. Showing downloaded titles, which play without it. Pull down to reconnect.</string>
     <string name="download_failed">Download failed</string>
     <string name="download_update">Update available</string>
     <string name="cancel_download">Cancel download</string>

@@ -208,7 +208,7 @@ private fun DownloadsCard(
                         .padding(vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    DownloadStateDot(entry)
+                    DownloadStateIcon(entry)
                     Spacer(Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(

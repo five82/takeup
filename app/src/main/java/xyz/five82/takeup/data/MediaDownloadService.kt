@@ -37,7 +37,7 @@ internal class MediaDownloadService : DownloadService(
         notMetRequirements,
     )
 
-    private companion object {
+    internal companion object {
         const val FOREGROUND_NOTIFICATION_ID = 1
         const val CHANNEL_ID = "downloads"
     }

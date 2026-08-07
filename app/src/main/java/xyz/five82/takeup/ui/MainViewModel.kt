@@ -58,7 +58,9 @@ internal enum class TopDestination {
 }
 
 internal fun MainUiState.topDestination(): TopDestination? = when (this) {
-    is MainUiState.Home -> TopDestination.Home
+    // Offline the toolbar would only offer destinations that cannot load, so it is
+    // hidden entirely; Settings stays reachable from Home's overlay button.
+    is MainUiState.Home -> TopDestination.Home.takeUnless { isOffline }
     is MainUiState.Library -> when (kind) {
         LibraryKind.Movies -> TopDestination.Movies
         LibraryKind.Shorts -> TopDestination.Shorts
@@ -83,6 +85,9 @@ internal sealed interface MainUiState {
         val content: HomeContent = EMPTY_HOME_CONTENT,
         val isLoading: Boolean = false,
         val error: String? = null,
+        // Loom is unreachable and downloads are all that can be played, so the rest
+        // of the library is withheld rather than shown as something it is not.
+        val isOffline: Boolean = false,
     ) : MainUiState
 
     data class Library(
@@ -1068,17 +1073,18 @@ internal class MainViewModel(
                 // Loom is reachable again, so hand it anything watched offline.
                 runCatching { repository.flushPendingProgress(serverUrl) }
             }
-            .onFailure {
+            .onFailure { error ->
+                // Only a connection failure means "offline". A malformed response is
+                // a real error and must keep saying so.
+                val offline = isOfflineError(error) &&
+                    !downloads?.downloads?.value.isNullOrEmpty()
                 _uiState.value = MainUiState.Home(
                     serverUrl = serverUrl,
-                    content = homeContent,
-                    // Downloads stay playable without Loom, so an unreachable server
-                    // is only an error when there is nothing to fall back on.
-                    error = if (downloads?.downloads?.value.isNullOrEmpty()) {
-                        readableError(it)
-                    } else {
-                        null
-                    },
+                    // Drop the cached library offline: every one of those titles
+                    // would open a details screen that cannot play.
+                    content = if (offline) EMPTY_HOME_CONTENT else homeContent,
+                    error = if (offline) null else readableError(error),
+                    isOffline = offline,
                 )
             }
     }

@@ -4,6 +4,7 @@ package xyz.five82.takeup.data
 
 import android.content.Context
 import androidx.core.net.toUri
+import androidx.media3.common.util.NotificationUtil
 import androidx.media3.database.StandaloneDatabaseProvider
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DefaultHttpDataSource
@@ -12,6 +13,7 @@ import androidx.media3.datasource.cache.NoOpCacheEvictor
 import androidx.media3.datasource.cache.SimpleCache
 import androidx.media3.exoplayer.offline.Download
 import androidx.media3.exoplayer.offline.DownloadManager
+import androidx.media3.exoplayer.offline.DownloadNotificationHelper
 import androidx.media3.exoplayer.offline.DownloadRequest
 import androidx.media3.exoplayer.offline.DownloadService
 import kotlinx.coroutines.CoroutineScope
@@ -22,6 +24,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import xyz.five82.takeup.R
 import java.io.File
 import java.util.concurrent.Executors
 
@@ -65,6 +68,9 @@ internal class DownloadStore(
         .setCacheWriteDataSinkFactory(null)
         .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
 
+    private val notificationHelper =
+        DownloadNotificationHelper(appContext, MediaDownloadService.CHANNEL_ID)
+
     private val _downloads = MutableStateFlow<List<DownloadEntry>>(emptyList())
     val downloads: StateFlow<List<DownloadEntry>> = _downloads.asStateFlow()
 
@@ -82,7 +88,10 @@ internal class DownloadStore(
                     manager: DownloadManager,
                     download: Download,
                     finalException: Exception?,
-                ) = refresh()
+                ) {
+                    notifyTerminalState(download)
+                    refresh()
+                }
 
                 override fun onDownloadRemoved(manager: DownloadManager, download: Download) {
                     pendingReplacements.remove(download.request.id)?.let { request ->
@@ -144,6 +153,39 @@ internal class DownloadStore(
         runCatching {
             DownloadService.sendResumeDownloads(appContext, MediaDownloadService::class.java, false)
         }
+    }
+
+    /**
+     * The foreground notification only lives as long as the transfer, which for a
+     * short film on a LAN can be seconds. Post a lasting one on the terminal state
+     * so finishing and failing are both visible after the fact.
+     */
+    private fun notifyTerminalState(download: Download) {
+        val title = runCatching {
+            LoomJson.item(String(download.request.data, Charsets.UTF_8)).title
+        }.getOrNull() ?: return
+        val notification = when (download.state) {
+            Download.STATE_COMPLETED -> notificationHelper.buildDownloadCompletedNotification(
+                appContext,
+                R.drawable.ic_download,
+                null,
+                title,
+            )
+            Download.STATE_FAILED -> notificationHelper.buildDownloadFailedNotification(
+                appContext,
+                R.drawable.ic_download,
+                null,
+                title,
+            )
+            else -> return
+        }
+        // A stable id per item so a replaced download updates its own notification
+        // rather than stacking a new one each time.
+        NotificationUtil.setNotification(
+            appContext,
+            TERMINAL_NOTIFICATION_ID_BASE + download.request.id.hashCode().and(0xFFFF),
+            notification,
+        )
     }
 
     private fun refresh() {
@@ -211,5 +253,8 @@ internal class DownloadStore(
 
     private companion object {
         const val PROGRESS_INTERVAL_MS = 1_000L
+
+        // Above the download service's own foreground notification id.
+        const val TERMINAL_NOTIFICATION_ID_BASE = 100
     }
 }

@@ -33,6 +33,13 @@ class TopDestinationTest {
     }
 
     @Test
+    fun `offline home hides the toolbar`() {
+        // Every remaining destination needs Loom, so offering them would only lead
+        // to screens that cannot load.
+        assertNull(MainUiState.Home(serverUrl, isOffline = true).topDestination())
+    }
+
+    @Test
     fun `detail and playback states hide the toolbar`() {
         val item = LoomItem(id = 1, kind = "movie", title = "Item", year = 2024, overview = "")
         assertNull(MainUiState.Starting.topDestination())
