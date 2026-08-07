@@ -261,6 +261,10 @@ internal val EMPTY_HOME_CONTENT = HomeContent(
     shows = emptyList(),
 )
 
+internal fun HomeContent.isEmpty(): Boolean =
+    continueWatching.isEmpty() && nextUp.isEmpty() && recentlyAdded.isEmpty() &&
+        movies.isEmpty() && shorts.isEmpty() && shows.isEmpty()
+
 internal fun nextEpisodeAfter(episodes: List<LoomItem>, itemId: Long): LoomItem? {
     val index = episodes.indexOfFirst { it.id == itemId }
     if (index < 0) return null
@@ -1157,11 +1161,17 @@ internal class MainViewModel(
     }
 
     private suspend fun loadHome(serverUrl: String) {
-        _uiState.value = MainUiState.Home(
-            serverUrl = serverUrl,
-            content = homeContent,
-            isLoading = true,
-        )
+        val offlineHome = (_uiState.value as? MainUiState.Home)?.takeIf { it.isOffline }
+        // Attempting a reconnect is not evidence Loom is back, so the offline home
+        // stays exactly as it is until the request settles. Rebuilding it as an
+        // online load would flash the banner away, put the withheld library and the
+        // toolbar back, and take them again the moment the attempt fails.
+        _uiState.value = offlineHome?.copy(serverUrl = serverUrl, isLoading = true)
+            ?: MainUiState.Home(
+                serverUrl = serverUrl,
+                content = homeContent,
+                isLoading = true,
+            )
         runCatching { repository.home(serverUrl) }
             .onSuccess {
                 homeContent = it

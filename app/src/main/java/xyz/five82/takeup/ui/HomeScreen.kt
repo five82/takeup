@@ -55,6 +55,19 @@ import xyz.five82.takeup.data.LoomItem
 import xyz.five82.takeup.data.downloadedRowItems
 import xyz.five82.takeup.ui.theme.heroBottomScrim
 
+/**
+ * A home carrying nothing but the downloads row is the offline layout, so rendering
+ * one while the first load is still in flight flashes offline on every cold start:
+ * the library arrives a second later and the screen changes shape. Placeholders hold
+ * that second instead, downloads included.
+ *
+ * Offline is the exception rather than a case of the same thing. There the
+ * downloads-only home is the answer and not a half-loaded one, so a reconnect
+ * attempt must leave it on screen rather than blank it behind a skeleton.
+ */
+internal fun showsPlaceholders(state: MainUiState.Home): Boolean =
+    state.isLoading && !state.isOffline && state.content.isEmpty()
+
 @Composable
 internal fun HomeScreen(
     state: MainUiState.Home,
@@ -72,15 +85,12 @@ internal fun HomeScreen(
     onHeroSeedUrlChanged: (String?) -> Unit,
 ) {
     UseLightStatusBarIcons()
-    val content = state.content
     // Downloads are playable without Loom, so a library that is empty only because
     // the server is unreachable is not empty as far as the user is concerned.
-    val isEmpty = content.continueWatching.isEmpty() && content.nextUp.isEmpty() &&
-        content.recentlyAdded.isEmpty() && content.movies.isEmpty() &&
-        content.shorts.isEmpty() && content.shows.isEmpty() && downloads.isEmpty()
+    val isEmpty = state.content.isEmpty() && downloads.isEmpty()
     Box(modifier = modifier.fillMaxSize()) {
         when {
-            state.isLoading && isEmpty -> LoadingHome()
+            showsPlaceholders(state) -> LoadingHome()
             state.error != null && isEmpty -> FullScreenError(
                 message = state.error,
                 onRetry = onRetry,
