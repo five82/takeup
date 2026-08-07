@@ -5,6 +5,7 @@ import org.junit.Test
 import java.util.Locale
 import xyz.five82.takeup.data.LoomItem
 import xyz.five82.takeup.data.MediaDynamicRange
+import xyz.five82.takeup.data.PlaybackProgress
 import xyz.five82.takeup.data.MediaStream
 
 class MediaCardTest {
@@ -98,6 +99,50 @@ class MediaCardTest {
     fun `formats release dates and preserves invalid values`() {
         assertEquals("Aug 2, 2026", formatReleaseDate("2026-08-02", Locale.US))
         assertEquals("not-a-date", formatReleaseDate("not-a-date", Locale.US))
+    }
+
+    @Test
+    fun `badges a show from its episode rollup`() {
+        val show = LoomItem(
+            id = 10,
+            kind = "show",
+            title = "Severance",
+            year = 2022,
+            overview = "",
+            episodeCount = 19,
+            unwatchedCount = 4,
+        )
+
+        assertEquals(CardBadge.Unwatched, show.cardBadge())
+        assertEquals(CardBadge.Watched, show.copy(unwatchedCount = 0).cardBadge())
+    }
+
+    @Test
+    fun `a show from an older Loom carries no badge`() {
+        val show = LoomItem(
+            id = 10,
+            kind = "show",
+            title = "Severance",
+            year = 2022,
+            overview = "",
+        )
+
+        assertEquals(CardBadge.None, show.cardBadge())
+    }
+
+    @Test
+    fun `a playable item still badges from its own progress`() {
+        val watched = episode(season = 1, episode = 2).copy(
+            progress = PlaybackProgress(
+                positionMs = 1_000,
+                durationMs = 1_000,
+                played = true,
+                resumePositionMs = 0,
+            ),
+        )
+
+        assertEquals(CardBadge.Watched, watched.cardBadge())
+        assertEquals(CardBadge.None, episode(season = 1, episode = 2).cardBadge())
     }
 
     @Test

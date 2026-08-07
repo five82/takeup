@@ -138,6 +138,8 @@ internal object LoomJson {
             mediaTag = media?.string("tag").orEmpty().ifBlank { value.string("media_tag") },
             mediaSizeBytes = media?.long("size") ?: 0L,
             progress = progress,
+            episodeCount = value.int("episode_count"),
+            unwatchedCount = value.int("unwatched_count"),
             seriesTitle = value.string("series_title"),
             seasonTitle = value.string("season_title"),
             genres = genres,

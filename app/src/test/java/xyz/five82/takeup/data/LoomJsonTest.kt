@@ -317,6 +317,41 @@ class LoomJsonTest {
     }
 
     @Test
+    fun `parses the episode rollup on a show`() {
+        val show = LoomJson.item(
+            """
+            {
+              "id": 265,
+              "kind": "show",
+              "title": "Severance",
+              "episode_count": 19,
+              "unwatched_count": 4
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals(19, show.episodeCount)
+        assertEquals(4, show.unwatchedCount)
+    }
+
+    @Test
+    fun `treats an omitted episode rollup as zero`() {
+        val show = LoomJson.item(
+            """
+            {
+              "id": 265,
+              "kind": "show",
+              "title": "Severance",
+              "episode_count": 19
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals(19, show.episodeCount)
+        assertEquals(0, show.unwatchedCount)
+    }
+
+    @Test
     fun `parses artwork options`() {
         val options = LoomJson.artworkOptions(
             """

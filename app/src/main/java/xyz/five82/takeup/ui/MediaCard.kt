@@ -140,31 +140,45 @@ internal fun LandscapeMediaCard(
     }
 }
 
+internal enum class CardBadge { None, Watched, Unwatched }
+
+/**
+ * What a card overlays on its artwork. A show or season has no playback state of
+ * its own, so its badge comes from the episode rollup Loom sends with the row;
+ * anything playable falls back to its own progress.
+ */
+internal fun LoomItem.cardBadge(): CardBadge = when {
+    episodeCount > 0 -> if (unwatchedCount > 0) CardBadge.Unwatched else CardBadge.Watched
+    progress?.played == true -> CardBadge.Watched
+    else -> CardBadge.None
+}
+
 @Composable
 private fun MediaCardProgressOverlay(item: LoomItem, modifier: Modifier = Modifier) {
     val progress = item.progress
     Box(modifier = modifier) {
-        if (progress?.played == true) {
-            WatchedBadge(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(8.dp),
-            )
-        } else if (
-            progress != null &&
-            progress.resumePositionMs > 0 &&
-            progress.durationMs > 0
-        ) {
-            val fraction = (progress.positionMs.toFloat() / progress.durationMs)
-                .coerceIn(0f, 1f)
-            LinearProgressIndicator(
-                progress = { fraction },
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .height(4.dp)
-                    .progressSemantics(fraction),
-            )
+        val badgeModifier = Modifier
+            .align(Alignment.TopEnd)
+            .padding(8.dp)
+        when (item.cardBadge()) {
+            CardBadge.Unwatched -> UnwatchedBadge(item.unwatchedCount, badgeModifier)
+            CardBadge.Watched -> WatchedBadge(badgeModifier)
+            CardBadge.None -> if (
+                progress != null &&
+                progress.resumePositionMs > 0 &&
+                progress.durationMs > 0
+            ) {
+                val fraction = (progress.positionMs.toFloat() / progress.durationMs)
+                    .coerceIn(0f, 1f)
+                LinearProgressIndicator(
+                    progress = { fraction },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .height(4.dp)
+                        .progressSemantics(fraction),
+                )
+            }
         }
     }
 }

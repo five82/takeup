@@ -271,6 +271,36 @@ internal fun nextEpisodeAfter(episodes: List<LoomItem>, itemId: Long): LoomItem?
     return episodes.getOrNull(index + 1)
 }
 
+/**
+ * Moves this row's unwatched rollup by [delta], staying within the episodes Loom
+ * counted beneath it. Rows carrying no rollup - movies, episodes, and anything
+ * from an older Loom - are left alone.
+ */
+internal fun LoomItem.shiftUnwatched(delta: Int): LoomItem =
+    if (episodeCount <= 0) {
+        this
+    } else {
+        copy(unwatchedCount = (unwatchedCount + delta).coerceIn(0, episodeCount))
+    }
+
+/**
+ * This row's rollup once [cascade], a show or season that was just marked or
+ * cleared, has taken every episode beneath it along. Loom recounts server-side,
+ * but the outcome is known outright, so cached rows do not need a refetch.
+ */
+internal fun LoomItem.afterWatchedCascade(cascade: LoomItem, watched: Boolean): LoomItem = when {
+    episodeCount <= 0 -> this
+    // The cascaded item itself, and the seasons under a cascaded show, all end up
+    // wholly watched or wholly unwatched.
+    id == cascade.id || (cascade.kind == "show" && parentId == cascade.id) ->
+        copy(unwatchedCount = if (watched) 0 else episodeCount)
+    // The show above a cascaded season moves by however many episodes that season
+    // just changed hands; its other seasons are untouched.
+    cascade.kind == "season" && id == cascade.parentId ->
+        shiftUnwatched((if (watched) 0 else cascade.episodeCount) - cascade.unwatchedCount)
+    else -> this
+}
+
 private data class ShowContent(
     val show: LoomItem,
     val seasons: List<LoomItem>,
@@ -921,10 +951,15 @@ internal class MainViewModel(
             _uiState.value = state.copy(isLoading = true, error = null)
             runCatching { repository.setPlayed(state.serverUrl, state.show.id, watched) }
                 .onSuccess {
+                    applyWatchedCascade(state.show, watched)
                     refreshHomeContent(state.serverUrl)
-                    // Seasons carry no playback state of their own, so this screen
-                    // draws the same either way.
-                    _uiState.value = state.copy(isLoading = false, error = null)
+                    val cascaded = showContent?.takeIf { it.show.id == state.show.id }
+                    _uiState.value = state.copy(
+                        show = cascaded?.show ?: state.show,
+                        seasons = cascaded?.seasons ?: state.seasons,
+                        isLoading = false,
+                        error = null,
+                    )
                 }
                 .onFailure {
                     _uiState.value = state.copy(isLoading = false, error = readableError(it))
@@ -940,8 +975,12 @@ internal class MainViewModel(
             _uiState.value = state.copy(isLoading = true, error = null)
             runCatching { repository.setPlayed(state.serverUrl, state.season.id, watched) }
                 .onSuccess {
+                    applyWatchedCascade(state.season, watched)
                     refreshHomeContent(state.serverUrl)
-                    loadSeason(state.serverUrl, state.show, state.season)
+                    val cascaded = showContent?.seasons
+                        ?.firstOrNull { it.id == state.season.id }
+                        ?: state.season
+                    loadSeason(state.serverUrl, state.show, cascaded)
                 }
                 .onFailure {
                     _uiState.value = state.copy(isLoading = false, error = readableError(it))
@@ -958,6 +997,32 @@ internal class MainViewModel(
      */
     private suspend fun refreshHomeContent(serverUrl: String) {
         runCatching { repository.home(serverUrl) }.onSuccess { homeContent = it }
+    }
+
+    /**
+     * Rolls a show- or season-wide cascade into every cached copy of the rows
+     * above it. Call this before reloading home, so the rows Loom does resend win
+     * over the local arithmetic rather than being counted twice.
+     */
+    private fun applyWatchedCascade(item: LoomItem, watched: Boolean) {
+        mapCachedItems { it.afterWatchedCascade(item, watched) }
+    }
+
+    /**
+     * Moves the show and season rollups by one when an episode's watched state
+     * flips, so a badge is not stale on the way back out of the episode.
+     */
+    private fun adjustUnwatchedRollups(episode: LoomItem, wasPlayed: Boolean) {
+        val nowPlayed = episode.progress?.played == true
+        if (episode.kind != "episode" || nowPlayed == wasPlayed) return
+        val delta = if (nowPlayed) -1 else 1
+        val seasonId = episode.parentId
+        val season = seasonContent?.season?.takeIf { it.id == seasonId }
+            ?: showContent?.seasons?.firstOrNull { it.id == seasonId }
+        val showId = season?.parentId ?: 0L
+        mapCachedItems { row ->
+            if (row.id == seasonId || row.id == showId) row.shiftUnwatched(delta) else row
+        }
     }
 
     private fun watchedProgress(item: LoomItem, watched: Boolean): PlaybackProgress? {
@@ -1424,8 +1489,10 @@ internal class MainViewModel(
             else -> Unit
         }
 
-        val cached = findCachedItem(itemId)?.copy(progress = progress) ?: return
+        val previous = findCachedItem(itemId) ?: return
+        val cached = previous.copy(progress = progress)
         updateCachedItem(cached)
+        adjustUnwatchedRollups(cached, wasPlayed = previous.progress?.played == true)
         val continuing = homeContent.continueWatching
             .filterNot { it.id == itemId }
             .toMutableList()
@@ -1442,27 +1509,29 @@ internal class MainViewModel(
         )
     }
 
-    private fun updateCachedItem(updated: LoomItem) {
+    private fun updateCachedItem(updated: LoomItem) = mapCachedItems { item ->
+        if (item.id == updated.id) updated else item
+    }
+
+    /** Rewrites every cached copy of every item, wherever a screen might read it. */
+    private fun mapCachedItems(transform: (LoomItem) -> LoomItem) {
         homeContent = homeContent.copy(
-            continueWatching = homeContent.continueWatching.replaceItem(updated),
-            nextUp = homeContent.nextUp.replaceItem(updated),
-            recentlyAdded = homeContent.recentlyAdded.replaceItem(updated),
-            movies = homeContent.movies.replaceItem(updated),
-            shorts = homeContent.shorts.replaceItem(updated),
-            shows = homeContent.shows.replaceItem(updated),
+            continueWatching = homeContent.continueWatching.map(transform),
+            nextUp = homeContent.nextUp.map(transform),
+            recentlyAdded = homeContent.recentlyAdded.map(transform),
+            movies = homeContent.movies.map(transform),
+            shorts = homeContent.shorts.map(transform),
+            shows = homeContent.shows.map(transform),
         )
-        movieGenreItems = movieGenreItems?.let { it.first to it.second.replaceItem(updated) }
+        movieGenreItems = movieGenreItems?.let { it.first to it.second.map(transform) }
         showContent = showContent?.let {
-            it.copy(
-                show = if (it.show.id == updated.id) updated else it.show,
-                seasons = it.seasons.replaceItem(updated),
-            )
+            it.copy(show = transform(it.show), seasons = it.seasons.map(transform))
         }
         seasonContent = seasonContent?.let {
             it.copy(
-                show = if (it.show.id == updated.id) updated else it.show,
-                season = if (it.season.id == updated.id) updated else it.season,
-                episodes = it.episodes.replaceItem(updated),
+                show = transform(it.show),
+                season = transform(it.season),
+                episodes = it.episodes.map(transform),
             )
         }
     }
@@ -1475,9 +1544,6 @@ internal class MainViewModel(
             ?: homeContent.continueWatching.firstOrNull { it.id == itemId }
             ?: homeContent.nextUp.firstOrNull { it.id == itemId }
             ?: homeContent.recentlyAdded.firstOrNull { it.id == itemId }
-
-    private fun List<LoomItem>.replaceItem(updated: LoomItem): List<LoomItem> =
-        map { if (it.id == updated.id) updated else it }
 
     private fun HomeContent.items(kind: LibraryKind): List<LoomItem> = when (kind) {
         LibraryKind.Movies -> movies

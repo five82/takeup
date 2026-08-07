@@ -16,12 +16,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
@@ -53,9 +55,11 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import coil3.compose.AsyncImage
@@ -361,6 +365,31 @@ internal fun WatchedBadge(modifier: Modifier = Modifier) {
             modifier = Modifier
                 .padding(4.dp)
                 .size(16.dp),
+        )
+    }
+}
+
+/** The watched badge's counterpart for a show or season with episodes left. */
+@Composable
+internal fun UnwatchedBadge(count: Int, modifier: Modifier = Modifier) {
+    val description = pluralStringResource(R.plurals.unwatched_count, count, count)
+    Surface(
+        modifier = modifier.semantics { contentDescription = description },
+        color = MaterialTheme.colorScheme.primary,
+        contentColor = MaterialTheme.colorScheme.onPrimary,
+        shape = CircleShape,
+        shadowElevation = 2.dp,
+    ) {
+        Text(
+            text = count.toString(),
+            // Matches WatchedBadge's 16dp icon inside 4dp padding, so a row of
+            // shows badges at one size whichever way each one went.
+            modifier = Modifier
+                .defaultMinSize(minWidth = 24.dp, minHeight = 24.dp)
+                .padding(horizontal = 6.dp, vertical = 4.dp)
+                .wrapContentSize(Alignment.Center),
+            textAlign = TextAlign.Center,
+            style = MaterialTheme.typography.labelMedium,
         )
     }
 }

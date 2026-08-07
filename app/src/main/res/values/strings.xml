@@ -26,6 +26,12 @@
         <item quantity="one">%d episode</item>
         <item quantity="other">%d episodes</item>
     </plurals>
+    <plurals name="unwatched_count">
+        <item quantity="one">%d unwatched episode</item>
+        <item quantity="other">%d unwatched episodes</item>
+    </plurals>
+    <string name="episodes_left">%1$s &#183; %2$d left</string>
+    <string name="episodes_all_watched">%1$s &#183; All watched</string>
     <string name="continue_watching">Continue Watching</string>
     <string name="time_left">%1$s left</string>
     <string name="next_up">Next Up</string>

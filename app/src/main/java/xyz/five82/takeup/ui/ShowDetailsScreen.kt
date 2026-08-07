@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import xyz.five82.takeup.R
@@ -156,6 +157,13 @@ internal fun ShowDetailsScreen(
                                     style = MaterialTheme.typography.bodyLarge,
                                 )
                             }
+                            episodeRollup(state.show)?.let {
+                                Text(
+                                    text = it,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                )
+                            }
                         }
                     }
                 }
@@ -206,11 +214,22 @@ internal fun ShowDetailsScreen(
                                     .width(72.dp)
                                     .aspectRatio(2f / 3f),
                             )
-                            Text(
-                                text = season.title,
+                            Column(
                                 modifier = Modifier.padding(18.dp),
-                                style = MaterialTheme.typography.titleMedium,
-                            )
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                Text(
+                                    text = season.title,
+                                    style = MaterialTheme.typography.titleMedium,
+                                )
+                                episodeRollup(season)?.let {
+                                    Text(
+                                        text = it,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -225,5 +244,25 @@ internal fun ShowDetailsScreen(
             }
         }
     }
+    }
+}
+
+/**
+ * "12 episodes - 3 left" for a show or season, from the rollup Loom attaches to
+ * the row. Null for anything with no episodes counted beneath it, which includes
+ * a listing served by an older Loom.
+ */
+@Composable
+private fun episodeRollup(item: LoomItem): String? {
+    if (item.episodeCount <= 0) return null
+    val episodes = pluralStringResource(
+        R.plurals.episode_count,
+        item.episodeCount,
+        item.episodeCount,
+    )
+    return if (item.unwatchedCount > 0) {
+        stringResource(R.string.episodes_left, episodes, item.unwatchedCount)
+    } else {
+        stringResource(R.string.episodes_all_watched, episodes)
     }
 }

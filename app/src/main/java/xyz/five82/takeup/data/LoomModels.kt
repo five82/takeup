@@ -30,6 +30,11 @@ data class LoomItem(
     val mediaTag: String = "",
     val mediaSizeBytes: Long = 0,
     val progress: PlaybackProgress? = null,
+    // Shows and seasons carry a rollup of the episodes beneath them so a grid can
+    // badge a series without walking down to every episode. Loom leaves both at
+    // zero for movies and episodes, and for a show with nothing left to watch.
+    val episodeCount: Int = 0,
+    val unwatchedCount: Int = 0,
     val seriesTitle: String = "",
     val seasonTitle: String = "",
     val genres: List<Genre> = emptyList(),
