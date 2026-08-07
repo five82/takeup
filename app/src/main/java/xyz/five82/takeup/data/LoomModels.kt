@@ -123,6 +123,11 @@ enum class ArtworkKind(val apiValue: String) {
     POSTER("poster"),
     BACKDROP("backdrop"),
     LOGO("logo"),
+
+    // Loom splits TMDB backdrops into textless backdrops and thumbs, the
+    // language-tagged ones with title art baked in. Takeup only selects thumbs
+    // for now; no screen draws them yet.
+    THUMB("thumb"),
 }
 
 data class ArtworkOption(

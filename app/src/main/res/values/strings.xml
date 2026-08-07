@@ -73,9 +73,11 @@
     <string name="poster">Poster</string>
     <string name="backdrop">Backdrop</string>
     <string name="logo">Logo</string>
+    <string name="thumb">Thumb</string>
     <string name="poster_artwork">Poster artwork</string>
     <string name="backdrop_artwork">Backdrop artwork</string>
     <string name="logo_artwork">Logo artwork</string>
+    <string name="thumb_artwork">Thumb artwork</string>
     <string name="selected_artwork">Selected artwork</string>
     <string name="reset_artwork">Reset</string>
     <string name="no_artwork_options">TMDB did not return any artwork options.</string>

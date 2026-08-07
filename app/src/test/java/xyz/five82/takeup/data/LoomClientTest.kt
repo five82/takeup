@@ -113,6 +113,17 @@ class LoomClientTest {
     }
 
     @Test
+    fun `loads thumb artwork options`() = runBlocking {
+        val options = LoomClient().artworkOptions(address, 42, ArtworkKind.THUMB)
+
+        assertEquals("/titled.jpg", options.single().providerPath)
+        assertEquals(
+            listOf("GET /api/v1/items/42/images/thumb/options "),
+            artworkRequests,
+        )
+    }
+
+    @Test
     fun `loads every movie page`() = runBlocking {
         paginateMovies.set(true)
 
@@ -220,6 +231,11 @@ class LoomClientTest {
                 artworkRequests += "${exchange.requestMethod} ${exchange.requestURI.path} " +
                     exchange.requestBody.bufferedReader().use { it.readText() }
                 """{"items":[{"provider":"tmdb","provider_path":"/alternate.jpg","width":1000,"height":1500,"thumbnail_url":"https://image.tmdb.org/poster.jpg","selected":false}]}"""
+            }
+            "/api/v1/items/42/images/thumb/options" -> {
+                artworkRequests += "${exchange.requestMethod} ${exchange.requestURI.path} " +
+                    exchange.requestBody.bufferedReader().use { it.readText() }
+                """{"items":[{"provider":"tmdb","provider_path":"/titled.jpg","width":1920,"height":1080,"language":"en","thumbnail_url":"https://image.tmdb.org/titled.jpg","selected":true}]}"""
             }
             "/api/v1/items/42/images/poster" -> {
                 artworkRequests += "${exchange.requestMethod} ${exchange.requestURI.path} " +

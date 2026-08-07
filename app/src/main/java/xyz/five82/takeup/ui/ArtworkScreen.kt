@@ -234,16 +234,19 @@ private fun ArtworkKind.labelResource(): Int = when (this) {
     ArtworkKind.POSTER -> R.string.poster
     ArtworkKind.BACKDROP -> R.string.backdrop
     ArtworkKind.LOGO -> R.string.logo
+    ArtworkKind.THUMB -> R.string.thumb
 }
 
 private fun ArtworkKind.descriptionResource(): Int = when (this) {
     ArtworkKind.POSTER -> R.string.poster_artwork
     ArtworkKind.BACKDROP -> R.string.backdrop_artwork
     ArtworkKind.LOGO -> R.string.logo_artwork
+    ArtworkKind.THUMB -> R.string.thumb_artwork
 }
 
 private fun ArtworkKind.aspectRatio(): Float = when (this) {
     ArtworkKind.POSTER -> 2f / 3f
-    ArtworkKind.BACKDROP -> 16f / 9f
+    // Thumbs are backdrops with title art baked in, so they share the shape.
+    ArtworkKind.BACKDROP, ArtworkKind.THUMB -> 16f / 9f
     ArtworkKind.LOGO -> 5f / 2f
 }
