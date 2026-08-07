@@ -9,7 +9,9 @@ browsed by season and episode, with runtime, playback progress, and source
 video/audio badges shown for each episode. Movie and episode details report
 codec, resolution class, dynamic range, audio codec,
 and channel layout from Loom's `ffprobe` metadata. Browsing screens support
-pull-to-refresh and preserve existing content when a refresh fails. Takeup
+pull-to-refresh and preserve existing content when a refresh fails. Artwork is
+requested at Loom's resized width buckets sized to the slot it fills, so a
+poster card never pulls a full-size original. Takeup
 direct-plays selected media with Media3 and saves playback progress every 15
 seconds and when playback stops.
 

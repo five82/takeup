@@ -69,6 +69,27 @@ data class LoomItem(
     }
 }
 
+// Loom serves resized artwork variants at these fixed width buckets, snapping
+// any requested width up to the next one. Mirroring the buckets here keeps the
+// URLs stable, so slots of a similar size share one cached variant instead of
+// each pulling its own resize.
+private val imageWidthBuckets = listOf(240, 480, 960, 1440)
+
+private const val LOOM_IMAGE_PATH = "/api/v1/images/"
+
+/**
+ * Returns [url] asking Loom for a variant at least [pixels] wide, so a phone
+ * never decodes a 4K TMDB original for a small card. URLs that do not point at
+ * Loom's image endpoint (TMDB artwork options, which arrive pre-sized) are
+ * returned unchanged.
+ */
+fun imageUrlAtWidth(url: String, pixels: Int): String {
+    if (!url.contains(LOOM_IMAGE_PATH)) return url
+    val bucket = imageWidthBuckets.firstOrNull { pixels <= it } ?: imageWidthBuckets.last()
+    val separator = if (url.contains('?')) '&' else '?'
+    return "$url${separator}width=$bucket"
+}
+
 data class Genre(
     val id: Long,
     val name: String,

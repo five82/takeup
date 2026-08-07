@@ -11,6 +11,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -65,6 +66,7 @@ import xyz.five82.takeup.R
 import xyz.five82.takeup.data.LoomItem
 import xyz.five82.takeup.data.MediaDynamicRange
 import xyz.five82.takeup.data.MediaStream
+import xyz.five82.takeup.data.imageUrlAtWidth
 import xyz.five82.takeup.ui.theme.overlayPillColor
 import xyz.five82.takeup.ui.theme.topScrim
 
@@ -133,7 +135,10 @@ internal fun MediaArtwork(
 ) {
     var isLoading by remember(url) { mutableStateOf(url != null) }
     var isError by remember(url) { mutableStateOf(url == null) }
-    Box(
+    // Sizing the request from the laid-out width keeps every call site honest:
+    // Loom resizes to the bucket that covers this slot rather than serving a
+    // full-size original. An unbounded slot lands on the widest bucket.
+    BoxWithConstraints(
         modifier = modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh),
         contentAlignment = Alignment.Center,
     ) {
@@ -150,7 +155,7 @@ internal fun MediaArtwork(
         }
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
-                .data(url)
+                .data(url?.let { imageUrlAtWidth(it, constraints.maxWidth) })
                 .crossfade(true)
                 .build(),
             contentDescription = contentDescription,
@@ -203,8 +208,10 @@ internal fun AmbientGlow(
     ) {
         AsyncImage(
             // A tiny decode is all a heavy blur needs; keeps the effect cheap.
+            // The smallest Loom variant is shared with seed extraction, so the
+            // glow costs no extra download.
             model = ImageRequest.Builder(LocalContext.current)
-                .data(url)
+                .data(imageUrlAtWidth(url, 64))
                 .size(Size(64, 64))
                 .crossfade(true)
                 .build(),
@@ -277,6 +284,11 @@ internal fun FadingBackdropArtwork(
     }
 }
 
+// Logos draw 64dp tall and Fit-scaled, so their drawn width follows the
+// artwork's aspect ratio rather than the slot. This covers even a very wide
+// wordmark while skipping the multi-thousand-pixel original.
+private const val LogoRequestWidth = 960
+
 @Composable
 internal fun TitleLogo(
     url: String,
@@ -285,7 +297,7 @@ internal fun TitleLogo(
 ) {
     AsyncImage(
         model = ImageRequest.Builder(LocalContext.current)
-            .data(url)
+            .data(imageUrlAtWidth(url, LogoRequestWidth))
             .crossfade(true)
             .build(),
         contentDescription = title,

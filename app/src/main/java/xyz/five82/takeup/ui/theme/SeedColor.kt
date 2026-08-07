@@ -22,6 +22,7 @@ import com.materialkolor.ktx.toColor
 import com.materialkolor.ktx.toHct
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import xyz.five82.takeup.data.imageUrlAtWidth
 
 // Seeds are deterministic per artwork URL, so a small process-wide cache keeps
 // revisited screens from re-running quantization or flashing the fallback.
@@ -59,10 +60,10 @@ internal fun rememberSeedColor(url: String?): Color {
 }
 
 private suspend fun extractSeedColor(context: Context, url: String): Color {
-    // A tiny software bitmap is all quantization needs; the request rides the
-    // same Coil cache as the visible artwork.
+    // A tiny software bitmap is all quantization needs, so ask Loom for its
+    // smallest variant: the same one the ambient glow behind the artwork uses.
     val request = ImageRequest.Builder(context)
-        .data(url)
+        .data(imageUrlAtWidth(url, 128))
         .size(128)
         .allowHardware(false)
         .build()
