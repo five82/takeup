@@ -86,6 +86,10 @@
     <string name="reset_artwork">Reset</string>
     <string name="no_artwork_options">TMDB did not return any artwork options.</string>
     <string name="watched">Watched</string>
+    <string name="watched_state">Watched state</string>
+    <string name="mark_watched">Mark watched</string>
+    <string name="mark_unwatched">Mark unwatched</string>
+    <string name="clear_watched_history">Clear watched history</string>
     <string name="crop_video">Crop</string>
     <string name="fit_video">Fit</string>
     <string name="hdr_badge">HDR</string>

@@ -332,6 +332,7 @@ private fun TakeupApp(
                 onBack = viewModel::backFromShowDetails,
                 onRetry = viewModel::retryShowDetails,
                 onEditArtwork = viewModel::editArtwork,
+                onSetWatched = viewModel::setShowWatched,
                 onSeasonSelected = viewModel::selectSeason,
             )
         }
@@ -343,6 +344,7 @@ private fun TakeupApp(
                 onBack = viewModel::backFromSeason,
                 onRetry = viewModel::retrySeason,
                 onEditArtwork = viewModel::editArtwork,
+                onSetWatched = viewModel::setSeasonWatched,
                 onEpisodeSelected = viewModel::selectEpisode,
             )
         }
@@ -358,6 +360,7 @@ private fun TakeupApp(
                 viewModel.startDownload(current.item)
             },
             onRemoveDownload = { viewModel.cancelDownload(current.item.id) },
+            onSetWatched = viewModel::setDetailsWatched,
             onGenreSelected = viewModel::openGenre,
         )
         is MainUiState.Artwork -> ArtworkScreen(

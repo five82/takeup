@@ -169,6 +169,19 @@ internal class LoomRepository(
     }
 
     /**
+     * Marks the item watched, or forgets its playback state entirely. Addressing a
+     * season or a show cascades to every episode beneath it, which is how a series
+     * is retired or returned to a first watch.
+     */
+    suspend fun setPlayed(serverUrl: String, itemId: Long, played: Boolean) {
+        client.setPlayed(
+            server = ServerAddress.parse(serverUrl),
+            itemId = itemId,
+            played = played,
+        )
+    }
+
+    /**
      * Captures the item response as the download's offline snapshot, so browsing and
      * playing it later needs nothing from Loom.
      */

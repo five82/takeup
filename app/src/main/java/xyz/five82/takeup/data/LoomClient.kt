@@ -145,6 +145,24 @@ internal class LoomClient(
         )
     }
 
+    /**
+     * Records watched state Loom never observed - a title finished on another
+     * device, or history to discard - for the item and, when it is a season or a
+     * show, every playable item beneath it. Loom answers with the number of
+     * playback rows it changed, which nothing here needs.
+     */
+    suspend fun setPlayed(
+        server: ServerAddress,
+        itemId: Long,
+        played: Boolean,
+    ) {
+        require(itemId > 0)
+        request(
+            uri = server.api("api/v1/items/$itemId/played"),
+            method = if (played) "POST" else "DELETE",
+        )
+    }
+
     private suspend fun pagedItems(
         server: ServerAddress,
         path: String,

@@ -26,6 +26,7 @@ class LoomClientTest {
     private val progressMethod = AtomicReference<String>()
     private val progressRequest = AtomicReference<String>()
     private val artworkRequests = CopyOnWriteArrayList<String>()
+    private val playedRequests = CopyOnWriteArrayList<String>()
     private val searchQueries = CopyOnWriteArrayList<String>()
 
     @Before
@@ -150,6 +151,24 @@ class LoomClientTest {
         )
     }
 
+    // Marking and clearing share one endpoint and are told apart only by method,
+    // so a swapped verb would silently discard history instead of recording it.
+    @Test
+    fun `writes watched state with the verb that matches`() = runBlocking {
+        val client = LoomClient()
+
+        client.setPlayed(address, 42, played = true)
+        client.setPlayed(address, 51, played = false)
+
+        assertEquals(
+            listOf(
+                "POST /api/v1/items/42/played",
+                "DELETE /api/v1/items/51/played",
+            ),
+            playedRequests,
+        )
+    }
+
     @Test
     fun `loads every movie page`() = runBlocking {
         paginateMovies.set(true)
@@ -260,6 +279,10 @@ class LoomClientTest {
                 progressMethod.set(exchange.requestMethod)
                 progressRequest.set(exchange.requestBody.bufferedReader().use { it.readText() })
                 """{"position_ms":15000,"duration_ms":120000,"played":false,"resume_position_ms":15000}"""
+            }
+            "/api/v1/items/42/played", "/api/v1/items/51/played" -> {
+                playedRequests += "${exchange.requestMethod} ${exchange.requestURI.path}"
+                """{"updated":1}"""
             }
             "/api/v1/items/42/images/poster/options" -> {
                 artworkRequests += "${exchange.requestMethod} ${exchange.requestURI.path} " +

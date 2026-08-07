@@ -72,12 +72,14 @@ internal fun DetailsScreen(
     onPlay: () -> Unit,
     onDownload: () -> Unit,
     onRemoveDownload: () -> Unit,
+    onSetWatched: (Boolean) -> Unit,
     onGenreSelected: (Genre) -> Unit,
 ) {
     BackHandler(onBack = onBack)
     UseLightStatusBarIcons()
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     var confirmRemoval by remember(state.item.id) { mutableStateOf(false) }
+    val watched = state.item.progress?.played == true
     // Downloaded artwork comes off local storage so the screen renders unchanged
     // when Loom is unreachable.
     val backdropUrl = downloadEntry?.backdropPath
@@ -97,6 +99,21 @@ internal fun DetailsScreen(
                         iconResource = R.drawable.ic_arrow_back,
                         contentDescription = stringResource(R.string.navigate_back),
                         onClick = onBack,
+                    )
+                },
+                // The action row below is already three segments wide, so the
+                // watched toggle rides here rather than crowding Play out of it.
+                actions = {
+                    MediaOverlayIconButton(
+                        iconResource = if (watched) {
+                            R.drawable.ic_watched
+                        } else {
+                            R.drawable.ic_unwatched
+                        },
+                        contentDescription = stringResource(
+                            if (watched) R.string.mark_unwatched else R.string.mark_watched,
+                        ),
+                        onClick = { onSetWatched(!watched) },
                     )
                 },
                 colors = TopAppBarDefaults.topAppBarColors(

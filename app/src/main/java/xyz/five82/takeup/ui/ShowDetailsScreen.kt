@@ -43,6 +43,7 @@ internal fun ShowDetailsScreen(
     onBack: () -> Unit,
     onRetry: () -> Unit,
     onEditArtwork: () -> Unit,
+    onSetWatched: (Boolean) -> Unit,
     onSeasonSelected: (LoomItem) -> Unit,
 ) {
     BackHandler(onBack = onBack)
@@ -66,6 +67,7 @@ internal fun ShowDetailsScreen(
                     )
                 },
                 actions = {
+                    WatchedStateMenu(onSetWatched = onSetWatched)
                     if (state.show.tmdbId > 0) {
                         MediaOverlayIconButton(
                             iconResource = R.drawable.ic_artwork,

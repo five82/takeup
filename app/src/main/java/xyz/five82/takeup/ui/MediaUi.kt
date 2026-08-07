@@ -24,6 +24,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -105,6 +107,42 @@ internal fun MediaOverlayIconButton(
             painter = painterResource(iconResource),
             contentDescription = contentDescription,
         )
+    }
+}
+
+/**
+ * Watched-state actions for a show or a season. Loom attaches playback state only
+ * to playable items, so there is no season- or show-level flag to toggle against
+ * and both directions are offered outright.
+ */
+@Composable
+internal fun WatchedStateMenu(onSetWatched: (Boolean) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        MediaOverlayIconButton(
+            iconResource = R.drawable.ic_more_vert,
+            contentDescription = stringResource(R.string.watched_state),
+            onClick = { expanded = true },
+        )
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.mark_watched)) },
+                onClick = {
+                    expanded = false
+                    onSetWatched(true)
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.clear_watched_history)) },
+                onClick = {
+                    expanded = false
+                    onSetWatched(false)
+                },
+            )
+        }
     }
 }
 

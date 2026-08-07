@@ -15,7 +15,11 @@ pull-to-refresh and preserve existing content when a refresh fails. Artwork is
 requested at Loom's resized width buckets sized to the slot it fills, so a
 poster card never pulls a full-size original. Takeup
 direct-plays selected media with Media3 and saves playback progress every 15
-seconds and when playback stops. Movies, short films, and episodes can be
+seconds and when playback stops. Watched state can also be written without
+playing anything: a movie or episode toggles between watched and no history from
+its details screen, for a title finished on another device or an abandoned one
+that should leave Continue Watching, and a season or show marks or clears every
+episode beneath it in one action. Movies, short films, and episodes can be
 downloaded for offline viewing.
 
 ## Offline downloads

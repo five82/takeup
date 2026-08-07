@@ -893,6 +893,80 @@ internal class MainViewModel(
         }
     }
 
+    /**
+     * Writes watched state for the item on screen. Loom stores the file's duration
+     * as the position when marking played, so the same progress can be applied
+     * locally and Continue Watching retires the item without a home reload.
+     */
+    fun setDetailsWatched(watched: Boolean) {
+        val state = _uiState.value as? MainUiState.Details ?: return
+        if (state.isLoading) return
+        val item = state.item
+        viewModelScope.launch {
+            runCatching { repository.setPlayed(state.serverUrl, item.id, watched) }
+                .onSuccess { updateLocalProgress(item.id, watchedProgress(item, watched)) }
+                .onFailure { showDetailsError(readableError(it)) }
+        }
+    }
+
+    fun setShowWatched(watched: Boolean) {
+        val state = _uiState.value as? MainUiState.ShowDetails ?: return
+        if (state.isLoading) return
+        activeJob?.cancel()
+        activeJob = viewModelScope.launch {
+            _uiState.value = state.copy(isLoading = true, error = null)
+            runCatching { repository.setPlayed(state.serverUrl, state.show.id, watched) }
+                .onSuccess {
+                    refreshHomeContent(state.serverUrl)
+                    // Seasons carry no playback state of their own, so this screen
+                    // draws the same either way.
+                    _uiState.value = state.copy(isLoading = false, error = null)
+                }
+                .onFailure {
+                    _uiState.value = state.copy(isLoading = false, error = readableError(it))
+                }
+        }
+    }
+
+    fun setSeasonWatched(watched: Boolean) {
+        val state = _uiState.value as? MainUiState.Season ?: return
+        if (state.isLoading) return
+        activeJob?.cancel()
+        activeJob = viewModelScope.launch {
+            _uiState.value = state.copy(isLoading = true, error = null)
+            runCatching { repository.setPlayed(state.serverUrl, state.season.id, watched) }
+                .onSuccess {
+                    refreshHomeContent(state.serverUrl)
+                    loadSeason(state.serverUrl, state.show, state.season)
+                }
+                .onFailure {
+                    _uiState.value = state.copy(isLoading = false, error = readableError(it))
+                }
+        }
+    }
+
+    /**
+     * Refetches the home rows after a cascade. Which episodes it touched is Loom's
+     * answer to give: clearing a series restores a Next Up episode that only Loom
+     * can name, and the client cannot tell which of many episodes left Continue
+     * Watching. Failure leaves the cached rows in place; Home can be pulled to
+     * refresh.
+     */
+    private suspend fun refreshHomeContent(serverUrl: String) {
+        runCatching { repository.home(serverUrl) }.onSuccess { homeContent = it }
+    }
+
+    private fun watchedProgress(item: LoomItem, watched: Boolean): PlaybackProgress? {
+        if (!watched) return null
+        val duration = item.progress?.durationMs?.takeIf { it > 0 } ?: item.mediaDurationMs
+        return PlaybackProgress(
+            positionMs = duration,
+            durationMs = duration,
+            played = true,
+            resumePositionMs = 0,
+        )
+    }
+
     fun startDownload(item: LoomItem) {
         val serverUrl = (_uiState.value as? MainUiState.Details)?.serverUrl ?: return
         viewModelScope.launch {
@@ -902,7 +976,7 @@ internal class MainViewModel(
                 result.isFailure -> readableError(result.exceptionOrNull()!!)
                 else -> null
             }
-            if (message != null) showDownloadError(message)
+            if (message != null) showDetailsError(message)
         }
     }
 
@@ -914,7 +988,7 @@ internal class MainViewModel(
         downloads?.removeAll()
     }
 
-    private fun showDownloadError(message: String) {
+    private fun showDetailsError(message: String) {
         val state = _uiState.value
         if (state is MainUiState.Details) {
             _uiState.value = state.copy(error = message)
@@ -1321,10 +1395,11 @@ internal class MainViewModel(
         }
     }
 
+    // A null progress is an item whose playback state was discarded outright.
     private fun updateLocalProgress(
         itemId: Long,
-        progress: PlaybackProgress,
-        exactPositionMs: Long,
+        progress: PlaybackProgress?,
+        exactPositionMs: Long = progress?.resumePositionMs ?: 0L,
     ) {
         when (val state = _uiState.value) {
             is MainUiState.Playback -> if (state.item.id == itemId) {
@@ -1344,14 +1419,15 @@ internal class MainViewModel(
         val continuing = homeContent.continueWatching
             .filterNot { it.id == itemId }
             .toMutableList()
-        if (progress.resumePositionMs > 0) {
+        if ((progress?.resumePositionMs ?: 0L) > 0) {
             continuing.add(0, cached)
         }
         homeContent = homeContent.copy(
             continueWatching = continuing.take(20),
-            // Watching an episode retires it from Next Up either way: a partial
-            // watch moves the show to Continue Watching, and a finished one
-            // leaves Loom to name the successor on the next home load.
+            // Writing playback state retires an episode from Next Up whichever
+            // way it went: a partial watch moves the show to Continue Watching,
+            // and anything else leaves Loom to name the row's next occupant on
+            // the following home load.
             nextUp = homeContent.nextUp.filterNot { it.id == itemId },
         )
     }
