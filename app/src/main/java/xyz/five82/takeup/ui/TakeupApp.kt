@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -121,7 +122,7 @@ private fun TakeupBottomBar(nav: NavState) {
             .fillMaxWidth()
             .background(Stage.copy(alpha = 0.98f))
             .navigationBarsPadding()
-            .padding(vertical = 10.dp),
+            .padding(vertical = 4.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -129,13 +130,17 @@ private fun TakeupBottomBar(nav: NavState) {
             val selected = nav.tab == tab
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
                 modifier = Modifier
                     .clip(CircleShape)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
                     ) { nav.selectTab(tab) }
-                    .padding(horizontal = 18.dp, vertical = 4.dp),
+                    // 48dp minimum touch target; the row's old vertical padding
+                    // moved inside the tap area so the bar stays the same height.
+                    .defaultMinSize(minHeight = 48.dp)
+                    .padding(horizontal = 20.dp, vertical = 4.dp),
             ) {
                 // The active marker is the tab's thread; Home gets the whole selvedge.
                 Box(Modifier.size(width = 16.dp, height = 3.dp), contentAlignment = Alignment.Center) {

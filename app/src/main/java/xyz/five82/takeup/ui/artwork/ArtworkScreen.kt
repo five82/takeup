@@ -9,10 +9,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -146,7 +148,9 @@ fun ArtworkScreen(repository: LoomRepository, nav: NavState, itemId: Long, title
                         .background(if (selected) accent.copy(alpha = 0.2f) else Color.Transparent)
                         .border(1.dp, if (selected) accent else Line, RoundedCornerShape(50))
                         .clickable { model.selectKind(kind) }
-                        .padding(horizontal = 14.dp, vertical = 7.dp),
+                        .defaultMinSize(minHeight = 48.dp)
+                        .padding(horizontal = 16.dp)
+                        .wrapContentHeight(),
                 )
             }
         }

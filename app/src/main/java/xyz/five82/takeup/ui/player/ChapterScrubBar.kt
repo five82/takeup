@@ -41,7 +41,9 @@ fun ChapterScrubBar(
 
     Canvas(
         modifier
-            .height(28.dp)
+            // Tall enough to grab with a thumb; the thread itself stays thin
+            // because everything is drawn around the vertical center.
+            .height(44.dp)
             .pointerInput(durationMs) {
                 detectTapGestures { offset ->
                     if (durationMs > 0) onSeek(fractionToMs(offset.x / size.width))

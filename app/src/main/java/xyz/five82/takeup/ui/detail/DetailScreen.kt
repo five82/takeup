@@ -12,10 +12,12 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -299,8 +301,10 @@ private fun SeasonChips(state: DetailState, onSelect: (Long) -> Unit) {
                     .background(if (selected) accent.copy(alpha = 0.16f) else Color.Transparent)
                     .border(1.dp, if (selected) accent else Line, RoundedCornerShape(10.dp))
                     .clickable { onSelect(season.id) }
-                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                    .defaultMinSize(minHeight = 48.dp)
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
             ) {
                 Text(
                     season.title.ifEmpty { "Season ${season.seasonNumber}" },
@@ -520,6 +524,7 @@ private fun HeadIconButton(onClick: () -> Unit, content: @Composable () -> Unit)
     IconButton(
         onClick = onClick,
         modifier = Modifier
+            .size(48.dp)
             .clip(CircleShape)
             .background(Stage.copy(alpha = 0.55f)),
         content = content,
@@ -634,11 +639,13 @@ private fun androidx.compose.foundation.lazy.LazyListScope.creditsSection(nav: N
                     "Directed by ${director.name}",
                     style = MaterialTheme.typography.bodyMedium,
                     color = Ink.copy(alpha = 0.9f),
+                    // Outer/inner padding split keeps the text at the usual
+                    // 20dp inset while the tap area reaches 48dp tall.
                     modifier = Modifier
-                        .padding(start = 20.dp, top = 6.dp)
+                        .padding(start = 12.dp)
                         .clip(RoundedCornerShape(6.dp))
                         .clickable { nav.push(Screen.Search(director.name)) }
-                        .padding(vertical = 2.dp),
+                        .padding(horizontal = 8.dp, vertical = 12.dp),
                 )
             }
             if (cast.isNotEmpty()) {

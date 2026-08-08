@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -322,7 +323,7 @@ private fun PlayerControls(
             SkipButton("-10") { player.seekTo((player.currentPosition - 10_000).coerceAtLeast(0)) }
             IconButton(
                 onClick = { if (playing) player.pause() else player.play() },
-                modifier = Modifier.size(52.dp),
+                modifier = Modifier.size(64.dp),
             ) {
                 if (playing) {
                     PauseGlyph(accent = Ink)
@@ -331,7 +332,7 @@ private fun PlayerControls(
                         Icons.Filled.PlayArrow,
                         contentDescription = "Play",
                         tint = Ink,
-                        modifier = Modifier.size(36.dp),
+                        modifier = Modifier.size(44.dp),
                     )
                 }
             }
@@ -352,24 +353,24 @@ private fun PlayerControls(
 
 @Composable
 private fun SkipButton(label: String, onClick: () -> Unit) {
-    TextButton(onClick = onClick) {
-        Text(label, style = MaterialTheme.typography.labelLarge, color = Ink)
+    TextButton(onClick = onClick, modifier = Modifier.defaultMinSize(minWidth = 56.dp, minHeight = 48.dp)) {
+        Text(label, style = MaterialTheme.typography.titleMedium, color = Ink)
     }
 }
 
 @Composable
 private fun SheetButton(label: String, onClick: () -> Unit) {
-    TextButton(onClick = onClick) {
-        Text(label, style = MaterialTheme.typography.labelLarge, color = Muted)
+    TextButton(onClick = onClick, modifier = Modifier.defaultMinSize(minWidth = 56.dp, minHeight = 48.dp)) {
+        Text(label, style = MaterialTheme.typography.titleMedium, color = Muted)
     }
 }
 
 /** Two bars; the core icon set has no pause glyph and one is not worth a library. */
 @Composable
 private fun PauseGlyph(accent: Color) {
-    Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-        Box(Modifier.size(width = 6.dp, height = 24.dp).clip(RoundedCornerShape(2.dp)).background(accent))
-        Box(Modifier.size(width = 6.dp, height = 24.dp).clip(RoundedCornerShape(2.dp)).background(accent))
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Box(Modifier.size(width = 8.dp, height = 30.dp).clip(RoundedCornerShape(2.dp)).background(accent))
+        Box(Modifier.size(width = 8.dp, height = 30.dp).clip(RoundedCornerShape(2.dp)).background(accent))
     }
 }
 
