@@ -11,10 +11,11 @@ import androidx.compose.ui.unit.sp
 import xyz.five82.takeup.R
 
 // One variable font, worked hard. Google Sans Flex carries the whole app:
-// a wide display cut for titles (and the text fallback when a title has no
-// logo art), and the normal width for everything else.
-
-private const val WideWidth = 151f
+// a refined display cut for titles (and the text fallback when a title has
+// no logo art), and the workhorse cut for everything else. The display cut
+// pushes the optical-size axis to its display end (144) at a lower weight,
+// which Compose never sets on its own; that, not width, is what makes it a
+// different voice.
 
 val TakeupSans = FontFamily(
     Font(
@@ -44,16 +45,8 @@ val TakeupDisplay = FontFamily(
         R.font.google_sans_flex,
         weight = FontWeight.SemiBold,
         variationSettings = FontVariation.Settings(
-            FontVariation.weight(640),
-            FontVariation.width(WideWidth),
-        ),
-    ),
-    Font(
-        R.font.google_sans_flex,
-        weight = FontWeight.Bold,
-        variationSettings = FontVariation.Settings(
-            FontVariation.weight(700),
-            FontVariation.width(WideWidth),
+            FontVariation.weight(580),
+            FontVariation.Setting("opsz", 144f),
         ),
     ),
 )
@@ -61,14 +54,14 @@ val TakeupDisplay = FontFamily(
 val TakeupType = Typography(
     displayLarge = TextStyle(
         fontFamily = TakeupDisplay,
-        fontWeight = FontWeight.Bold,
+        fontWeight = FontWeight.SemiBold,
         fontSize = 40.sp,
         lineHeight = 42.sp,
         letterSpacing = (-0.01).em,
     ),
     displayMedium = TextStyle(
         fontFamily = TakeupDisplay,
-        fontWeight = FontWeight.Bold,
+        fontWeight = FontWeight.SemiBold,
         fontSize = 30.sp,
         lineHeight = 33.sp,
     ),
