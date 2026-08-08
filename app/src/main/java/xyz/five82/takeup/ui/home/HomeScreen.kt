@@ -294,10 +294,12 @@ private fun HomeRow(
 
 @Composable
 private fun Hero(item: Item, api: xyz.five82.takeup.api.LoomApi, onOpen: () -> Unit) {
+    // No fixed height: the backdrop sizes itself to 4:3 art plus the logo
+    // and resume band, so a tall logo grows the hero instead of squeezing
+    // the photo.
     Box(
         Modifier
             .fillMaxWidth()
-            .height(400.dp)
             .clickable(onClick = onOpen),
     ) {
         val backdrop = api.backdropUrl(item, 960) ?: api.thumbUrl(item, 960)
@@ -315,7 +317,7 @@ private fun Hero(item: Item, api: xyz.five82.takeup.api.LoomApi, onOpen: () -> U
             imageUrl = backdrop,
             tint = seed ?: Ember,
             solidLeft = solid,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxWidth(),
             contentDescription = item.title,
         )
         Column(

@@ -59,12 +59,13 @@ fun logoLaneHeight(aspect: Float?): Dp {
  * right, instead of a fade into the stage. The wedge below the cut takes a
  * wash of the title's woven color dissolving into Stage.
  *
- * The art fills the box's width but ends just below the cut's low point
- * instead of filling the box, so the wedge hides only a sliver of the
- * photo's bottom rather than everything down to the box's edge. Callers
- * keep that frame a narrower shape than the 16:9 art (box height minus
- * [solidLeft] at least 9/16 of the width), so Crop always fits the photo's
- * full height and trims the sides only - never the top or bottom.
+ * The art is always the full width at 4:3, and the component sizes its own
+ * height to art plus [solidLeft] minus the overlap - so a tall logo grows
+ * the box downward instead of squeezing the photo into a flatter frame.
+ * Since 4:3 is a narrower shape than the 16:9 art, Crop fits the photo's
+ * full height and trims the sides only - never the top or bottom - and the
+ * cut hides just the [CutOverlap] sliver. Callers wrap this in a Box that
+ * takes its height rather than imposing one.
  *
  * [solidLeft] is the height of solid ground at the left edge, where titles
  * and logos sit. The cut climbs away from there, so the clearance over
@@ -79,69 +80,73 @@ fun BiasCutBackdrop(
     contentDescription: String? = null,
 ) {
     BoxWithConstraints(modifier) {
-        if (imageUrl != null) {
-            AsyncImage(
-                model = imageUrl,
-                contentDescription = contentDescription,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
+        val artHeight = maxWidth * 3 / 4
+        Box(Modifier.fillMaxWidth().height(artHeight + solidLeft - CutOverlap)) {
+            if (imageUrl != null) {
+                AsyncImage(
+                    model = imageUrl,
+                    contentDescription = contentDescription,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(artHeight),
+                )
+            }
+            // The wedge is painted over the art rather than clipping the
+            // image: path fills stay anti-aliased where a hardware clipPath
+            // can jag along the diagonal.
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .drawWithCache {
+                        val radians = Math.toRadians(CUT_DEGREES)
+                        val leftY = size.height - solidLeft.toPx()
+                        val rightY = leftY - size.width * tan(radians).toFloat()
+                        val wedge = Path().apply {
+                            moveTo(0f, leftY)
+                            lineTo(size.width, rightY)
+                            lineTo(size.width, size.height)
+                            lineTo(0f, size.height)
+                            close()
+                        }
+                        // Gradient axis perpendicular to the cut, so the wash
+                        // is even along the whole edge.
+                        val reach = GlowReach.toPx()
+                        val glow = Brush.linearGradient(
+                            0f to tint.copy(alpha = 0.30f),
+                            1f to Color.Transparent,
+                            start = Offset(0f, leftY),
+                            end = Offset(
+                                sin(radians).toFloat() * reach,
+                                leftY + cos(radians).toFloat() * reach,
+                            ),
+                        )
+                        val melt = Brush.verticalGradient(
+                            0f to Color.Transparent,
+                            1f to Stage,
+                            startY = size.height - BottomMelt.toPx(),
+                            endY = size.height,
+                        )
+                        onDrawBehind {
+                            drawPath(wedge, Stage)
+                            drawPath(wedge, glow)
+                            drawPath(wedge, melt)
+                        }
+                    },
+            )
+            // Status bar and header icons still need dark ground over
+            // bright art.
+            Box(
+                Modifier
                     .fillMaxWidth()
-                    .height(maxHeight - solidLeft + CutOverlap),
+                    .height(120.dp)
+                    .background(
+                        Brush.verticalGradient(
+                            0f to Stage.copy(alpha = 0.35f),
+                            1f to Color.Transparent,
+                        ),
+                    ),
             )
         }
-        // The wedge is painted over the art rather than clipping the image:
-        // path fills stay anti-aliased where a hardware clipPath can jag
-        // along the diagonal.
-        Box(
-            Modifier
-                .fillMaxSize()
-                .drawWithCache {
-                    val radians = Math.toRadians(CUT_DEGREES)
-                    val leftY = size.height - solidLeft.toPx()
-                    val rightY = leftY - size.width * tan(radians).toFloat()
-                    val wedge = Path().apply {
-                        moveTo(0f, leftY)
-                        lineTo(size.width, rightY)
-                        lineTo(size.width, size.height)
-                        lineTo(0f, size.height)
-                        close()
-                    }
-                    // Gradient axis perpendicular to the cut, so the wash is
-                    // even along the whole edge.
-                    val reach = GlowReach.toPx()
-                    val glow = Brush.linearGradient(
-                        0f to tint.copy(alpha = 0.30f),
-                        1f to Color.Transparent,
-                        start = Offset(0f, leftY),
-                        end = Offset(
-                            sin(radians).toFloat() * reach,
-                            leftY + cos(radians).toFloat() * reach,
-                        ),
-                    )
-                    val melt = Brush.verticalGradient(
-                        0f to Color.Transparent,
-                        1f to Stage,
-                        startY = size.height - BottomMelt.toPx(),
-                        endY = size.height,
-                    )
-                    onDrawBehind {
-                        drawPath(wedge, Stage)
-                        drawPath(wedge, glow)
-                        drawPath(wedge, melt)
-                    }
-                },
-        )
-        // Status bar and header icons still need dark ground over bright art.
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(120.dp)
-                .background(
-                    Brush.verticalGradient(
-                        0f to Stage.copy(alpha = 0.35f),
-                        1f to Color.Transparent,
-                    ),
-                ),
-        )
     }
 }

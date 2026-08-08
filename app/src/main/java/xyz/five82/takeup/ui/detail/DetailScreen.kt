@@ -439,11 +439,9 @@ private fun DetailHead(
     item: Item,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
-    // The backdrop ends just below the cut, so this height sets how much of
-    // it shows. 340dp keeps the art frame narrower-shaped than 16:9 even
-    // under the tallest logo lane (solid up to 122dp at the Pixel's 412dp
-    // width), so backdrops crop sides only, never the top or bottom.
-    Box(Modifier.fillMaxWidth().height(340.dp)) {
+    // No fixed height: the backdrop sizes itself to 4:3 art plus the logo
+    // band, so a tall logo grows the head instead of squeezing the photo.
+    Box(Modifier.fillMaxWidth()) {
         val backdrop = repository.api.backdropUrl(item, 960)
         val logo = repository.api.logoUrl(item)
         // Raw seed, not colorScheme.primary: the toned primary washes out to
@@ -462,7 +460,7 @@ private fun DetailHead(
             imageUrl = backdrop,
             tint = seed ?: Ember,
             solidLeft = solid,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxWidth(),
         )
         Row(
             Modifier
