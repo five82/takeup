@@ -72,6 +72,7 @@ internal object LoomJson {
             container = media.string("container"),
             tag = media.requiredString("tag"),
             sizeBytes = media.long("size"),
+            chapterStartsMs = chapterStartsMs(media),
         )
     }
 
@@ -131,6 +132,7 @@ internal object LoomJson {
             logoImageTag = value.string("logo_image_tag"),
             mediaDurationMs = media?.long("duration_ms") ?: 0L,
             mediaStreams = streams,
+            mediaChapterStartsMs = media?.let(::chapterStartsMs).orEmpty(),
             // A single-item response nests the version in media; every response,
             // list endpoints included, also carries it as media_tag. Both are the
             // version the last scan recorded, and reading the flat one is what
@@ -144,6 +146,17 @@ internal object LoomJson {
             seasonTitle = value.string("season_title"),
             genres = genres,
         )
+    }
+
+    // Loom sends chapters in file order, already dropping the degenerate case of a
+    // single chapter spanning the whole runtime. Only the offsets are read: titles
+    // on a disc rip are almost always "Chapter 01" and nothing here shows them.
+    private fun chapterStartsMs(media: JsonObject): List<Long> {
+        val chapters = media.get("chapters")?.takeUnless { it.isJsonNull } ?: return emptyList()
+        if (!chapters.isJsonArray) {
+            throw JsonParseException("Loom media chapters must be an array")
+        }
+        return chapters.asJsonArray.map { element -> element.asJsonObject.long("start_ms") }
     }
 
     private fun mediaStream(stream: JsonObject): MediaStream {

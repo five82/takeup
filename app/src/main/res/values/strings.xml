@@ -73,6 +73,8 @@
     <string name="pause">Pause</string>
     <string name="seek_back_10">Seek back 10 seconds</string>
     <string name="seek_forward_10">Seek forward 10 seconds</string>
+    <string name="previous_chapter">Previous chapter</string>
+    <string name="next_chapter">Next chapter</string>
     <string name="play_next">Play next</string>
     <string name="replay">Replay</string>
     <string name="finished">Finished</string>

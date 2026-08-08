@@ -27,6 +27,7 @@ data class LoomItem(
     // from a superseded copy of the file.
     val mediaDurationMs: Long = 0,
     val mediaStreams: List<MediaStream> = emptyList(),
+    val mediaChapterStartsMs: List<Long> = emptyList(),
     val mediaTag: String = "",
     val mediaSizeBytes: Long = 0,
     val progress: PlaybackProgress? = null,
@@ -165,6 +166,7 @@ data class PlaybackResponse(
     val container: String,
     val tag: String,
     val sizeBytes: Long,
+    val chapterStartsMs: List<Long> = emptyList(),
 )
 
 data class PreparedPlayback(
@@ -175,6 +177,11 @@ data class PreparedPlayback(
     val durationMs: Long,
     val resumePositionMs: Long,
     val container: String,
+    // Ascending chapter offsets, as Loom recorded them from the container. Loom
+    // omits chapters entirely for a file with fewer than two, so an empty list
+    // means the file has nowhere to skip to and the player hides its chapter
+    // controls.
+    val chapterStartsMs: List<Long> = emptyList(),
 )
 
 data class HomeContent(

@@ -17,6 +17,7 @@ import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.rememberScrollState
@@ -65,6 +66,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -72,6 +74,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -453,6 +457,8 @@ private fun VideoPlayer(
                 player = player,
                 title = playback.title,
                 supportingText = supportingText,
+                chapterStartsMs = playback.chapterStartsMs,
+                durationMs = playback.durationMs,
                 cropToFill = cropToFill,
                 isBuffering = isBuffering,
                 onBack = onBack,
@@ -550,6 +556,8 @@ private fun PlaybackControls(
     player: Player,
     title: String,
     supportingText: String,
+    chapterStartsMs: List<Long>,
+    durationMs: Long,
     cropToFill: Boolean,
     isBuffering: Boolean,
     onBack: () -> Unit,
@@ -571,6 +579,7 @@ private fun PlaybackControls(
         } else {
             PlaybackButtonGroup(
                 player = player,
+                chapterStartsMs = chapterStartsMs,
                 onInteraction = onInteraction,
                 modifier = Modifier.align(Alignment.Center),
             )
@@ -587,12 +596,19 @@ private fun PlaybackControls(
                 )
                 .padding(start = 20.dp, top = 32.dp, end = 20.dp, bottom = 12.dp),
         ) {
-            ProgressSlider(
-                player = player,
-                modifier = Modifier.fillMaxWidth(),
-                onValueChange = { onInteraction() },
-                onValueChangeFinished = onInteraction,
-            )
+            Box(modifier = Modifier.fillMaxWidth()) {
+                ProgressSlider(
+                    player = player,
+                    modifier = Modifier.fillMaxWidth(),
+                    onValueChange = { onInteraction() },
+                    onValueChangeFinished = onInteraction,
+                )
+                ChapterMarkers(
+                    chapterStartsMs = chapterStartsMs,
+                    durationMs = durationMs,
+                    modifier = Modifier.matchParentSize(),
+                )
+            }
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -610,15 +626,75 @@ private fun PlaybackControls(
     }
 }
 
+/**
+ * Draws a mark at every chapter start over the scrub bar. The marks sit where the
+ * slider thumb comes to rest at that offset, so they line up with the thumb: the
+ * thumb travels the track inset by half its own width at each end.
+ */
+@Composable
+private fun ChapterMarkers(
+    chapterStartsMs: List<Long>,
+    durationMs: Long,
+    modifier: Modifier = Modifier,
+) {
+    if (chapterStartsMs.isEmpty() || durationMs <= 0L) return
+    // The darkest stage neutral reads as a gap in the bar over both the played and
+    // the unplayed halves of the track.
+    val markerColor = MaterialTheme.colorScheme.surfaceContainerLowest
+    Canvas(modifier = modifier) {
+        val thumbWidthPx = SliderThumbWidth.toPx()
+        val markerHeightPx = SliderTrackHeight.toPx()
+        val travelPx = size.width - thumbWidthPx
+        val markerWidthPx = ChapterMarkerWidth.toPx()
+        chapterStartsMs.forEach { startMs ->
+            // The mark at the very start of the file has nothing to separate.
+            if (startMs <= 0L) return@forEach
+            val fraction = (startMs.toFloat() / durationMs).coerceIn(0f, 1f)
+            drawRect(
+                color = markerColor,
+                topLeft = Offset(
+                    x = thumbWidthPx / 2f + fraction * travelPx - markerWidthPx / 2f,
+                    y = (size.height - markerHeightPx) / 2f,
+                ),
+                size = Size(markerWidthPx, markerHeightPx),
+            )
+        }
+    }
+}
+
+private val ChapterMarkerWidth = 2.dp
+
+// The Material 3 slider tokens the marks have to line up with. Material keeps its
+// own copies internal, so they are mirrored here; if a Material release retunes
+// the slider, the marks drift by the difference until these follow.
+private val SliderThumbWidth = 4.dp
+private val SliderTrackHeight = 16.dp
+
 @Composable
 private fun PlaybackButtonGroup(
     player: Player,
+    chapterStartsMs: List<Long>,
     onInteraction: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val playPauseState = rememberPlayPauseButtonState(player)
     val seekBackState = rememberSeekBackButtonState(player)
     val seekForwardState = rememberSeekForwardButtonState(player)
+    // Chapter targets depend on where playback is, and the group is only composed
+    // while the controls are on screen, so polling here costs nothing once they fade.
+    var positionMs by remember(player) { mutableLongStateOf(player.currentPosition) }
+    LaunchedEffect(player) {
+        while (isActive) {
+            positionMs = player.currentPosition
+            delay(500)
+        }
+    }
+    val previousChapterMs = previousChapterPositionMs(chapterStartsMs, positionMs)
+    val nextChapterMs = nextChapterPositionMs(chapterStartsMs, positionMs)
+    val smallShapes = IconButtonDefaults.shapes(
+        shape = IconButtonDefaults.smallRoundShape,
+        pressedShape = IconButtonDefaults.smallPressedShape,
+    )
     val mediumShapes = IconButtonDefaults.shapes(
         shape = IconButtonDefaults.mediumRoundShape,
         pressedShape = IconButtonDefaults.mediumPressedShape,
@@ -633,6 +709,28 @@ private fun PlaybackButtonGroup(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        if (chapterStartsMs.isNotEmpty()) {
+            customItem(
+                buttonGroupContent = {
+                    FilledTonalIconButton(
+                        onClick = {
+                            previousChapterMs?.let(player::seekTo)
+                            onInteraction()
+                        },
+                        shapes = smallShapes,
+                        modifier = Modifier.size(48.dp),
+                        enabled = previousChapterMs != null,
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_skip_previous),
+                            contentDescription = stringResource(R.string.previous_chapter),
+                            modifier = Modifier.size(24.dp),
+                        )
+                    }
+                },
+                menuContent = {},
+            )
+        }
         customItem(
             buttonGroupContent = {
                 FilledTonalIconButton(
@@ -697,8 +795,47 @@ private fun PlaybackButtonGroup(
             },
             menuContent = {},
         )
+        if (chapterStartsMs.isNotEmpty()) {
+            customItem(
+                buttonGroupContent = {
+                    FilledTonalIconButton(
+                        onClick = {
+                            nextChapterMs?.let(player::seekTo)
+                            onInteraction()
+                        },
+                        shapes = smallShapes,
+                        modifier = Modifier.size(48.dp),
+                        enabled = nextChapterMs != null,
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_skip_next),
+                            contentDescription = stringResource(R.string.next_chapter),
+                            modifier = Modifier.size(24.dp),
+                        )
+                    }
+                },
+                menuContent = {},
+            )
+        }
     }
 }
+
+// Pressing previous restarts the chapter you are in, the way a disc player does,
+// unless you only just entered it - then it steps back to the mark before.
+private const val CHAPTER_RESTART_GRACE_MS = 3_000L
+
+/**
+ * The chapter mark to jump back to from [positionMs], or null when nothing lies
+ * behind it. [chapterStartsMs] must be ascending, which is the order Loom sends.
+ */
+internal fun previousChapterPositionMs(chapterStartsMs: List<Long>, positionMs: Long): Long? {
+    val floorMs = (positionMs - CHAPTER_RESTART_GRACE_MS).coerceAtLeast(0L)
+    return chapterStartsMs.lastOrNull { it <= floorMs }
+}
+
+/** The next chapter mark after [positionMs], or null once the last one is playing. */
+internal fun nextChapterPositionMs(chapterStartsMs: List<Long>, positionMs: Long): Long? =
+    chapterStartsMs.firstOrNull { it > positionMs }
 
 private data class PlaybackTrackOption(
     val group: Tracks.Group,

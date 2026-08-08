@@ -406,6 +406,90 @@ class LoomJsonTest {
     }
 
     @Test
+    fun `parses chapter marks from a playback response`() {
+        val playback = LoomJson.playback(
+            """
+            {
+              "item_id": 42,
+              "media": {
+                "id": 7,
+                "tag": "9f86d081884c7d65",
+                "duration_ms": 6960000,
+                "container": "matroska",
+                "chapters": [
+                  {"index": 0, "start_ms": 0, "title": "Chapter 01"},
+                  {"index": 1, "start_ms": 300341, "title": "Chapter 02"},
+                  {"index": 2, "start_ms": 500291, "title": "Chapter 03"}
+                ]
+              },
+              "stream_url": "/api/v1/media/7?tag=9f86d081884c7d65"
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals(listOf(0L, 300341L, 500291L), playback.chapterStartsMs)
+    }
+
+    // Loom omits chapters for a file that has none, and for one whose single
+    // chapter spans the whole runtime.
+    @Test
+    fun `treats media without chapters as having none`() {
+        val playback = LoomJson.playback(
+            """
+            {
+              "item_id": 42,
+              "media": {
+                "id": 7,
+                "tag": "9f86d081884c7d65",
+                "duration_ms": 6960000,
+                "container": "matroska"
+              },
+              "stream_url": "/api/v1/media/7?tag=9f86d081884c7d65"
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals(emptyList<Long>(), playback.chapterStartsMs)
+    }
+
+    // A download plays from the item snapshot taken when it was queued, so the
+    // item response has to carry the marks too.
+    @Test
+    fun `parses chapter marks from an item response`() {
+        val item = LoomJson.item(
+            """
+            {
+              "id": 42,
+              "kind": "movie",
+              "title": "Arrival",
+              "year": 2016,
+              "media": {
+                "id": 7,
+                "tag": "9f86d081884c7d65",
+                "duration_ms": 6960000,
+                "streams": [
+                  {
+                    "kind": "video",
+                    "codec": "hevc",
+                    "width": 3840,
+                    "height": 1604,
+                    "dynamic_range": "hdr",
+                    "is_default": true
+                  }
+                ],
+                "chapters": [
+                  {"index": 0, "start_ms": 0, "title": "Chapter 01"},
+                  {"index": 1, "start_ms": 300341, "title": "Chapter 02"}
+                ]
+              }
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals(listOf(0L, 300341L), item.mediaChapterStartsMs)
+    }
+
+    @Test
     fun `rejects a playback response without a media version tag`() {
         assertThrows(JsonParseException::class.java) {
             LoomJson.playback(

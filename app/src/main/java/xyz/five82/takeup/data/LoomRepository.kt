@@ -134,6 +134,7 @@ internal class LoomRepository(
                 durationMs = playback.durationMs,
                 resumePositionMs = item.progress?.resumePositionMs ?: 0L,
                 container = playback.container,
+                chapterStartsMs = playback.chapterStartsMs,
             )
         } catch (error: IOException) {
             // Loom is unreachable. A completed download is entirely self-contained,
@@ -147,6 +148,9 @@ internal class LoomRepository(
                 durationMs = entry.item.mediaDurationMs,
                 resumePositionMs = offlineResumePositionMs(entry.item),
                 container = "",
+                // The snapshot taken at download time carries the chapters, so an
+                // offline title skips between them exactly as a streamed one does.
+                chapterStartsMs = entry.item.mediaChapterStartsMs,
             )
         }
     }
