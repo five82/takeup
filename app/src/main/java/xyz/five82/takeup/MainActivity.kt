@@ -359,6 +359,7 @@ private fun TakeupApp(
                 onEditArtwork = viewModel::editArtwork,
                 onSetWatched = viewModel::setShowWatched,
                 onSeasonSelected = viewModel::selectSeason,
+                onPersonSelected = { viewModel.openPersonSearch(it.name) },
             )
         }
         is MainUiState.Season -> saveableStateHolder.SaveableStateProvider(
@@ -387,6 +388,7 @@ private fun TakeupApp(
             onRemoveDownload = { viewModel.cancelDownload(current.item.id) },
             onSetWatched = viewModel::setDetailsWatched,
             onGenreSelected = viewModel::openGenre,
+            onPersonSelected = { viewModel.openPersonSearch(it.name) },
         )
         is MainUiState.Artwork -> ArtworkScreen(
             state = current,

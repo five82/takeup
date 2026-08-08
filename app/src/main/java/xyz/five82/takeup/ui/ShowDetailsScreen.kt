@@ -36,6 +36,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import xyz.five82.takeup.R
+import xyz.five82.takeup.data.Credit
 import xyz.five82.takeup.data.LoomItem
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -47,6 +48,7 @@ internal fun ShowDetailsScreen(
     onEditArtwork: () -> Unit,
     onSetWatched: (Boolean) -> Unit,
     onSeasonSelected: (LoomItem) -> Unit,
+    onPersonSelected: (Credit) -> Unit,
 ) {
     BackHandler(onBack = onBack)
     UseLightStatusBarIcons()
@@ -205,6 +207,15 @@ internal fun ShowDetailsScreen(
                             style = MaterialTheme.typography.bodyLarge,
                         )
                     }
+                }
+            }
+            if (state.show.credits.isNotEmpty()) {
+                item {
+                    CreditSection(
+                        credits = state.show.credits,
+                        onPersonSelected = onPersonSelected,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    )
                 }
             }
             if (state.seasons.isNotEmpty()) {

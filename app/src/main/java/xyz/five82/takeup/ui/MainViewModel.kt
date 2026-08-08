@@ -281,6 +281,18 @@ internal fun HomeContent.isEmpty(): Boolean =
     continueWatching.isEmpty() && nextUp.isEmpty() && recentlyAdded.isEmpty() &&
         movies.isEmpty() && shorts.isEmpty() && shows.isEmpty() && collections.isEmpty()
 
+/**
+ * The state back from a person search returns to. Only the two detail screens
+ * host a credit pill, and a remembered one must not resume the spinner it was
+ * wearing when it was left. Anywhere else leaves no origin, so back falls
+ * through to Home the way it does for the toolbar's own search.
+ */
+internal fun personSearchOrigin(state: MainUiState): MainUiState? = when (state) {
+    is MainUiState.Details -> state.copy(isLoading = false)
+    is MainUiState.ShowDetails -> state.copy(isLoading = false)
+    else -> null
+}
+
 internal fun nextEpisodeAfter(episodes: List<LoomItem>, itemId: Long): LoomItem? {
     val index = episodes.indexOfFirst { it.id == itemId }
     if (index < 0) return null
@@ -350,6 +362,10 @@ internal class MainViewModel(
     private var artworkReturnState: MainUiState? = null
     private var settingsReturnState: MainUiState.Home? = null
     private var searchReturnState: MainUiState.Search? = null
+    // Where a person search was opened from, so back returns to the detail screen
+    // that credited them rather than dropping to Home the way the toolbar's own
+    // search does.
+    private var searchOriginState: MainUiState? = null
     // Landing content survives a round trip into item details (origin Genre),
     // and the return state remembers where the landing was opened from.
     private var genreLandingContent: Pair<Genre, List<LoomItem>>? = null
@@ -451,6 +467,7 @@ internal class MainViewModel(
         when (destination) {
             TopDestination.Home -> {
                 searchReturnState = null
+                searchOriginState = null
                 _uiState.value = MainUiState.Home(serverUrl = serverUrl, content = homeContent)
             }
             TopDestination.Movies -> showLibraryContent(serverUrl, LibraryKind.Movies)
@@ -458,6 +475,7 @@ internal class MainViewModel(
             TopDestination.Shows -> showLibraryContent(serverUrl, LibraryKind.Shows)
             TopDestination.Search -> {
                 searchReturnState = null
+                searchOriginState = null
                 _uiState.value = MainUiState.Search(serverUrl = serverUrl, genres = movieGenres)
                 if (movieGenres.isEmpty()) {
                     activeJob = viewModelScope.launch { loadSearchGenres(serverUrl) }
@@ -704,11 +722,32 @@ internal class MainViewModel(
         }
     }
 
+    // Opens search already run against a credited person's name, from a pill on a
+    // detail screen. Loom matches cast and director names in search but has no
+    // browse-by-person axis, so a search is the whole route to the rest of
+    // someone's work.
+    fun openPersonSearch(name: String) {
+        if (name.isBlank()) return
+        val current = _uiState.value
+        val serverUrl = currentServerUrl() ?: return
+        searchOriginState = personSearchOrigin(current)
+        activeJob?.cancel()
+        _uiState.value = MainUiState.Search(
+            serverUrl = serverUrl,
+            query = name,
+            genres = movieGenres,
+            isLoading = true,
+        )
+        activeJob = viewModelScope.launch { runSearch(name) }
+    }
+
     fun backFromSearch() {
         val state = _uiState.value as? MainUiState.Search ?: return
         activeJob?.cancel()
         searchReturnState = null
-        _uiState.value = MainUiState.Home(serverUrl = state.serverUrl, content = homeContent)
+        _uiState.value = searchOriginState
+            ?: MainUiState.Home(serverUrl = state.serverUrl, content = homeContent)
+        searchOriginState = null
     }
 
     fun openSettings() {

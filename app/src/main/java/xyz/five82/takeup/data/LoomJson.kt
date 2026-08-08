@@ -104,6 +104,20 @@ internal object LoomJson {
                 )
             }
         }
+        val creditValues = value.get("credits")
+        val credits = when {
+            creditValues == null || creditValues.isJsonNull -> emptyList()
+            !creditValues.isJsonArray -> throw JsonParseException("Loom item credits must be an array")
+            else -> creditValues.asJsonArray.map { element ->
+                val credit = element.asJsonObject
+                Credit(
+                    personId = credit.long("person_id"),
+                    name = credit.requiredString("name"),
+                    role = credit.requiredString("role"),
+                    character = credit.string("character"),
+                )
+            }
+        }
         return LoomItem(
             id = value.long("id"),
             kind = value.requiredString("kind"),
@@ -142,6 +156,7 @@ internal object LoomJson {
             seriesTitle = value.string("series_title"),
             seasonTitle = value.string("season_title"),
             genres = genres,
+            credits = credits,
         )
     }
 

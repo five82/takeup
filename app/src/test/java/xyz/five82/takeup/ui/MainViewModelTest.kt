@@ -78,6 +78,41 @@ class MainViewModelTest {
         assertEquals(6, other.afterWatchedCascade(seasonOne, watched = true).unwatchedCount)
     }
 
+    @Test
+    fun `a person search returns to the detail screen that credited them`() {
+        val details = MainUiState.Details(
+            serverUrl = "http://loom.local:8080",
+            item = episode(1),
+            origin = BrowseOrigin.Home,
+        )
+        assertEquals(details, personSearchOrigin(details))
+
+        val showDetails = MainUiState.ShowDetails(
+            serverUrl = "http://loom.local:8080",
+            show = show,
+            origin = BrowseOrigin.Home,
+        )
+        assertEquals(showDetails, personSearchOrigin(showDetails))
+    }
+
+    // Restoring the spinner would leave a load on screen that nothing finishes.
+    @Test
+    fun `a returning detail screen is not still loading`() {
+        val details = MainUiState.Details(
+            serverUrl = "http://loom.local:8080",
+            item = episode(1),
+            origin = BrowseOrigin.Home,
+            isLoading = true,
+        )
+        assertEquals(false, (personSearchOrigin(details) as MainUiState.Details).isLoading)
+    }
+
+    @Test
+    fun `search opened anywhere else has no origin to return to`() {
+        assertNull(personSearchOrigin(MainUiState.Search(serverUrl = "http://loom.local:8080")))
+        assertNull(personSearchOrigin(MainUiState.Home(serverUrl = "http://loom.local:8080")))
+    }
+
     private fun episode(id: Long) = LoomItem(
         id = id,
         kind = "episode",

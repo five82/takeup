@@ -159,6 +159,63 @@ class LoomJsonTest {
         assertEquals(emptyList<Genre>(), item.genres)
     }
 
+    // Loom serves directors ahead of the billed cast, and the pills render in the
+    // order they arrive, so the order is part of the contract.
+    @Test
+    fun `parses item credits in the order Loom serves them`() {
+        val item = LoomJson.item(
+            """
+            {
+              "id": 42,
+              "kind": "movie",
+              "title": "Alien",
+              "credits": [
+                {"person_id": 578, "name": "Ridley Scott", "role": "director"},
+                {
+                  "person_id": 10205,
+                  "name": "Sigourney Weaver",
+                  "role": "actor",
+                  "character": "Ripley"
+                },
+                {"person_id": 4139, "name": "Tom Skerritt", "role": "actor"}
+              ]
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals(
+            listOf(
+                Credit(578, "Ridley Scott", "director"),
+                Credit(10205, "Sigourney Weaver", "actor", "Ripley"),
+                // TMDB leaves the character off plenty of entries.
+                Credit(4139, "Tom Skerritt", "actor"),
+            ),
+            item.credits,
+        )
+    }
+
+    // Episodes are never credited, and no list endpoint carries credits at all.
+    @Test
+    fun `treats missing item credits as empty`() {
+        val item = LoomJson.item("""{"id":42,"kind":"episode","title":"Pilot"}""")
+
+        assertEquals(emptyList<Credit>(), item.credits)
+    }
+
+    @Test
+    fun `treats null item credits as empty`() {
+        val item = LoomJson.item("""{"id":42,"kind":"movie","title":"Arrival","credits":null}""")
+
+        assertEquals(emptyList<Credit>(), item.credits)
+    }
+
+    @Test
+    fun `rejects credits that are not an array`() {
+        assertThrows(JsonParseException::class.java) {
+            LoomJson.item("""{"id":42,"kind":"movie","title":"Arrival","credits":{}}""")
+        }
+    }
+
     @Test
     fun `parses genre summaries`() {
         val genres = LoomJson.genres(

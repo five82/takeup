@@ -52,6 +52,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import xyz.five82.takeup.R
+import xyz.five82.takeup.data.CREDIT_ROLE_DIRECTOR
+import xyz.five82.takeup.data.Credit
 import xyz.five82.takeup.data.DownloadEntry
 import xyz.five82.takeup.data.DownloadState
 import xyz.five82.takeup.data.Genre
@@ -75,6 +77,7 @@ internal fun DetailsScreen(
     onRemoveDownload: () -> Unit,
     onSetWatched: (Boolean) -> Unit,
     onGenreSelected: (Genre) -> Unit,
+    onPersonSelected: (Credit) -> Unit,
 ) {
     BackHandler(onBack = onBack)
     UseLightStatusBarIcons()
@@ -308,6 +311,15 @@ internal fun DetailsScreen(
                     }
                 }
             }
+            if (state.item.credits.isNotEmpty()) {
+                item {
+                    CreditSection(
+                        credits = state.item.credits,
+                        onPersonSelected = onPersonSelected,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    )
+                }
+            }
             item { Box(Modifier.padding(bottom = 4.dp)) }
         }
     }
@@ -461,6 +473,73 @@ private fun DownloadActionButton(
                     LocalContentColor.current
                 },
             )
+        }
+    }
+}
+
+/**
+ * The credited people as tappable pills, in the order Loom serves them: any
+ * directors first, then the billed cast. Loom has no profile images - it
+ * deliberately never built a person-image pipeline - so a name over its role is
+ * the whole pill.
+ *
+ * Tapping one searches the library for that name, which is the only route to the
+ * rest of someone's work: Loom matches credited names in search but offers no
+ * browse-by-person axis to link into.
+ */
+@Composable
+internal fun CreditSection(
+    credits: List<Credit>,
+    onPersonSelected: (Credit) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = stringResource(
+                if (credits.any { it.role == CREDIT_ROLE_DIRECTOR }) {
+                    R.string.cast_and_crew
+                } else {
+                    R.string.cast
+                },
+            ),
+            style = MaterialTheme.typography.titleMedium,
+        )
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            credits.forEach { credit ->
+                val subtitle = if (credit.role == CREDIT_ROLE_DIRECTOR) {
+                    stringResource(R.string.director)
+                } else {
+                    credit.character
+                }
+                Surface(
+                    onClick = { onPersonSelected(credit) },
+                    color = MaterialTheme.colorScheme.surfaceContainer,
+                    shape = MaterialTheme.shapes.large,
+                ) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        Text(
+                            text = credit.name,
+                            style = MaterialTheme.typography.labelLargeEmphasized,
+                        )
+                        if (subtitle.isNotBlank()) {
+                            Text(
+                                text = subtitle,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.labelSmall,
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }

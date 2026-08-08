@@ -86,6 +86,9 @@
     <string name="finished">Finished</string>
     <string name="resume">Resume</string>
     <string name="overview">Overview</string>
+    <string name="cast">Cast</string>
+    <string name="cast_and_crew">Cast &amp; crew</string>
+    <string name="director">Director</string>
     <string name="artwork">Artwork</string>
     <string name="artwork_title">%1$s artwork</string>
     <string name="poster">Poster</string>

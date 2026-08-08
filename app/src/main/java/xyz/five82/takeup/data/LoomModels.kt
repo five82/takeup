@@ -51,6 +51,10 @@ data class LoomItem(
     val seriesTitle: String = "",
     val seasonTitle: String = "",
     val genres: List<Genre> = emptyList(),
+    // Loom attaches credits to single-item responses only, so a listed item never
+    // carries them. Movies get their directors and billed cast, shows the cast
+    // alone, and episodes nothing at all.
+    val credits: List<Credit> = emptyList(),
 ) {
     fun posterUrl(serverUrl: String): String? =
         imageUrl(serverUrl, posterImageId, posterImageTag)
@@ -137,6 +141,21 @@ data class Genre(
     val id: Long,
     val name: String,
 )
+
+/**
+ * One person's billing on a title, in the order Loom serves them: directors
+ * first, then the cast as TMDB bills it. [role] stays a string rather than an
+ * enum so a role Loom adds later still lists instead of failing the parse.
+ * [character] is routinely blank - TMDB leaves it off older entries.
+ */
+data class Credit(
+    val personId: Long,
+    val name: String,
+    val role: String,
+    val character: String = "",
+)
+
+const val CREDIT_ROLE_DIRECTOR = "director"
 
 data class GenreSummary(
     val id: Long,
