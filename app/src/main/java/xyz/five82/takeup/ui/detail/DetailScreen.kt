@@ -481,17 +481,17 @@ private fun DetailHead(
                     val watched = item.progress?.played == true ||
                         (item.kind == "show" && item.episodeCount > 0 && item.unwatchedCount == 0)
                     DropdownMenuItem(
+                        text = { Text("Artwork") },
+                        onClick = {
+                            menuOpen = false
+                            nav.push(Screen.Artwork(item.id, item.title))
+                        },
+                    )
+                    DropdownMenuItem(
                         text = { Text(if (watched) "Mark unwatched" else "Mark watched") },
                         onClick = {
                             menuOpen = false
                             model.setWatched(item, !watched)
-                        },
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Artwork...") },
-                        onClick = {
-                            menuOpen = false
-                            nav.push(Screen.Artwork(item.id, item.title))
                         },
                     )
                 }

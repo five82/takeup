@@ -72,7 +72,7 @@ class ArtworkViewModel(
             loading = true
             runCatching { repository.api.imageOptions(itemId, kind) }
                 .onSuccess {
-                    options[kind] = it
+                    options[kind] = sortArtworkOptions(it)
                     error = null
                 }
                 .onFailure { error = it.message }
@@ -105,6 +105,13 @@ class ArtworkViewModel(
         }
     }
 }
+
+internal fun sortArtworkOptions(options: List<ImageOption>): List<ImageOption> =
+    options.sortedWith(
+        compareByDescending<ImageOption> { it.width.toLong() * it.height }
+            .thenByDescending { it.voteAverage }
+            .thenByDescending { it.voteCount },
+    )
 
 /**
  * Loom's curation surface: browse TMDB's options for each artwork kind,

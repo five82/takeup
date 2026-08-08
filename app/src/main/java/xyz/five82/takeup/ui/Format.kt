@@ -48,7 +48,7 @@ fun progressFraction(item: Item): Float? {
 
 /**
  * Badge strip for a detail screen, derived from ffprobe stream facts:
- * resolution, dynamic range, video codec, default audio, container.
+ * resolution, dynamic range, video codec, and default audio.
  */
 fun techBadges(media: MediaFile?): List<String> {
     media ?: return emptyList()
@@ -75,21 +75,7 @@ fun techBadges(media: MediaFile?): List<String> {
         val layout = audioLayout(audio.channelLayout, audio.channels)
         badges += if (layout != null) "$name $layout" else name
     }
-    containerLabel(media)?.let { badges += it }
     return badges.filter { it.isNotEmpty() }
-}
-
-/**
- * The badge for the file's container. ffprobe reports demuxer names like
- * "matroska,webm", so the filename extension is the honest label; the
- * probe name is only a fallback.
- */
-fun containerLabel(media: MediaFile): String? {
-    val extension = media.filename.substringAfterLast('.', "")
-    if (extension.isNotEmpty() && extension.length <= 4) return extension.uppercase()
-    val probed = media.container.substringBefore(',')
-    if (probed.isEmpty()) return null
-    return if (probed == "matroska") "MKV" else probed.uppercase()
 }
 
 private fun codecLabel(codec: String): String? = when (codec.lowercase()) {
