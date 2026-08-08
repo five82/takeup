@@ -34,6 +34,8 @@ data class Item(
     val thumbImageId: Long = 0,
     val thumbImageTag: String? = null,
     val mediaTag: String? = null,
+    // Runtime of the item's own file; zero for shows and seasons.
+    val durationMs: Long = 0,
     val addedAt: String? = null,
     val updatedAt: String? = null,
     val media: MediaFile? = null,

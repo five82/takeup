@@ -107,6 +107,10 @@ class LoomApi(@Volatile var baseUrl: String? = null) {
     suspend fun recentlyAdded(limit: Int = 20): List<Item> =
         itemsList(get("/api/v1/recently-added", "limit" to limit.toString()), Item::class.java)
 
+    /** Finished movies and fully watched shows, most recently finished first. */
+    suspend fun recentlyPlayed(limit: Int = 20): List<Item> =
+        itemsList(get("/api/v1/recently-played", "limit" to limit.toString()), Item::class.java)
+
     // -- playback ------------------------------------------------------------
 
     suspend fun playback(id: Long): PlaybackInfo =

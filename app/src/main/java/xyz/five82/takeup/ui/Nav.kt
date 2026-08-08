@@ -12,6 +12,8 @@ sealed interface Screen {
     data class Search(val initialQuery: String = "") : Screen
     data object Settings : Screen
     data class Artwork(val itemId: Long, val title: String) : Screen
+    data class GenreGrid(val genreId: Long, val title: String) : Screen
+    data class CollectionGrid(val slug: String, val title: String) : Screen
 }
 
 enum class Tab(val label: String, val library: String?) {
@@ -19,11 +21,12 @@ enum class Tab(val label: String, val library: String?) {
     Movies("Movies", "movies"),
     Tv("TV", "tv"),
     Shorts("Shorts", "shorts"),
+    Browse("Browse", null),
 }
 
 /**
- * Hand-rolled navigation: four tab roots and one overlay stack. Five
- * destinations do not justify a navigation library. State does not survive
+ * Hand-rolled navigation: five tab roots and one overlay stack. A handful of
+ * destinations does not justify a navigation library. State does not survive
  * process death; on a LAN client that restarts to its home screen, that is
  * an acceptable trade.
  */

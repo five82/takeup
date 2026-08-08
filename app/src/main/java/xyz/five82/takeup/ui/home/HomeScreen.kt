@@ -43,10 +43,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import coil3.compose.AsyncImage
+import java.time.LocalDate
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
-import xyz.five82.takeup.api.Collection
 import xyz.five82.takeup.api.Item
 import xyz.five82.takeup.data.LoomRepository
 import xyz.five82.takeup.ui.NavState
@@ -57,6 +57,7 @@ import xyz.five82.takeup.ui.components.LoadingState
 import xyz.five82.takeup.ui.components.PosterCard
 import xyz.five82.takeup.ui.components.RowLabel
 import xyz.five82.takeup.ui.components.ThreadProgress
+import xyz.five82.takeup.ui.components.navPillClearance
 import xyz.five82.takeup.ui.components.ThumbCard
 import xyz.five82.takeup.ui.backdropUrl
 import xyz.five82.takeup.ui.episodeLabel
@@ -78,7 +79,7 @@ data class HomeState(
     val continueWatching: List<Item> = emptyList(),
     val nextUp: List<Item> = emptyList(),
     val recentlyAdded: List<Item> = emptyList(),
-    val collections: List<Collection> = emptyList(),
+    val discovery: List<DiscoveryRow> = emptyList(),
 )
 
 class HomeViewModel(private val repository: LoomRepository) : ViewModel() {
@@ -95,13 +96,22 @@ class HomeViewModel(private val repository: LoomRepository) : ViewModel() {
                     val continueWatching = async { repository.api.continueWatching() }
                     val nextUp = async { repository.api.nextUp() }
                     val recentlyAdded = async { repository.api.recentlyAdded() }
+                    val movies = async { repository.api.allItems("movies") }
+                    val shows = async { repository.api.allItems("tv") }
                     val collections = async { repository.api.collections() }
+                    val recentlyPlayed = async { repository.api.recentlyPlayed() }
                     state = HomeState(
                         loading = false,
                         continueWatching = continueWatching.await(),
                         nextUp = nextUp.await(),
                         recentlyAdded = recentlyAdded.await(),
-                        collections = collections.await(),
+                        discovery = discoveryRows(
+                            movies = movies.await(),
+                            shows = shows.await(),
+                            collections = collections.await(),
+                            recentlyPlayed = recentlyPlayed.await(),
+                            epochDay = LocalDate.now().toEpochDay(),
+                        ),
                     )
                 }
             } catch (e: Exception) {
@@ -158,7 +168,7 @@ private fun HomeContent(
 ) {
     val api = repository.api
     val hero = state.continueWatching.firstOrNull() ?: state.recentlyAdded.firstOrNull()
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = navPillClearance())) {
         item(key = "hero") {
             Box {
                 if (hero != null) {
@@ -221,27 +231,25 @@ private fun HomeContent(
             }
         }
 
-        // A batch of new episodes all inherit one season poster, so collapse
-        // recently-added siblings into a single card.
-        val recentlyAdded = state.recentlyAdded.distinctBy { it.parentId ?: it.id }
-        if (recentlyAdded.isNotEmpty()) {
+        if (state.recentlyAdded.isNotEmpty()) {
             item(key = "recent") {
                 HomeRow("Recently Added") {
-                    items(recentlyAdded, key = { "ra-${it.id}" }) { item ->
+                    items(state.recentlyAdded, key = { "ra-${it.id}" }) { item ->
                         PosterCard(
                             title = item.title,
                             imageUrl = api.posterUrl(item),
-                            onClick = { nav.push(Screen.Detail(itemForDetail(item))) },
+                            onClick = { nav.push(Screen.Detail(item.id)) },
                         )
                     }
                 }
             }
         }
 
-        for (collection in state.collections) {
-            item(key = "col-${collection.slug}") {
-                HomeRow(collection.title, labelColor = Violet) {
-                    items(collection.items, key = { "${collection.slug}-${it.id}" }) { item ->
+        // The rotating shelves: a different slice of the library every day.
+        for (discoveryRow in state.discovery) {
+            item(key = "d-${discoveryRow.key}") {
+                HomeRow(discoveryRow.title, labelColor = Violet) {
+                    items(discoveryRow.items, key = { "${discoveryRow.key}-${it.id}" }) { item ->
                         PosterCard(
                             title = item.title,
                             imageUrl = api.posterUrl(item),
@@ -254,9 +262,6 @@ private fun HomeContent(
         }
     }
 }
-
-/** Episodes open their show from recently-added; movies and shows open themselves. */
-private fun itemForDetail(item: Item): Long = item.id
 
 private fun continueLine(item: Item): String {
     val remaining = remainingLabel(item)

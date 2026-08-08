@@ -2,22 +2,24 @@ package xyz.five82.takeup.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -34,6 +36,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import xyz.five82.takeup.data.LoomRepository
 import xyz.five82.takeup.ui.artwork.ArtworkScreen
+import xyz.five82.takeup.ui.browse.BrowseScreen
+import xyz.five82.takeup.ui.browse.CollectionGridScreen
+import xyz.five82.takeup.ui.browse.GenreGridScreen
 import xyz.five82.takeup.ui.components.Selvedge
 import xyz.five82.takeup.ui.detail.DetailScreen
 import xyz.five82.takeup.ui.home.HomeScreen
@@ -46,8 +51,11 @@ import xyz.five82.takeup.ui.theme.Amber
 import xyz.five82.takeup.ui.theme.Ember
 import xyz.five82.takeup.ui.theme.Faint
 import xyz.five82.takeup.ui.theme.Ink
+import xyz.five82.takeup.ui.theme.Line
 import xyz.five82.takeup.ui.theme.Stage
+import xyz.five82.takeup.ui.theme.Surface1
 import xyz.five82.takeup.ui.theme.Teal
+import xyz.five82.takeup.ui.theme.Violet
 
 @Composable
 fun TakeupApp(repository: LoomRepository) {
@@ -66,18 +74,18 @@ private fun MainScaffold(repository: LoomRepository) {
 
     Box(Modifier.fillMaxSize().background(Stage)) {
         // Tab roots stay in composition beneath the overlay stack so their
-        // scroll positions survive a trip into detail or the player.
-        Column(Modifier.fillMaxSize()) {
-            Box(Modifier.weight(1f)) {
-                when (nav.tab) {
-                    Tab.Home -> HomeScreen(repository, nav, active = nav.stack.isEmpty())
-                    Tab.Movies -> LibraryScreen(repository, nav, "movies", active = nav.stack.isEmpty())
-                    Tab.Tv -> LibraryScreen(repository, nav, "tv", active = nav.stack.isEmpty())
-                    Tab.Shorts -> LibraryScreen(repository, nav, "shorts", active = nav.stack.isEmpty())
-                }
+        // scroll positions survive a trip into detail or the player. The nav
+        // pill floats over them; scrollables clear it with navPillClearance.
+        Box(Modifier.fillMaxSize()) {
+            when (nav.tab) {
+                Tab.Home -> HomeScreen(repository, nav, active = nav.stack.isEmpty())
+                Tab.Movies -> LibraryScreen(repository, nav, "movies", active = nav.stack.isEmpty())
+                Tab.Tv -> LibraryScreen(repository, nav, "tv", active = nav.stack.isEmpty())
+                Tab.Shorts -> LibraryScreen(repository, nav, "shorts", active = nav.stack.isEmpty())
+                Tab.Browse -> BrowseScreen(repository, nav, active = nav.stack.isEmpty())
             }
-            TakeupBottomBar(nav)
         }
+        TakeupNavPill(nav, Modifier.align(Alignment.BottomCenter))
         nav.stack.forEachIndexed { index, screen ->
             val topmost = index == nav.stack.lastIndex
             key(index, screen) {
@@ -94,6 +102,8 @@ private fun MainScaffold(repository: LoomRepository) {
                             is Screen.Search -> SearchScreen(repository, nav, screen.initialQuery)
                             is Screen.Settings -> SettingsScreen(repository, nav)
                             is Screen.Artwork -> ArtworkScreen(repository, nav, screen.itemId, screen.title)
+                            is Screen.GenreGrid -> GenreGridScreen(repository, nav, screen)
+                            is Screen.CollectionGrid -> CollectionGridScreen(repository, nav, screen)
                         }
                     }
                 }
@@ -115,15 +125,17 @@ private fun ScreenScoped(content: @Composable () -> Unit) {
     CompositionLocalProvider(LocalViewModelStoreOwner provides owner, content = content)
 }
 
+/** Floating icon pill; the active tab shows its thread beneath the icon. */
 @Composable
-private fun TakeupBottomBar(nav: NavState) {
+private fun TakeupNavPill(nav: NavState, modifier: Modifier = Modifier) {
     Row(
-        Modifier
-            .fillMaxWidth()
-            .background(Stage.copy(alpha = 0.98f))
+        modifier
             .navigationBarsPadding()
-            .padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly,
+            .padding(bottom = 12.dp)
+            .clip(RoundedCornerShape(50))
+            .background(Surface1.copy(alpha = 0.97f))
+            .border(1.dp, Line, RoundedCornerShape(50))
+            .padding(horizontal = 10.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         for (tab in Tab.entries) {
@@ -137,28 +149,36 @@ private fun TakeupBottomBar(nav: NavState) {
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
                     ) { nav.selectTab(tab) }
-                    // 48dp minimum touch target; the row's old vertical padding
-                    // moved inside the tap area so the bar stays the same height.
-                    .defaultMinSize(minHeight = 48.dp)
-                    .padding(horizontal = 20.dp, vertical = 4.dp),
+                    // 48dp touch target even though the pill draws smaller.
+                    .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                    .padding(horizontal = 8.dp),
             ) {
+                Icon(
+                    when (tab) {
+                        Tab.Home -> Icons.Filled.Home
+                        Tab.Movies -> MovieIcon
+                        Tab.Tv -> TvIcon
+                        Tab.Shorts -> TheatersIcon
+                        Tab.Browse -> ExploreIcon
+                    },
+                    contentDescription = tab.label,
+                    tint = if (selected) Ink else Faint,
+                )
                 // The active marker is the tab's thread; Home gets the whole selvedge.
-                Box(Modifier.size(width = 16.dp, height = 3.dp), contentAlignment = Alignment.Center) {
+                Box(
+                    Modifier.padding(top = 3.dp).size(width = 16.dp, height = 3.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
                     if (selected) {
                         when (tab) {
                             Tab.Home -> Selvedge(Modifier.width(16.dp), height = 3f)
                             Tab.Movies -> Dot(Ember)
                             Tab.Tv -> Dot(Teal)
                             Tab.Shorts -> Dot(Amber)
+                            Tab.Browse -> Dot(Violet)
                         }
                     }
                 }
-                Text(
-                    tab.label,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = if (selected) Ink else Faint,
-                    modifier = Modifier.padding(top = 5.dp),
-                )
             }
         }
     }

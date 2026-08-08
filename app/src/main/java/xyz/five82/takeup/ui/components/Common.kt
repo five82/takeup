@@ -6,9 +6,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -25,6 +28,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import xyz.five82.takeup.ui.initials
 import xyz.five82.takeup.ui.theme.Amber
@@ -90,6 +94,15 @@ fun ThreadProgress(fraction: Float, color: Color, modifier: Modifier = Modifier)
         )
     }
 }
+
+/**
+ * Bottom clearance for tab-root scrollables: the floating nav pill hovers
+ * over content, so the last row needs room to scroll out from under it
+ * (system inset + pill height + margins).
+ */
+@Composable
+fun navPillClearance(): Dp =
+    WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 84.dp
 
 /** Caps-and-tracking row label, the proposal's "Continue Watching" voice. */
 @Composable
