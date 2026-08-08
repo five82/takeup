@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -30,19 +29,21 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.compose.animation.core.animateDpAsState
 import coil3.compose.AsyncImage
+import coil3.compose.AsyncImagePainter
 import java.time.LocalDate
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -51,7 +52,9 @@ import xyz.five82.takeup.api.Item
 import xyz.five82.takeup.data.LoomRepository
 import xyz.five82.takeup.ui.NavState
 import xyz.five82.takeup.ui.Screen
+import xyz.five82.takeup.ui.components.BiasCutBackdrop
 import xyz.five82.takeup.ui.components.CardAction
+import xyz.five82.takeup.ui.components.logoLaneHeight
 import xyz.five82.takeup.ui.components.ErrorState
 import xyz.five82.takeup.ui.components.LoadingState
 import xyz.five82.takeup.ui.components.PosterCard
@@ -72,6 +75,7 @@ import xyz.five82.takeup.ui.theme.Ink
 import xyz.five82.takeup.ui.theme.Muted
 import xyz.five82.takeup.ui.theme.Stage
 import xyz.five82.takeup.ui.theme.Violet
+import xyz.five82.takeup.ui.theme.rememberWovenSeed
 
 data class HomeState(
     val loading: Boolean = true,
@@ -297,25 +301,22 @@ private fun Hero(item: Item, api: xyz.five82.takeup.api.LoomApi, onOpen: () -> U
             .clickable(onClick = onOpen),
     ) {
         val backdrop = api.backdropUrl(item, 960) ?: api.thumbUrl(item, 960)
-        if (backdrop != null) {
-            AsyncImage(
-                model = backdrop,
-                contentDescription = item.title,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
-        // The melt: artwork is never hard-cropped against the stage.
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        0f to Stage.copy(alpha = 0.30f),
-                        0.45f to Color.Transparent,
-                        1f to Stage,
-                    ),
-                ),
+        val logo = api.logoUrl(item)
+        val seed = rememberWovenSeed(item.id, api.posterUrl(item, 240))
+        // Same tailoring as the detail head: area-normalized logo lane, line
+        // riding above it, 76dp of resume line and progress stacked below.
+        var logoAspect by remember(item.id) { mutableStateOf<Float?>(null) }
+        val lane by animateDpAsState(logoLaneHeight(logoAspect), label = "logoLane")
+        val solid by animateDpAsState(
+            if (logo != null) logoLaneHeight(logoAspect) + 76.dp else 160.dp,
+            label = "biasSolid",
+        )
+        BiasCutBackdrop(
+            imageUrl = backdrop,
+            tint = seed ?: Ember,
+            solidLeft = solid,
+            modifier = Modifier.fillMaxSize(),
+            contentDescription = item.title,
         )
         Column(
             Modifier
@@ -323,17 +324,22 @@ private fun Hero(item: Item, api: xyz.five82.takeup.api.LoomApi, onOpen: () -> U
                 .padding(horizontal = 20.dp)
                 .fillMaxWidth(),
         ) {
-            val logo = api.logoUrl(item)
             if (logo != null) {
                 AsyncImage(
                     model = logo,
                     contentDescription = item.title,
                     contentScale = ContentScale.Fit,
-                    modifier = Modifier
-                        .fillMaxWidth(0.62f)
-                        .height(84.dp)
-                        .wrapContentWidth(Alignment.Start),
                     alignment = Alignment.BottomStart,
+                    onState = { state ->
+                        val size = (state as? AsyncImagePainter.State.Success)
+                            ?.painter?.intrinsicSize
+                        if (size != null && size.width > 0f && size.height > 0f) {
+                            logoAspect = size.width / size.height
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth(0.8f)
+                        .height(lane),
                 )
             } else {
                 Text(

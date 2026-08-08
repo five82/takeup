@@ -47,7 +47,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontStyle
@@ -55,7 +54,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.compose.animation.core.animateDpAsState
 import coil3.compose.AsyncImage
+import coil3.compose.AsyncImagePainter
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -65,7 +66,9 @@ import xyz.five82.takeup.data.LoomRepository
 import xyz.five82.takeup.ui.NavState
 import xyz.five82.takeup.ui.Screen
 import xyz.five82.takeup.ui.backdropUrl
+import xyz.five82.takeup.ui.components.BiasCutBackdrop
 import xyz.five82.takeup.ui.components.ErrorState
+import xyz.five82.takeup.ui.components.logoLaneHeight
 import xyz.five82.takeup.ui.components.LoadingState
 import xyz.five82.takeup.ui.components.PersonAvatar
 import xyz.five82.takeup.ui.components.RowLabel
@@ -78,6 +81,7 @@ import xyz.five82.takeup.ui.progressFraction
 import xyz.five82.takeup.ui.remainingLabel
 import xyz.five82.takeup.ui.takeupViewModel
 import xyz.five82.takeup.ui.techBadges
+import xyz.five82.takeup.ui.theme.Ember
 import xyz.five82.takeup.ui.theme.Ink
 import xyz.five82.takeup.ui.theme.Line
 import xyz.five82.takeup.ui.theme.Muted
@@ -426,7 +430,7 @@ private fun EpisodeRow(
 
 // -- shared pieces ------------------------------------------------------------
 
-/** Backdrop melting into the stage, logo art over it, back and overflow above. */
+/** Backdrop ending on the bias cut, logo art below it, back and overflow above. */
 @Composable
 private fun DetailHead(
     repository: LoomRepository,
@@ -437,24 +441,24 @@ private fun DetailHead(
     var menuOpen by remember { mutableStateOf(false) }
     Box(Modifier.fillMaxWidth().height(300.dp)) {
         val backdrop = repository.api.backdropUrl(item, 960)
-        if (backdrop != null) {
-            AsyncImage(
-                model = backdrop,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        0f to Stage.copy(alpha = 0.35f),
-                        0.5f to Color.Transparent,
-                        1f to Stage,
-                    ),
-                ),
+        val logo = repository.api.logoUrl(item)
+        // Raw seed, not colorScheme.primary: the toned primary washes out to
+        // pastel, and the head should match the home hero for the same title.
+        val seed = rememberWovenSeed(item.id, repository.api.posterUrl(item, 240))
+        // Cut tailored to the logo: the lane is area-normalized once the art
+        // decodes, and the line rides just above it. Animated so the first
+        // load settles instead of popping.
+        var logoAspect by remember(item.id) { mutableStateOf<Float?>(null) }
+        val lane by animateDpAsState(logoLaneHeight(logoAspect), label = "logoLane")
+        val solid by animateDpAsState(
+            if (logo != null) logoLaneHeight(logoAspect) + 22.dp else 116.dp,
+            label = "biasSolid",
+        )
+        BiasCutBackdrop(
+            imageUrl = backdrop,
+            tint = seed ?: Ember,
+            solidLeft = solid,
+            modifier = Modifier.fillMaxSize(),
         )
         Row(
             Modifier
@@ -490,21 +494,29 @@ private fun DetailHead(
                 }
             }
         }
+        // Logo lane under the low start of the cut; the line climbs away to
+        // the right, so clearance only grows across the lane.
         Box(
             Modifier
                 .align(Alignment.BottomStart)
-                .padding(start = 20.dp, end = 20.dp, bottom = 6.dp),
+                .padding(start = 20.dp, end = 20.dp, bottom = 12.dp),
         ) {
-            val logo = repository.api.logoUrl(item)
             if (logo != null) {
                 AsyncImage(
                     model = logo,
                     contentDescription = item.title,
                     contentScale = ContentScale.Fit,
                     alignment = Alignment.BottomStart,
+                    onState = { state ->
+                        val size = (state as? AsyncImagePainter.State.Success)
+                            ?.painter?.intrinsicSize
+                        if (size != null && size.width > 0f && size.height > 0f) {
+                            logoAspect = size.width / size.height
+                        }
+                    },
                     modifier = Modifier
-                        .fillMaxWidth(0.66f)
-                        .height(76.dp),
+                        .fillMaxWidth(0.8f)
+                        .height(lane),
                 )
             } else {
                 Text(
