@@ -110,7 +110,7 @@ fun ChapterScrubBar(
             }
         }
         // Thumb with a soft glow.
-        drawCircle(accent.copy(alpha = 0.25f), radius = 9.dp.toPx(), center = Offset(fillWidth, centerY))
-        drawCircle(accent, radius = 5.dp.toPx(), center = Offset(fillWidth, centerY))
+        drawCircle(accent.copy(alpha = 0.25f), radius = 13.dp.toPx(), center = Offset(fillWidth, centerY))
+        drawCircle(accent, radius = 8.dp.toPx(), center = Offset(fillWidth, centerY))
     }
 }

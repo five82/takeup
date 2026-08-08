@@ -3,14 +3,21 @@ package xyz.five82.takeup.ui.player
 import android.content.pm.ActivityInfo
 import android.view.WindowManager
 import androidx.activity.compose.LocalActivity
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
@@ -31,7 +38,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -40,6 +46,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -47,10 +54,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -62,6 +76,8 @@ import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.ui.PlayerView
 import coil3.compose.AsyncImage
+import kotlin.math.cos
+import kotlin.math.sin
 import kotlinx.coroutines.delay
 import xyz.five82.takeup.TakeupApplication
 import xyz.five82.takeup.api.Chapter
@@ -79,6 +95,13 @@ import xyz.five82.takeup.ui.theme.WovenTheme
 import xyz.five82.takeup.ui.theme.rememberWovenSeed
 import xyz.five82.takeup.ui.posterUrl
 import xyz.five82.takeup.ui.thumbUrl
+
+// Shading for the control chips. Video renders on a SurfaceView, which Compose
+// cannot blur behind an overlay, so a deep translucent fill does the work that
+// a blur would otherwise share.
+private val ChipFill = Color(0xFF0A0E17).copy(alpha = 0.62f)
+private val ChipStroke = Ink.copy(alpha = 0.14f)
+private val ConsoleFill = Color(0xFF0B0F1A).copy(alpha = 0.75f)
 
 @Composable
 fun PlayerScreen(repository: LoomRepository, nav: NavState, itemId: Long) {
@@ -116,6 +139,9 @@ fun PlayerScreen(repository: LoomRepository, nav: NavState, itemId: Long) {
     }
 }
 
+// PlayerView.subtitleView is flagged unstable, but it is the only way to move
+// rendered cues clear of the control console.
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
 private fun PlayerContent(repository: LoomRepository, nav: NavState, model: PlayerViewModel) {
     val player = model.player
@@ -127,6 +153,7 @@ private fun PlayerContent(repository: LoomRepository, nav: NavState, model: Play
     var duration by remember { mutableLongStateOf(0L) }
     var scrubPreview by remember { mutableStateOf<Long?>(null) }
     var sheet by remember { mutableStateOf<PlayerSheet?>(null) }
+    var interactionTick by remember { mutableIntStateOf(0) }
 
     DisposableEffect(player) {
         val listener = object : Player.Listener {
@@ -154,8 +181,9 @@ private fun PlayerContent(repository: LoomRepository, nav: NavState, model: Play
         }
     }
 
-    // Controls fade while playing; any interaction brings them back.
-    LaunchedEffect(controlsVisible, playing, sheet) {
+    // Controls fade while playing; any interaction brings them back, and
+    // interactionTick restarts the countdown so they cannot vanish mid-use.
+    LaunchedEffect(controlsVisible, playing, sheet, interactionTick) {
         if (controlsVisible && playing && sheet == null) {
             delay(3500)
             controlsVisible = false
@@ -170,6 +198,9 @@ private fun PlayerContent(repository: LoomRepository, nav: NavState, model: Play
                 detectTapGestures { controlsVisible = !controlsVisible }
             },
     ) {
+        // Lift rendered subtitle cues clear of the console while it is up; the
+        // value tracks the console's approximate height.
+        val subtitleLiftPx = with(LocalDensity.current) { 168.dp.roundToPx() }
         AndroidView(
             factory = { context ->
                 PlayerView(context).apply {
@@ -177,7 +208,13 @@ private fun PlayerContent(repository: LoomRepository, nav: NavState, model: Play
                     this.player = player
                 }
             },
-            update = { view -> view.player = player },
+            update = { view ->
+                view.player = player
+                view.subtitleView?.setPadding(
+                    0, 0, 0,
+                    if (controlsVisible && !model.ended) subtitleLiftPx else 0,
+                )
+            },
             onRelease = { view -> view.player = null },
             modifier = Modifier.fillMaxSize(),
         )
@@ -189,21 +226,37 @@ private fun PlayerContent(repository: LoomRepository, nav: NavState, model: Play
             )
         }
 
-        if (controlsVisible && !model.ended) {
+        val chromeVisible = controlsVisible && !model.ended
+        AnimatedVisibility(
+            visible = chromeVisible,
+            enter = fadeIn(tween(200)) + slideInVertically(tween(200)) { -it / 4 },
+            exit = fadeOut(tween(200)) + slideOutVertically(tween(200)) { -it / 4 },
+        ) {
             PlayerTopBar(nav, model, position)
+        }
+        AnimatedVisibility(
+            visible = chromeVisible,
+            enter = fadeIn(tween(200)) + slideInVertically(tween(200)) { it / 4 },
+            exit = fadeOut(tween(200)) + slideOutVertically(tween(200)) { it / 4 },
+            modifier = Modifier.align(Alignment.BottomCenter),
+        ) {
             PlayerControls(
                 model = model,
                 playing = playing,
                 position = scrubPreview ?: position,
                 duration = duration,
                 tracks = tracks,
-                onScrubPreview = { scrubPreview = it },
+                onInteraction = { interactionTick++ },
+                onScrubPreview = { preview ->
+                    if (preview != null && scrubPreview == null) interactionTick++
+                    scrubPreview = preview
+                },
                 onSeek = { target ->
                     player.seekTo(target)
                     scrubPreview = null
+                    interactionTick++
                 },
                 onOpenSheet = { sheet = it },
-                modifier = Modifier.align(Alignment.BottomCenter),
             )
         }
 
@@ -239,31 +292,52 @@ private fun PlayerTopBar(nav: NavState, model: PlayerViewModel, positionMs: Long
         Modifier
             .fillMaxWidth()
             .statusBarsPadding()
-            .padding(8.dp),
+            .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        IconButton(onClick = { nav.pop() }) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Ink)
-        }
-        Column(Modifier.padding(start = 4.dp)) {
-            Text(
-                when {
-                    item == null -> ""
-                    item.kind == "episode" -> "${episodeLabel(item)} · ${item.title}"
-                    else -> item.title
-                },
-                style = MaterialTheme.typography.titleMedium,
-                color = Ink,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+        Box(
+            Modifier
+                .size(56.dp)
+                .clip(CircleShape)
+                .background(ChipFill)
+                .border(1.dp, ChipStroke, CircleShape)
+                .clickable { nav.pop() },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Back",
+                tint = Ink,
+                modifier = Modifier.size(28.dp),
             )
-            val chapter = currentChapter(item?.media?.chapters, positionMs)
-            if (chapter != null) {
+        }
+        if (item != null) {
+            val pill = RoundedCornerShape(percent = 50)
+            Column(
+                Modifier
+                    .weight(1f, fill = false)
+                    .clip(pill)
+                    .background(ChipFill)
+                    .border(1.dp, ChipStroke, pill)
+                    .padding(horizontal = 26.dp, vertical = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp),
+            ) {
                 Text(
-                    chapterName(chapter),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Muted,
+                    if (item.kind == "episode") "${episodeLabel(item)} · ${item.title}" else item.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Ink,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
+                val chapter = currentChapter(item.media?.chapters, positionMs)
+                if (chapter != null) {
+                    Text(
+                        chapterName(chapter),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Muted,
+                    )
+                }
             }
         }
     }
@@ -276,6 +350,7 @@ private fun PlayerControls(
     position: Long,
     duration: Long,
     tracks: Tracks,
+    onInteraction: () -> Unit,
     onScrubPreview: (Long?) -> Unit,
     onSeek: (Long) -> Unit,
     onOpenSheet: (PlayerSheet) -> Unit,
@@ -284,93 +359,193 @@ private fun PlayerControls(
     val player = model.player
     val chapters = model.item?.media?.chapters.orEmpty()
     val accent = MaterialTheme.colorScheme.primary
+    val shape = RoundedCornerShape(26.dp)
     Column(
         modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(horizontal = 20.dp, vertical = 14.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(Surface1.copy(alpha = 0.78f))
-            .padding(horizontal = 18.dp, vertical = 12.dp),
+            .padding(horizontal = 14.dp, vertical = 14.dp)
+            .clip(shape)
+            .background(ConsoleFill)
+            .border(1.dp, ChipStroke, shape)
+            .padding(horizontal = 22.dp, vertical = 10.dp),
     ) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(
-                formatClock(position),
-                style = MaterialTheme.typography.labelSmall,
-                color = Ink,
-            )
-            Text(
-                formatClock(duration),
-                style = MaterialTheme.typography.labelSmall,
-                color = Muted,
-            )
-        }
-        ChapterScrubBar(
-            positionMs = position,
-            durationMs = duration,
-            chapters = chapters,
-            accent = accent,
-            onPreview = onScrubPreview,
-            onSeek = onSeek,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp),
-        )
         Row(
             Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            SkipButton("-10") { player.seekTo((player.currentPosition - 10_000).coerceAtLeast(0)) }
-            IconButton(
-                onClick = { if (playing) player.pause() else player.play() },
-                modifier = Modifier.size(64.dp),
-            ) {
-                if (playing) {
-                    PauseGlyph(accent = Ink)
-                } else {
-                    Icon(
-                        Icons.Filled.PlayArrow,
-                        contentDescription = "Play",
-                        tint = Ink,
-                        modifier = Modifier.size(44.dp),
-                    )
+            Text(
+                formatClock(position),
+                style = MaterialTheme.typography.labelLarge,
+                color = Ink,
+            )
+            ChapterScrubBar(
+                positionMs = position,
+                durationMs = duration,
+                chapters = chapters,
+                accent = accent,
+                onPreview = onScrubPreview,
+                onSeek = onSeek,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                formatClock(duration),
+                style = MaterialTheme.typography.labelLarge,
+                color = Muted,
+            )
+        }
+        // Three zones - utility pills on the wings, transport dead center - so
+        // the play button stays horizontally centered no matter what is shown.
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Row(Modifier.weight(1f)) {
+                if (chapters.isNotEmpty()) {
+                    ConsolePill("Chapters") {
+                        onInteraction()
+                        onOpenSheet(PlayerSheet.Chapters)
+                    }
                 }
             }
-            SkipButton("+10") { player.seekTo(player.currentPosition + 10_000) }
-            Spacer(Modifier.weight(1f))
-            if (chapters.isNotEmpty()) {
-                SheetButton("Chapters") { onOpenSheet(PlayerSheet.Chapters) }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(26.dp),
+            ) {
+                SkipChip(forward = false) {
+                    onInteraction()
+                    player.seekTo((player.currentPosition - 10_000).coerceAtLeast(0))
+                }
+                Box(
+                    Modifier
+                        .size(80.dp)
+                        .clip(CircleShape)
+                        .background(Ink.copy(alpha = 0.12f))
+                        .clickable { onInteraction(); if (playing) player.pause() else player.play() },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (playing) {
+                        PauseGlyph(accent = Ink)
+                    } else {
+                        Icon(
+                            Icons.Filled.PlayArrow,
+                            contentDescription = "Play",
+                            tint = Ink,
+                            modifier = Modifier.size(46.dp),
+                        )
+                    }
+                }
+                SkipChip(forward = true) {
+                    onInteraction()
+                    player.seekTo(player.currentPosition + 10_000)
+                }
             }
-            if (trackCount(tracks, androidx.media3.common.C.TRACK_TYPE_AUDIO) > 1) {
-                SheetButton("Audio") { onOpenSheet(PlayerSheet.Tracks(androidx.media3.common.C.TRACK_TYPE_AUDIO)) }
-            }
-            if (trackCount(tracks, androidx.media3.common.C.TRACK_TYPE_TEXT) > 0) {
-                SheetButton("CC") { onOpenSheet(PlayerSheet.Tracks(androidx.media3.common.C.TRACK_TYPE_TEXT)) }
+            Row(
+                Modifier.weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
+            ) {
+                if (trackCount(tracks, androidx.media3.common.C.TRACK_TYPE_AUDIO) > 1) {
+                    ConsolePill("Audio") {
+                        onInteraction()
+                        onOpenSheet(PlayerSheet.Tracks(androidx.media3.common.C.TRACK_TYPE_AUDIO))
+                    }
+                }
+                if (trackCount(tracks, androidx.media3.common.C.TRACK_TYPE_TEXT) > 0) {
+                    ConsolePill("CC") {
+                        onInteraction()
+                        onOpenSheet(PlayerSheet.Tracks(androidx.media3.common.C.TRACK_TYPE_TEXT))
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun SkipButton(label: String, onClick: () -> Unit) {
-    TextButton(onClick = onClick, modifier = Modifier.defaultMinSize(minWidth = 56.dp, minHeight = 48.dp)) {
-        Text(label, style = MaterialTheme.typography.titleMedium, color = Ink)
+private fun ConsolePill(label: String, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .clip(CircleShape)
+            .background(Ink.copy(alpha = 0.08f))
+            .clickable(onClick = onClick)
+            .defaultMinSize(minWidth = 64.dp, minHeight = 44.dp)
+            .padding(horizontal = 20.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, style = MaterialTheme.typography.labelLarge, color = Ink)
     }
 }
 
 @Composable
-private fun SheetButton(label: String, onClick: () -> Unit) {
-    TextButton(onClick = onClick, modifier = Modifier.defaultMinSize(minWidth = 56.dp, minHeight = 48.dp)) {
-        Text(label, style = MaterialTheme.typography.titleMedium, color = Muted)
+private fun SkipChip(forward: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .size(64.dp)
+            .clip(CircleShape)
+            .background(Ink.copy(alpha = 0.08f))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        SkipGlyph(forward)
+    }
+}
+
+/**
+ * Circular skip arrow with the seconds inside; the material glyph lives in the
+ * extended icon set, which is not worth pulling in for two icons.
+ */
+@Composable
+private fun SkipGlyph(forward: Boolean) {
+    Box(contentAlignment = Alignment.Center) {
+        Canvas(
+            Modifier
+                .size(34.dp)
+                // The back glyph is the forward glyph mirrored.
+                .scale(scaleX = if (forward) 1f else -1f, scaleY = 1f),
+        ) {
+            val stroke = 2.dp.toPx()
+            val r = size.minDimension / 2f - 5.dp.toPx()
+            // Arc with a gap at the top; the arrowhead sits on the leading edge.
+            drawArc(
+                color = Ink,
+                startAngle = -75f,
+                sweepAngle = 300f,
+                useCenter = false,
+                topLeft = Offset(center.x - r, center.y - r),
+                size = Size(2 * r, 2 * r),
+                style = Stroke(stroke, cap = StrokeCap.Round),
+            )
+            val angle = Math.toRadians(-75.0)
+            val tip = Offset(
+                center.x + r * cos(angle).toFloat(),
+                center.y + r * sin(angle).toFloat(),
+            )
+            val tangent = Offset(-sin(angle).toFloat(), cos(angle).toFloat())
+            val radial = Offset(cos(angle).toFloat(), sin(angle).toFloat())
+            val head = 5.dp.toPx()
+            drawPath(
+                Path().apply {
+                    moveTo(tip.x + tangent.x * head, tip.y + tangent.y * head)
+                    lineTo(tip.x + radial.x * head * 0.8f, tip.y + radial.y * head * 0.8f)
+                    lineTo(tip.x - radial.x * head * 0.8f, tip.y - radial.y * head * 0.8f)
+                    close()
+                },
+                Ink,
+            )
+        }
+        Text("10", style = MaterialTheme.typography.labelMedium, color = Ink)
     }
 }
 
 /** Two bars; the core icon set has no pause glyph and one is not worth a library. */
 @Composable
 private fun PauseGlyph(accent: Color) {
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        Box(Modifier.size(width = 8.dp, height = 30.dp).clip(RoundedCornerShape(2.dp)).background(accent))
-        Box(Modifier.size(width = 8.dp, height = 30.dp).clip(RoundedCornerShape(2.dp)).background(accent))
+    Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+        Box(Modifier.size(width = 9.dp, height = 32.dp).clip(RoundedCornerShape(2.dp)).background(accent))
+        Box(Modifier.size(width = 9.dp, height = 32.dp).clip(RoundedCornerShape(2.dp)).background(accent))
     }
 }
 
