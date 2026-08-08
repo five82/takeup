@@ -103,6 +103,24 @@ fun imageUrlAtWidth(url: String, pixels: Int): String {
     return "$url${separator}width=$bucket"
 }
 
+/**
+ * A hand-curated shelf Loom groups movies into - a franchise, a studio, a
+ * director. Loom resolves the members and serves them alongside the shelf, so a
+ * collection is complete the moment it arrives and never fetches on its own.
+ */
+data class LoomCollection(
+    val slug: String,
+    val title: String,
+    val items: List<LoomItem>,
+) {
+    // Card artwork for the shelf. A backdrop is preferred because the card is
+    // landscape and crops a poster badly; a poster is the fallback for a shelf
+    // whose members all lack one.
+    fun artworkUrl(serverUrl: String): String? =
+        items.firstNotNullOfOrNull { it.backdropUrl(serverUrl) }
+            ?: items.firstNotNullOfOrNull { it.posterUrl(serverUrl) }
+}
+
 data class Genre(
     val id: Long,
     val name: String,
@@ -194,4 +212,5 @@ data class HomeContent(
     val movies: List<LoomItem>,
     val shorts: List<LoomItem>,
     val shows: List<LoomItem>,
+    val collections: List<LoomCollection>,
 )

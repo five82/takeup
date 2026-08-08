@@ -119,6 +119,7 @@ class SeedArtworkUrlTest {
             movies = movies,
             shorts = emptyList(),
             shows = shows,
+            collections = emptyList(),
         ),
     )
 

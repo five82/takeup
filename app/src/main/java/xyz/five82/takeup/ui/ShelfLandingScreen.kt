@@ -46,23 +46,40 @@ import xyz.five82.takeup.R
 import xyz.five82.takeup.data.LoomItem
 import xyz.five82.takeup.ui.theme.heroBottomScrim
 
+/**
+ * A named shelf of movies: a hero drawn from its first artwork-bearing title
+ * over a grid of the rest. Genres and collections differ only in where the list
+ * comes from, so both land here.
+ *
+ * A collection arrives complete with the home load and cannot fail, which is why
+ * the loading and error parameters default to having nothing to say.
+ *
+ * Omitting [onPlayItem] leaves the hero a plain banner. The featured title is in
+ * the grid below like any other, so a shelf that wants its header to name the
+ * shelf rather than push one of its titles loses no way in.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun GenreLandingScreen(
-    state: MainUiState.GenreLanding,
+internal fun ShelfLandingScreen(
+    serverUrl: String,
+    title: String,
+    items: List<LoomItem>,
+    emptyMessage: String,
     onBack: () -> Unit,
-    onRetry: () -> Unit,
     onItemSelected: (LoomItem) -> Unit,
-    onPlayItem: (LoomItem) -> Unit,
+    onPlayItem: ((LoomItem) -> Unit)? = null,
+    isLoading: Boolean = false,
+    error: String? = null,
+    onRetry: () -> Unit = {},
 ) {
     BackHandler(onBack = onBack)
     UseLightStatusBarIcons()
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
-    val featured = state.items.firstOrNull { it.backdropUrl(state.serverUrl) != null }
-        ?: state.items.firstOrNull()
+    val featured = items.firstOrNull { it.backdropUrl(serverUrl) != null }
+        ?: items.firstOrNull()
     Box(Modifier.fillMaxSize()) {
     AmbientGlow(
-        url = featured?.let { it.backdropUrl(state.serverUrl) ?: it.posterUrl(state.serverUrl) },
+        url = featured?.let { it.backdropUrl(serverUrl) ?: it.posterUrl(serverUrl) },
     )
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -76,7 +93,7 @@ internal fun GenreLandingScreen(
                         exit = fadeOut(MaterialTheme.motionScheme.fastEffectsSpec()),
                     ) {
                         Text(
-                            text = state.genre.name,
+                            text = title,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             style = MaterialTheme.typography.titleMediumEmphasized,
@@ -99,8 +116,8 @@ internal fun GenreLandingScreen(
         },
     ) { contentPadding ->
         when {
-            state.error != null && state.items.isEmpty() -> FullScreenError(
-                message = state.error,
+            error != null && items.isEmpty() -> FullScreenError(
+                message = error,
                 onRetry = onRetry,
                 modifier = Modifier.padding(contentPadding),
             )
@@ -117,27 +134,27 @@ internal fun GenreLandingScreen(
             ) {
                 featured?.let { item ->
                     item(span = { GridItemSpan(maxLineSpan) }) {
-                        GenreHero(
-                            serverUrl = state.serverUrl,
-                            genreName = state.genre.name,
-                            itemCount = state.items.size,
+                        ShelfHero(
+                            serverUrl = serverUrl,
+                            shelfTitle = title,
+                            itemCount = items.size,
                             item = item,
-                            onPlay = { onPlayItem(item) },
+                            onPlay = onPlayItem?.let { play -> { play(item) } },
                             onDetails = { onItemSelected(item) },
                         )
                     }
                 }
-                state.error?.let { error ->
+                error?.let { message ->
                     item(span = { GridItemSpan(maxLineSpan) }) {
-                        ErrorCard(message = error, onRetry = onRetry)
+                        ErrorCard(message = message, onRetry = onRetry)
                     }
                 }
-                if (state.isLoading && state.items.isEmpty()) {
+                if (isLoading && items.isEmpty()) {
                     items(6) { PosterCardPlaceholder() }
-                } else if (state.items.isEmpty() && state.error == null) {
+                } else if (items.isEmpty() && error == null) {
                     item(span = { GridItemSpan(maxLineSpan) }) {
                         Text(
-                            text = stringResource(R.string.no_movies_for_genre),
+                            text = emptyMessage,
                             modifier = Modifier
                                 .padding(contentPadding)
                                 .padding(12.dp),
@@ -145,9 +162,9 @@ internal fun GenreLandingScreen(
                         )
                     }
                 }
-                items(state.items, key = { it.id }) { item ->
+                items(items, key = { it.id }) { item ->
                     MediaCard(
-                        serverUrl = state.serverUrl,
+                        serverUrl = serverUrl,
                         item = item,
                         onClick = { onItemSelected(item) },
                         modifier = Modifier.fillMaxWidth(),
@@ -160,14 +177,17 @@ internal fun GenreLandingScreen(
     }
 }
 
-/** Featured title for the genre: full-bleed backdrop with the hero CTA pair. */
+/**
+ * Featured title for the shelf: full-bleed backdrop, with the CTA pair only when
+ * [onPlay] is given. Without it the hero is a banner and nothing is tappable.
+ */
 @Composable
-private fun GenreHero(
+private fun ShelfHero(
     serverUrl: String,
-    genreName: String,
+    shelfTitle: String,
     itemCount: Int,
     item: LoomItem,
-    onPlay: () -> Unit,
+    onPlay: (() -> Unit)?,
     onDetails: () -> Unit,
 ) {
     Box(
@@ -201,7 +221,7 @@ private fun GenreHero(
                         R.plurals.title_count,
                         itemCount,
                         itemCount,
-                    ).let { "$genreName · $it" },
+                    ).let { "$shelfTitle · $it" },
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                     style = MaterialTheme.typography.labelMediumEmphasized,
                 )
@@ -221,6 +241,7 @@ private fun GenreHero(
                     style = MaterialTheme.typography.headlineMediumEmphasized,
                 )
             }
+            if (onPlay != null) {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Button(
                     onClick = onPlay,
@@ -256,6 +277,7 @@ private fun GenreHero(
                         Text(stringResource(R.string.view_details))
                     }
                 }
+            }
             }
         }
     }

@@ -35,6 +35,7 @@ internal class LoomRepository(
             movies = client.movies(server),
             shorts = client.shorts(server),
             shows = client.shows(server),
+            collections = client.collections(server),
         )
     }
 

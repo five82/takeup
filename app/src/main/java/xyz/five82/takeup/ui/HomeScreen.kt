@@ -51,6 +51,7 @@ import xyz.five82.takeup.R
 import xyz.five82.takeup.data.DownloadEntry
 import xyz.five82.takeup.data.Genre
 import xyz.five82.takeup.data.GenreSummary
+import xyz.five82.takeup.data.LoomCollection
 import xyz.five82.takeup.data.LoomItem
 import xyz.five82.takeup.data.downloadedRowItems
 import xyz.five82.takeup.ui.theme.heroBottomScrim
@@ -82,6 +83,8 @@ internal fun HomeScreen(
     onPlayItem: (LoomItem) -> Unit,
     onGenreSelected: (Genre) -> Unit,
     onOpenGenreHub: () -> Unit,
+    onCollectionSelected: (LoomCollection) -> Unit,
+    onOpenCollectionHub: () -> Unit,
     onHeroSeedUrlChanged: (String?) -> Unit,
 ) {
     UseLightStatusBarIcons()
@@ -108,6 +111,8 @@ internal fun HomeScreen(
                 onPlayItem = onPlayItem,
                 onGenreSelected = onGenreSelected,
                 onOpenGenreHub = onOpenGenreHub,
+                onCollectionSelected = onCollectionSelected,
+                onOpenCollectionHub = onOpenCollectionHub,
                 onHeroSeedUrlChanged = onHeroSeedUrlChanged,
             )
         }
@@ -171,6 +176,8 @@ private fun HomeList(
     onPlayItem: (LoomItem) -> Unit,
     onGenreSelected: (Genre) -> Unit,
     onOpenGenreHub: () -> Unit,
+    onCollectionSelected: (LoomCollection) -> Unit,
+    onOpenCollectionHub: () -> Unit,
     onHeroSeedUrlChanged: (String?) -> Unit,
 ) {
     val content = state.content
@@ -285,6 +292,20 @@ private fun HomeList(
                         serverUrl = state.serverUrl,
                         items = content.recentlyAdded,
                         onItemSelected = onItemSelected,
+                        modifier = Modifier.staggeredEntrance(entrance),
+                    )
+                }
+            }
+            // Above the generated rows: a curated shelf is the most interesting
+            // thing on Home that the user did not already ask for.
+            if (content.collections.isNotEmpty()) {
+                val entrance = entranceIndex++
+                item(key = "collections") {
+                    CollectionRow(
+                        serverUrl = state.serverUrl,
+                        collections = content.collections,
+                        onCollectionSelected = onCollectionSelected,
+                        onOpenCollectionHub = onOpenCollectionHub,
                         modifier = Modifier.staggeredEntrance(entrance),
                     )
                 }
@@ -513,6 +534,54 @@ private fun HeroItem(
                         Text(stringResource(R.string.view_details))
                     }
                 }
+            }
+        }
+    }
+}
+
+/** Horizontal strip of collection cards with a "See all" entry into the hub. */
+@Composable
+private fun CollectionRow(
+    serverUrl: String,
+    collections: List<LoomCollection>,
+    onCollectionSelected: (LoomCollection) -> Unit,
+    onOpenCollectionHub: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.collections),
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.titleLargeEmphasized,
+            )
+            TextButton(
+                onClick = onOpenCollectionHub,
+                shapes = ButtonDefaults.shapes(),
+            ) {
+                Text(stringResource(R.string.see_all))
+            }
+        }
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            items(collections.take(8), key = { it.slug }) { collection ->
+                CollectionCard(
+                    serverUrl = serverUrl,
+                    collection = collection,
+                    onClick = { onCollectionSelected(collection) },
+                    modifier = Modifier
+                        .width(200.dp)
+                        .height(112.dp),
+                )
             }
         }
     }

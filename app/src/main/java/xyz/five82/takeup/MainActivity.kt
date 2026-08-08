@@ -65,9 +65,9 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import xyz.five82.takeup.ui.ArtworkScreen
 import xyz.five82.takeup.ui.SettingsScreen
+import xyz.five82.takeup.ui.CollectionHubScreen
 import xyz.five82.takeup.ui.DetailsScreen
 import xyz.five82.takeup.ui.GenreHubScreen
-import xyz.five82.takeup.ui.GenreLandingScreen
 import xyz.five82.takeup.ui.HomeScreen
 import xyz.five82.takeup.ui.LibraryListScreen
 import xyz.five82.takeup.ui.LocalNetworkPermissionScreen
@@ -82,6 +82,7 @@ import xyz.five82.takeup.ui.PlaybackScreen
 import xyz.five82.takeup.ui.topDestination
 import xyz.five82.takeup.ui.SearchScreen
 import xyz.five82.takeup.ui.SeasonScreen
+import xyz.five82.takeup.ui.ShelfLandingScreen
 import xyz.five82.takeup.ui.ShowDetailsScreen
 import xyz.five82.takeup.ui.seedArtworkUrl
 import xyz.five82.takeup.ui.theme.TakeupTheme
@@ -283,6 +284,8 @@ private fun TakeupApp(
                 onPlayItem = viewModel::playHomeItem,
                 onGenreSelected = viewModel::openGenre,
                 onOpenGenreHub = viewModel::openGenreHub,
+                onCollectionSelected = viewModel::openCollection,
+                onOpenCollectionHub = viewModel::openCollectionHub,
                 onHeroSeedUrlChanged = onHeroSeedUrlChanged,
             )
         }
@@ -316,12 +319,34 @@ private fun TakeupApp(
         is MainUiState.GenreLanding -> saveableStateHolder.SaveableStateProvider(
             key = "genre:${current.genre.id}",
         ) {
-            GenreLandingScreen(
-                state = current,
+            ShelfLandingScreen(
+                serverUrl = current.serverUrl,
+                title = current.genre.name,
+                items = current.items,
+                emptyMessage = stringResource(R.string.no_movies_for_genre),
                 onBack = viewModel::backFromGenreLanding,
-                onRetry = viewModel::retryGenreLanding,
                 onItemSelected = viewModel::selectGenreItem,
                 onPlayItem = viewModel::playGenreItem,
+                isLoading = current.isLoading,
+                error = current.error,
+                onRetry = viewModel::retryGenreLanding,
+            )
+        }
+        is MainUiState.CollectionHub -> CollectionHubScreen(
+            state = current,
+            onBack = viewModel::backFromCollectionHub,
+            onCollectionSelected = viewModel::openCollection,
+        )
+        is MainUiState.CollectionLanding -> saveableStateHolder.SaveableStateProvider(
+            key = "collection:${current.collection.slug}",
+        ) {
+            ShelfLandingScreen(
+                serverUrl = current.serverUrl,
+                title = current.collection.title,
+                items = current.collection.items,
+                emptyMessage = stringResource(R.string.no_movies_for_collection),
+                onBack = viewModel::backFromCollectionLanding,
+                onItemSelected = viewModel::selectCollectionItem,
             )
         }
         is MainUiState.ShowDetails -> saveableStateHolder.SaveableStateProvider(

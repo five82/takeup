@@ -46,6 +46,8 @@
     <string name="no_movies_for_genre">Loom did not return any movies for this genre.</string>
     <string name="browse_by_genre">Browse by genre</string>
     <string name="genres">Genres</string>
+    <string name="collections">Collections</string>
+    <string name="no_movies_for_collection">Loom did not return any titles for this collection.</string>
     <string name="genre_spotlight">%1$s spotlight</string>
     <string name="loading_genres">Loading genres&#8230;</string>
     <string name="no_genres">Loom did not return any genres.</string>

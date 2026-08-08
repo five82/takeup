@@ -20,6 +20,7 @@ import xyz.five82.takeup.data.DownloadStore
 import xyz.five82.takeup.data.Genre
 import xyz.five82.takeup.data.GenreSummary
 import xyz.five82.takeup.data.HomeContent
+import xyz.five82.takeup.data.LoomCollection
 import xyz.five82.takeup.data.LoomHttpException
 import xyz.five82.takeup.data.LoomItem
 import xyz.five82.takeup.data.LoomRepository
@@ -47,6 +48,7 @@ internal enum class BrowseOrigin {
     Season,
     Search,
     Genre,
+    Collection,
 }
 
 // Destinations reachable from the floating navigation toolbar.
@@ -126,6 +128,18 @@ internal sealed interface MainUiState {
         val items: List<LoomItem> = emptyList(),
         val isLoading: Boolean = false,
         val error: String? = null,
+    ) : MainUiState
+
+    // Both collection screens are served entirely from the shelves the home load
+    // already carries, so neither one loads or can fail.
+    data class CollectionHub(
+        val serverUrl: String,
+        val collections: List<LoomCollection> = emptyList(),
+    ) : MainUiState
+
+    data class CollectionLanding(
+        val serverUrl: String,
+        val collection: LoomCollection,
     ) : MainUiState
 
     data class ShowDetails(
@@ -246,6 +260,7 @@ internal fun seedArtworkUrl(state: MainUiState): String? = when (state) {
     is MainUiState.GenreLanding -> state.items.firstOrNull()?.let {
         it.backdropUrl(state.serverUrl) ?: it.posterUrl(state.serverUrl)
     }
+    is MainUiState.CollectionLanding -> state.collection.artworkUrl(state.serverUrl)
     // The player accent follows the item being watched.
     is MainUiState.Playback ->
         state.item.backdropUrl(state.serverUrl) ?: state.item.posterUrl(state.serverUrl)
@@ -259,11 +274,12 @@ internal val EMPTY_HOME_CONTENT = HomeContent(
     movies = emptyList(),
     shorts = emptyList(),
     shows = emptyList(),
+    collections = emptyList(),
 )
 
 internal fun HomeContent.isEmpty(): Boolean =
     continueWatching.isEmpty() && nextUp.isEmpty() && recentlyAdded.isEmpty() &&
-        movies.isEmpty() && shorts.isEmpty() && shows.isEmpty()
+        movies.isEmpty() && shorts.isEmpty() && shows.isEmpty() && collections.isEmpty()
 
 internal fun nextEpisodeAfter(episodes: List<LoomItem>, itemId: Long): LoomItem? {
     val index = episodes.indexOfFirst { it.id == itemId }
@@ -338,6 +354,10 @@ internal class MainViewModel(
     // and the return state remembers where the landing was opened from.
     private var genreLandingContent: Pair<Genre, List<LoomItem>>? = null
     private var genreReturnState: MainUiState? = null
+    // The shelf on screen is named rather than held, so returning to it rebuilds
+    // from the cached collections and picks up any watched state written since.
+    private var collectionLandingSlug: String? = null
+    private var collectionReturnState: MainUiState? = null
 
     fun start() {
         if (started) return
@@ -394,6 +414,8 @@ internal class MainViewModel(
                     movieGenreItems = null
                     genreLandingContent = null
                     genreReturnState = null
+                    collectionLandingSlug = null
+                    collectionReturnState = null
                     showContent = null
                     seasonContent = null
                     loadHome(it)
@@ -600,6 +622,52 @@ internal class MainViewModel(
         } else {
             startPlayback(state.serverUrl, item, BrowseOrigin.Genre)
         }
+    }
+
+    fun openCollectionHub() {
+        val serverUrl = currentServerUrl() ?: return
+        activeJob?.cancel()
+        _uiState.value = MainUiState.CollectionHub(
+            serverUrl = serverUrl,
+            collections = homeContent.collections,
+        )
+    }
+
+    fun backFromCollectionHub() {
+        val state = _uiState.value as? MainUiState.CollectionHub ?: return
+        activeJob?.cancel()
+        _uiState.value = MainUiState.Home(serverUrl = state.serverUrl, content = homeContent)
+    }
+
+    // Opens a shelf from the Home row or the hub, remembering which so back
+    // returns there.
+    fun openCollection(collection: LoomCollection) {
+        val serverUrl = currentServerUrl() ?: return
+        val current = _uiState.value
+        if (current !is MainUiState.CollectionLanding) {
+            collectionReturnState = current
+        }
+        activeJob?.cancel()
+        collectionLandingSlug = collection.slug
+        _uiState.value = MainUiState.CollectionLanding(
+            serverUrl = serverUrl,
+            collection = collection,
+        )
+    }
+
+    fun backFromCollectionLanding() {
+        val state = _uiState.value as? MainUiState.CollectionLanding ?: return
+        activeJob?.cancel()
+        _uiState.value = collectionReturnState
+            ?: MainUiState.Home(serverUrl = state.serverUrl, content = homeContent)
+        collectionReturnState = null
+    }
+
+    // Loom builds collections from movies alone, so no member ever opens a show.
+    // A shelf offers no play of its own; playback starts from the title's details.
+    fun selectCollectionItem(item: LoomItem) {
+        if (_uiState.value !is MainUiState.CollectionLanding) return
+        selectItem(item, BrowseOrigin.Collection)
     }
 
     fun updateSearchQuery(query: String) {
@@ -1467,6 +1535,12 @@ internal class MainViewModel(
                     items = items,
                 )
             } ?: MainUiState.Home(serverUrl = serverUrl, content = homeContent)
+            // Rebuilt from the cached shelves rather than a snapshot, so a title
+            // marked watched in details comes back badged.
+            BrowseOrigin.Collection -> collectionLandingSlug
+                ?.let { slug -> homeContent.collections.firstOrNull { it.slug == slug } }
+                ?.let { MainUiState.CollectionLanding(serverUrl = serverUrl, collection = it) }
+                ?: MainUiState.Home(serverUrl = serverUrl, content = homeContent)
         }
     }
 
@@ -1522,6 +1596,9 @@ internal class MainViewModel(
             movies = homeContent.movies.map(transform),
             shorts = homeContent.shorts.map(transform),
             shows = homeContent.shows.map(transform),
+            collections = homeContent.collections.map { collection ->
+                collection.copy(items = collection.items.map(transform))
+            },
         )
         movieGenreItems = movieGenreItems?.let { it.first to it.second.map(transform) }
         showContent = showContent?.let {
@@ -1544,6 +1621,9 @@ internal class MainViewModel(
             ?: homeContent.continueWatching.firstOrNull { it.id == itemId }
             ?: homeContent.nextUp.firstOrNull { it.id == itemId }
             ?: homeContent.recentlyAdded.firstOrNull { it.id == itemId }
+            ?: homeContent.collections.firstNotNullOfOrNull { collection ->
+                collection.items.firstOrNull { it.id == itemId }
+            }
 
     private fun HomeContent.items(kind: LibraryKind): List<LoomItem> = when (kind) {
         LibraryKind.Movies -> movies
@@ -1565,6 +1645,8 @@ internal class MainViewModel(
         is MainUiState.Playback -> state.serverUrl
         is MainUiState.GenreHub -> state.serverUrl
         is MainUiState.GenreLanding -> state.serverUrl
+        is MainUiState.CollectionHub -> state.serverUrl
+        is MainUiState.CollectionLanding -> state.serverUrl
         else -> null
     }
 

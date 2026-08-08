@@ -29,6 +29,11 @@ internal class LoomClient(
     suspend fun genres(server: ServerAddress): List<GenreSummary> =
         LoomJson.genres(request(server.api("api/v1/genres")))
 
+    // Loom serves every shelf with its members in one unpaged response, so the
+    // collections row and each shelf behind it cost a single request.
+    suspend fun collections(server: ServerAddress): List<LoomCollection> =
+        LoomJson.collections(request(server.api("api/v1/collections")))
+
     suspend fun search(server: ServerAddress, query: String): List<LoomItem> {
         val trimmed = query.trim()
         require(trimmed.isNotEmpty())

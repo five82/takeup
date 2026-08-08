@@ -489,6 +489,43 @@ class LoomJsonTest {
         assertEquals(listOf(0L, 300341L), item.mediaChapterStartsMs)
     }
 
+    // A collection nests its resolved members under the same "items" key the
+    // response itself uses, so the inner list must not be read as the outer one.
+    @Test
+    fun `parses collections with their members`() {
+        val collections = LoomJson.collections(
+            """
+            {
+              "items": [
+                {
+                  "slug": "star-wars",
+                  "title": "Star Wars",
+                  "items": [
+                    {"id": 11, "kind": "movie", "title": "Star Wars", "year": 1977},
+                    {"id": 12, "kind": "movie", "title": "The Empire Strikes Back", "year": 1980}
+                  ]
+                },
+                {
+                  "slug": "kill-bill",
+                  "title": "Kill Bill",
+                  "items": [
+                    {"id": 24, "kind": "movie", "title": "Kill Bill: Vol. 1", "year": 2003}
+                  ]
+                }
+              ]
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals(listOf("star-wars", "kill-bill"), collections.map { it.slug })
+        assertEquals("Star Wars", collections.first().title)
+        assertEquals(
+            listOf("Star Wars", "The Empire Strikes Back"),
+            collections.first().items.map { it.title },
+        )
+        assertEquals(1977, collections.first().items.first().year)
+    }
+
     @Test
     fun `rejects a playback response without a media version tag`() {
         assertThrows(JsonParseException::class.java) {

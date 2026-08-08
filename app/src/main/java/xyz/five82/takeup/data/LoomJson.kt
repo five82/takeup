@@ -1,5 +1,6 @@
 package xyz.five82.takeup.data
 
+import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import com.google.gson.JsonParseException
 import com.google.gson.JsonParser
@@ -12,26 +13,25 @@ internal object LoomJson {
         }
     }
 
-    fun items(body: String): List<LoomItem> {
-        val value = objectFrom(body).get("items")
-            ?: throw JsonParseException("Loom response is missing items")
-        if (value.isJsonNull) return emptyList()
-        if (!value.isJsonArray) {
-            throw JsonParseException("Loom response items must be an array")
-        }
-        return value.asJsonArray.map { item(it.asJsonObject) }
-    }
+    fun items(body: String): List<LoomItem> =
+        itemsOf(objectFrom(body)).map { item(it.asJsonObject) }
 
     fun item(body: String): LoomItem = item(objectFrom(body))
 
-    fun genres(body: String): List<GenreSummary> {
-        val value = objectFrom(body).get("items")
-            ?: throw JsonParseException("Loom response is missing items")
-        if (value.isJsonNull) return emptyList()
-        if (!value.isJsonArray) {
-            throw JsonParseException("Loom response items must be an array")
+    // Every shelf arrives with its members already resolved, so a collection is
+    // an items array wrapped in a name.
+    fun collections(body: String): List<LoomCollection> =
+        itemsOf(objectFrom(body)).map { element ->
+            val collection = element.asJsonObject
+            LoomCollection(
+                slug = collection.requiredString("slug"),
+                title = collection.requiredString("title"),
+                items = itemsOf(collection).map { item(it.asJsonObject) },
+            )
         }
-        return value.asJsonArray.map { element ->
+
+    fun genres(body: String): List<GenreSummary> =
+        itemsOf(objectFrom(body)).map { element ->
             val genre = element.asJsonObject
             GenreSummary(
                 id = genre.long("id"),
@@ -39,16 +39,9 @@ internal object LoomJson {
                 itemCount = genre.int("item_count"),
             )
         }
-    }
 
-    fun artworkOptions(body: String): List<ArtworkOption> {
-        val value = objectFrom(body).get("items")
-            ?: throw JsonParseException("Loom response is missing items")
-        if (value.isJsonNull) return emptyList()
-        if (!value.isJsonArray) {
-            throw JsonParseException("Loom response items must be an array")
-        }
-        return value.asJsonArray.map { element ->
+    fun artworkOptions(body: String): List<ArtworkOption> =
+        itemsOf(objectFrom(body)).map { element ->
             val option = element.asJsonObject
             ArtworkOption(
                 provider = option.requiredString("provider"),
@@ -60,7 +53,6 @@ internal object LoomJson {
                 selected = option.boolean("selected"),
             )
         }
-    }
 
     fun playback(body: String): PlaybackResponse {
         val root = objectFrom(body)
@@ -192,6 +184,18 @@ internal object LoomJson {
             )
             else -> throw JsonParseException("Loom media contains an unsupported stream kind")
         }
+    }
+
+    // Every list Loom serves - items, genres, artwork options, collections -
+    // arrives under the same "items" key, so they share one unwrapping.
+    private fun itemsOf(value: JsonObject): JsonArray {
+        val items = value.get("items")
+            ?: throw JsonParseException("Loom response is missing items")
+        if (items.isJsonNull) return JsonArray()
+        if (!items.isJsonArray) {
+            throw JsonParseException("Loom response items must be an array")
+        }
+        return items.asJsonArray
     }
 
     private fun objectFrom(body: String): JsonObject = try {

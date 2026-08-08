@@ -80,6 +80,7 @@ class GenreBrowsingTest {
             movies = movies,
             shorts = emptyList(),
             shows = emptyList(),
+            collections = emptyList(),
         ),
     )
 }

@@ -28,6 +28,7 @@ class LoomClientTest {
     private val artworkRequests = CopyOnWriteArrayList<String>()
     private val playedRequests = CopyOnWriteArrayList<String>()
     private val searchQueries = CopyOnWriteArrayList<String>()
+    private val collectionQueries = CopyOnWriteArrayList<String>()
 
     @Before
     fun setUp() {
@@ -211,6 +212,21 @@ class LoomClientTest {
         )
     }
 
+    // Loom serves every shelf resolved in one response, so asking for collections
+    // must stay a single unpaged request no matter how many shelves come back.
+    @Test
+    fun `loads collections with their members in one request`() = runBlocking {
+        val collections = LoomClient().collections(address)
+
+        assertEquals("Star Wars", collections.single().title)
+        assertEquals("star-wars", collections.single().slug)
+        assertEquals(
+            listOf("Star Wars", "The Empire Strikes Back"),
+            collections.single().items.map { it.title },
+        )
+        assertEquals(listOf(""), collectionQueries)
+    }
+
     @Test
     fun `filters movies by genre`() = runBlocking {
         LoomClient().movies(address, genreId = 878)
@@ -225,6 +241,13 @@ class LoomClientTest {
         val response = when (exchange.requestURI.path) {
             "/api/v1/health" -> """{"status":"ok"}"""
             "/api/v1/genres" -> """{"items":[{"id":28,"name":"Action","item_count":12},{"id":878,"name":"Science Fiction","item_count":4}]}"""
+            "/api/v1/collections" -> {
+                collectionQueries += exchange.requestURI.query.orEmpty()
+                """{"items":[{"slug":"star-wars","title":"Star Wars","items":[
+                    {"id":11,"kind":"movie","title":"Star Wars","year":1977},
+                    {"id":12,"kind":"movie","title":"The Empire Strikes Back","year":1980}
+                ]}]}"""
+            }
             "/api/v1/items" -> {
                 if (exchange.requestURI.query.startsWith("library=tv")) {
                     showsQueries += exchange.requestURI.query
