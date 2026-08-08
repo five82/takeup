@@ -2,6 +2,7 @@ package xyz.five82.takeup.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -22,8 +23,14 @@ import kotlin.math.sqrt
 import kotlin.math.tan
 import xyz.five82.takeup.ui.theme.Stage
 
-/** One shallow angle everywhere, so the cut reads as the app's signature. */
-private const val CUT_DEGREES = 6.0
+/** One shallow angle everywhere, so the cut reads as the app's signature.
+ *  Kept this flat so the climb costs the art's bottom-right corner little. */
+private const val CUT_DEGREES = 4.0
+
+/** Art runs this far below the cut's low point, so the wedge always covers
+ *  the art's raw bottom edge while hiding as little of the photo as
+ *  possible. */
+private val CutOverlap = 16.dp
 
 /** How far the woven color washes down from the cut before Stage takes over. */
 private val GlowReach = 140.dp
@@ -52,6 +59,13 @@ fun logoLaneHeight(aspect: Float?): Dp {
  * right, instead of a fade into the stage. The wedge below the cut takes a
  * wash of the title's woven color dissolving into Stage.
  *
+ * The art fills the box's width but ends just below the cut's low point
+ * instead of filling the box, so the wedge hides only a sliver of the
+ * photo's bottom rather than everything down to the box's edge. Callers
+ * keep that frame a narrower shape than the 16:9 art (box height minus
+ * [solidLeft] at least 9/16 of the width), so Crop always fits the photo's
+ * full height and trims the sides only - never the top or bottom.
+ *
  * [solidLeft] is the height of solid ground at the left edge, where titles
  * and logos sit. The cut climbs away from there, so the clearance over
  * left-aligned content only grows to the right.
@@ -64,13 +78,15 @@ fun BiasCutBackdrop(
     modifier: Modifier = Modifier,
     contentDescription: String? = null,
 ) {
-    Box(modifier) {
+    BoxWithConstraints(modifier) {
         if (imageUrl != null) {
             AsyncImage(
                 model = imageUrl,
                 contentDescription = contentDescription,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(maxHeight - solidLeft + CutOverlap),
             )
         }
         // The wedge is painted over the art rather than clipping the image:
