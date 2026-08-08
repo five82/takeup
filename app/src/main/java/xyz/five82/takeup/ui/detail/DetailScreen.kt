@@ -43,6 +43,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,6 +53,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.compose.animation.core.animateDpAsState
@@ -70,7 +72,6 @@ import xyz.five82.takeup.ui.components.BiasCutBackdrop
 import xyz.five82.takeup.ui.components.ErrorState
 import xyz.five82.takeup.ui.components.logoLaneHeight
 import xyz.five82.takeup.ui.components.LoadingState
-import xyz.five82.takeup.ui.components.PersonAvatar
 import xyz.five82.takeup.ui.components.RowLabel
 import xyz.five82.takeup.ui.components.ThreadProgress
 import xyz.five82.takeup.ui.episodeLabel
@@ -639,68 +640,77 @@ private fun ChapterLine(item: Item) {
     )
 }
 
-/** Director line plus a tappable cast row; a tap searches the person. */
+// Loom stores no people photos, so the credits are billing, not headshots:
+// a vertical list of name-over-role cards. Full width means names wrap
+// instead of truncating.
+private const val COLLAPSED_CAST_COUNT = 6
+
+/** Film-style billing, director first; tapping a card searches the person. */
 private fun androidx.compose.foundation.lazy.LazyListScope.creditsSection(nav: NavState, item: Item) {
     val credits = item.credits.orEmpty()
     if (credits.isEmpty()) return
     val director = credits.firstOrNull { it.role == "director" }
     val cast = credits.filter { it.role != "director" }
     item(key = "credits") {
-        Column(Modifier.padding(top = 24.dp)) {
-            RowLabel("Cast", modifier = Modifier.padding(start = 20.dp, bottom = 2.dp))
+        var expanded by rememberSaveable { mutableStateOf(false) }
+        Column(
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(top = 24.dp, start = 20.dp, end = 20.dp),
+        ) {
+            RowLabel("Cast", modifier = Modifier.padding(bottom = 4.dp))
             if (director != null) {
+                CreditCard(director.name, "Director", nav)
+            }
+            val visible = if (expanded) cast else cast.take(COLLAPSED_CAST_COUNT)
+            visible.forEach { credit ->
+                CreditCard(credit.name, credit.character, nav)
+            }
+            if (!expanded && cast.size > COLLAPSED_CAST_COUNT) {
                 Text(
-                    "Directed by ${director.name}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Ink.copy(alpha = 0.9f),
-                    // Outer/inner padding split keeps the text at the usual
-                    // 20dp inset while the tap area reaches 48dp tall.
+                    "All ${cast.size} cast members",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = Muted,
+                    // Outer/inner padding split keeps the text at the card
+                    // inset while the tap area reaches 48dp tall.
                     modifier = Modifier
-                        .padding(start = 12.dp)
+                        .padding(start = 8.dp)
                         .clip(RoundedCornerShape(6.dp))
-                        .clickable { nav.push(Screen.Search(director.name)) }
+                        .clickable { expanded = true }
                         .padding(horizontal = 8.dp, vertical = 12.dp),
                 )
             }
-            if (cast.isNotEmpty()) {
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 20.dp),
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                    modifier = Modifier.padding(top = 12.dp),
-                ) {
-                    items(cast, key = { "${it.personId}-${it.character}" }) { credit ->
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier
-                                .width(72.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable { nav.push(Screen.Search(credit.name)) }
-                                .padding(vertical = 4.dp),
-                        ) {
-                            PersonAvatar(credit.name)
-                            Text(
-                                credit.name,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Ink,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                modifier = Modifier.padding(top = 6.dp),
-                            )
-                            if (!credit.character.isNullOrEmpty()) {
-                                Text(
-                                    credit.character,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = Muted,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                )
-                            }
-                        }
-                    }
-                }
-            }
+        }
+    }
+}
+
+/** One person on the bill: name over role, on a card shaped to look tappable. */
+@Composable
+private fun CreditCard(name: String, role: String?, nav: NavState) {
+    Column(
+        verticalArrangement = Arrangement.Center,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(Surface1)
+            .border(1.dp, Line, RoundedCornerShape(12.dp))
+            .clickable { nav.push(Screen.Search(name)) }
+            .defaultMinSize(minHeight = 48.dp)
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+    ) {
+        // The scale jumps from 16sp body to 20sp title, so the bill sizes
+        // its own type: one step up from body, role a step up from label.
+        Text(
+            name,
+            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 18.sp, lineHeight = 25.sp),
+            color = Ink,
+        )
+        if (!role.isNullOrEmpty()) {
+            Text(
+                role,
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 13.sp, lineHeight = 17.sp),
+                color = Muted,
+                modifier = Modifier.padding(top = 1.dp),
+            )
         }
     }
 }

@@ -12,7 +12,6 @@ import xyz.five82.takeup.ui.audioLayout
 import xyz.five82.takeup.ui.episodeLabel
 import xyz.five82.takeup.ui.formatClock
 import xyz.five82.takeup.ui.formatRuntime
-import xyz.five82.takeup.ui.initials
 import xyz.five82.takeup.ui.nextEpisodeAfter
 import xyz.five82.takeup.ui.progressFraction
 import xyz.five82.takeup.ui.remainingLabel
@@ -95,12 +94,5 @@ class FormatTest {
     fun chapterNameFallsBackToNumber() {
         assertEquals("Docking", xyz.five82.takeup.ui.player.chapterName(Chapter(index = 13, title = "Docking")))
         assertEquals("Chapter 14", xyz.five82.takeup.ui.player.chapterName(Chapter(index = 13, title = null)))
-    }
-
-    @Test
-    fun initialsTakeFirstTwoNames() {
-        assertEquals("CT", initials("Charlize Theron"))
-        assertEquals("H", initials("Hugo"))
-        assertEquals("", initials(""))
     }
 }

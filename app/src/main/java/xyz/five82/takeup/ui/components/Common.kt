@@ -13,9 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -30,7 +28,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import xyz.five82.takeup.ui.initials
 import xyz.five82.takeup.ui.theme.Amber
 import xyz.five82.takeup.ui.theme.Ember
 import xyz.five82.takeup.ui.theme.Ink
@@ -113,24 +110,6 @@ fun RowLabel(text: String, color: Color = Muted, modifier: Modifier = Modifier) 
         color = color,
         modifier = modifier,
     )
-}
-
-/** Initials avatar for cast members; Loom stores no people photos. */
-@Composable
-fun PersonAvatar(name: String, size: Int = 56) {
-    Box(
-        Modifier
-            .size(size.dp)
-            .clip(CircleShape)
-            .background(Brush.linearGradient(listOf(Line, Color(0xFF171C2B)))),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            initials(name),
-            style = MaterialTheme.typography.titleMedium,
-            color = Muted,
-        )
-    }
 }
 
 @Composable

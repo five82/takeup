@@ -140,7 +140,3 @@ fun nextEpisodeAfter(episodes: List<Item>, currentId: Long): Item? {
     return ordered.getOrNull(index + 1)
 }
 
-/** Person initials for cast avatars: "Charlize Theron" -> "CT". */
-fun initials(name: String): String =
-    name.split(' ').filter { it.isNotEmpty() }.take(2).map { it.first().uppercaseChar() }
-        .joinToString("")
