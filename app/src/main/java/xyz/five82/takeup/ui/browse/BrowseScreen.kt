@@ -42,12 +42,14 @@ import xyz.five82.takeup.ui.components.LoadingState
 import xyz.five82.takeup.ui.components.PosterCard
 import xyz.five82.takeup.ui.components.RowLabel
 import xyz.five82.takeup.ui.components.navPillClearance
+import xyz.five82.takeup.ui.components.shadowWeave
 import xyz.five82.takeup.ui.posterUrl
 import xyz.five82.takeup.ui.takeupViewModel
 import xyz.five82.takeup.ui.theme.Ink
 import xyz.five82.takeup.ui.theme.Muted
 import xyz.five82.takeup.ui.theme.Violet
 import xyz.five82.takeup.ui.theme.genreThread
+import xyz.five82.takeup.ui.theme.rememberWovenThreads
 
 data class BrowseState(
     val loading: Boolean = true,
@@ -98,7 +100,11 @@ fun BrowseScreen(repository: LoomRepository, nav: NavState, active: Boolean) {
     }
 
     val state = model.state
-    Column(Modifier.fillMaxSize().statusBarsPadding()) {
+    // Shadow weave: the first collection's cover casts its colors into the
+    // top of the screen; violet holds the room until it decodes.
+    val lead = state.collections.firstOrNull()?.items?.firstOrNull()
+    val swatches = rememberWovenThreads(lead?.id ?: 0L, lead?.let { repository.api.posterUrl(it, 240) })
+    Column(Modifier.fillMaxSize().shadowWeave(swatches, fallback = Violet).statusBarsPadding()) {
         Text(
             "Browse",
             style = MaterialTheme.typography.displaySmall,

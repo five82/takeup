@@ -40,12 +40,14 @@ import xyz.five82.takeup.ui.components.EmptyState
 import xyz.five82.takeup.ui.components.ErrorState
 import xyz.five82.takeup.ui.components.LoadingState
 import xyz.five82.takeup.ui.components.PosterCard
+import xyz.five82.takeup.ui.components.shadowWeave
 import xyz.five82.takeup.ui.posterUrl
 import xyz.five82.takeup.ui.progressFraction
 import xyz.five82.takeup.ui.takeupViewModel
 import xyz.five82.takeup.ui.theme.Ink
 import xyz.five82.takeup.ui.theme.Violet
 import xyz.five82.takeup.ui.theme.genreThread
+import xyz.five82.takeup.ui.theme.rememberWovenThreads
 
 /** All movies in one genre, pushed from a Browse chip. */
 @Composable
@@ -112,7 +114,11 @@ private fun ItemGridScreen(
     LaunchedEffect(Unit) { model.refresh() }
 
     val state = model.state
-    Column(Modifier.fillMaxSize().statusBarsPadding()) {
+    // Shadow weave: the grid's lead poster casts its colors into the top of
+    // the screen; the grid's accent holds the room until it decodes.
+    val lead = state.items.firstOrNull()
+    val swatches = rememberWovenThreads(lead?.id ?: 0L, lead?.let { repository.api.posterUrl(it, 240) })
+    Column(Modifier.fillMaxSize().shadowWeave(swatches, fallback = accent).statusBarsPadding()) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp, end = 20.dp)) {
             IconButton(onClick = { nav.pop() }) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Ink)

@@ -1,6 +1,5 @@
 package xyz.five82.takeup.ui.settings
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -41,12 +40,14 @@ import xyz.five82.takeup.api.ScanStatus
 import xyz.five82.takeup.data.LoomRepository
 import xyz.five82.takeup.ui.NavState
 import xyz.five82.takeup.ui.components.RowLabel
+import xyz.five82.takeup.ui.components.threeThreads
 import xyz.five82.takeup.ui.takeupViewModel
 import xyz.five82.takeup.ui.theme.Amber
+import xyz.five82.takeup.ui.theme.Ember
 import xyz.five82.takeup.ui.theme.Ink
 import xyz.five82.takeup.ui.theme.Muted
-import xyz.five82.takeup.ui.theme.Stage
 import xyz.five82.takeup.ui.theme.Teal
+import xyz.five82.takeup.ui.theme.Violet
 
 class SettingsViewModel(private val repository: LoomRepository) : ViewModel() {
     var address by mutableStateOf(repository.server.value.address ?: "")
@@ -121,7 +122,8 @@ fun SettingsScreen(repository: LoomRepository, nav: NavState) {
     Column(
         Modifier
             .fillMaxSize()
-            .background(Stage)
+            // The brand threads as still, dim fields: branded without artwork.
+            .threeThreads(listOf(Ember, Teal, Violet))
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .imePadding()

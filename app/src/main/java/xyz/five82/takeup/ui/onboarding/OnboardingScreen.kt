@@ -32,10 +32,14 @@ import kotlinx.coroutines.launch
 import xyz.five82.takeup.api.LoomApi
 import xyz.five82.takeup.data.LoomRepository
 import xyz.five82.takeup.ui.components.Selvedge
+import xyz.five82.takeup.ui.components.threeThreads
 import xyz.five82.takeup.ui.takeupViewModel
+import xyz.five82.takeup.ui.theme.Ember
 import xyz.five82.takeup.ui.theme.Ink
 import xyz.five82.takeup.ui.theme.Muted
 import xyz.five82.takeup.ui.theme.Stage
+import xyz.five82.takeup.ui.theme.Teal
+import xyz.five82.takeup.ui.theme.Violet
 
 class OnboardingViewModel(private val repository: LoomRepository) : ViewModel() {
     var address by mutableStateOf("")
@@ -77,6 +81,9 @@ fun OnboardingScreen(repository: LoomRepository) {
         Modifier
             .fillMaxSize()
             .background(Stage)
+            // First run breathes in the brand threads; every screen after
+            // this takes its color from the library instead.
+            .threeThreads(listOf(Ember, Teal, Violet), drifting = true)
             .imePadding()
             .padding(horizontal = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,

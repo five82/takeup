@@ -15,25 +15,29 @@ import coil3.toBitmap
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * The color a title weaves through its screens, extracted from poster art.
+ * The colors a title weaves through its screens, extracted from poster art.
  * Cached per item id so a detail screen revisit never re-decodes.
  */
 object WovenColors {
 
-    private val cache = ConcurrentHashMap<Long, Color>()
+    private val cache = ConcurrentHashMap<Long, List<Color>>()
 
-    suspend fun seedFor(context: Context, itemId: Long, posterUrl: String?): Color? {
-        if (posterUrl == null) return null
+    suspend fun seedFor(context: Context, itemId: Long, posterUrl: String?): Color? =
+        threadsFor(context, itemId, posterUrl).firstOrNull()
+
+    /** Up to three hue-separated swatches; empty until the art decodes. */
+    suspend fun threadsFor(context: Context, itemId: Long, posterUrl: String?): List<Color> {
+        if (posterUrl == null) return emptyList()
         cache[itemId]?.let { return it }
         val request = ImageRequest.Builder(context)
             .data(posterUrl)
             .size(64)
             .allowHardware(false)
             .build()
-        val result = context.imageLoader.execute(request) as? SuccessResult ?: return null
-        val seed = dominantColor(result.image.toBitmap()) ?: return null
-        cache[itemId] = seed
-        return seed
+        val result = context.imageLoader.execute(request) as? SuccessResult ?: return emptyList()
+        val threads = threadColors(result.image.toBitmap())
+        if (threads.isNotEmpty()) cache[itemId] = threads
+        return threads
     }
 
     /**
@@ -41,10 +45,30 @@ object WovenColors {
      * times saturation, so a big beige sky loses to a smaller saturated
      * costume. Good enough for a seed the palette engine will tone anyway.
      */
-    fun dominantColor(bitmap: Bitmap): Color? {
+    fun dominantColor(bitmap: Bitmap): Color? = threadColors(bitmap, max = 1).firstOrNull()
+
+    /**
+     * The top [max] scored buckets, kept at least 40 degrees of hue apart so
+     * the swatches read as different threads instead of shades of one. Best
+     * bucket first, so callers can treat index zero as the seed.
+     */
+    fun threadColors(bitmap: Bitmap, max: Int = 3): List<Color> {
+        val ranked = scoredBuckets(bitmap)
+        val picked = mutableListOf<Pair<Color, Float>>()
+        for ((color, hue) in ranked) {
+            if (picked.size >= max) break
+            if (picked.none { hueDistance(it.second, hue) < 40f }) {
+                picked += color to hue
+            }
+        }
+        return picked.map { it.first }
+    }
+
+    /** Buckets worth using, best score first, paired with their hue. */
+    private fun scoredBuckets(bitmap: Bitmap): List<Pair<Color, Float>> {
         val width = bitmap.width
         val height = bitmap.height
-        if (width == 0 || height == 0) return null
+        if (width == 0 || height == 0) return emptyList()
         val pixels = IntArray(width * height)
         bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
         val counts = HashMap<Int, Int>()
@@ -53,8 +77,7 @@ object WovenColors {
             val key = (pixel shr 12 and 0xF00) or (pixel shr 8 and 0x0F0) or (pixel shr 4 and 0x00F)
             counts[key] = (counts[key] ?: 0) + 1
         }
-        var best: Int? = null
-        var bestScore = 0f
+        val scored = mutableListOf<Triple<Int, Float, Float>>()
         val hsv = FloatArray(3)
         for ((key, count) in counts) {
             val r = (key shr 8 and 0xF) * 17
@@ -66,21 +89,49 @@ object WovenColors {
             // Skip near-black and near-white buckets; they are backdrop, not thread.
             if (value < 0.12f || (saturation < 0.08f && value > 0.85f)) continue
             val score = count * (0.15f + saturation) * (0.25f + value)
-            if (score > bestScore) {
-                bestScore = score
-                best = android.graphics.Color.rgb(r, g, b)
-            }
+            scored += Triple(android.graphics.Color.rgb(r, g, b), score, hsv[0])
         }
-        return best?.let { Color(it) }
+        return scored
+            .sortedByDescending { it.second }
+            .map { Color(it.first) to it.third }
     }
+
+    private fun hueDistance(a: Float, b: Float): Float {
+        val d = kotlin.math.abs(a - b) % 360f
+        return if (d > 180f) 360f - d else d
+    }
+}
+
+/**
+ * The tone backgrounds use a thread color at: HSV value clamped into a
+ * narrow band. The ceiling keeps white logo art and Ink text landing on
+ * every field; the floor keeps the field visible at all - posters often
+ * yield near-black swatches that would otherwise vanish into the Stage.
+ * Saturation gets a small floor so quantized swatches stay colorful rather
+ * than murky; hue is never touched.
+ */
+fun Color.fieldTone(): Color {
+    val hsv = FloatArray(3)
+    android.graphics.Color.RGBToHSV(
+        (red * 255).toInt(),
+        (green * 255).toInt(),
+        (blue * 255).toInt(),
+        hsv,
+    )
+    return Color.hsv(hsv[0], hsv[1].coerceAtLeast(0.30f), hsv[2].coerceIn(0.48f, 0.62f))
 }
 
 /** Seed color for an item, resolving off the main thread; null until known. */
 @Composable
-fun rememberWovenSeed(itemId: Long, posterUrl: String?): Color? {
+fun rememberWovenSeed(itemId: Long, posterUrl: String?): Color? =
+    rememberWovenThreads(itemId, posterUrl).firstOrNull()
+
+/** Up to three thread colors for an item; empty until known. */
+@Composable
+fun rememberWovenThreads(itemId: Long, posterUrl: String?): List<Color> {
     val context = LocalContext.current
-    val seed by produceState<Color?>(initialValue = null, itemId, posterUrl) {
-        value = WovenColors.seedFor(context, itemId, posterUrl)
+    val threads by produceState(initialValue = emptyList<Color>(), itemId, posterUrl) {
+        value = WovenColors.threadsFor(context, itemId, posterUrl)
     }
-    return seed
+    return threads
 }

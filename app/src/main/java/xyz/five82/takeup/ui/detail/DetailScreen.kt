@@ -70,6 +70,7 @@ import xyz.five82.takeup.ui.Screen
 import xyz.five82.takeup.ui.backdropUrl
 import xyz.five82.takeup.ui.components.BiasCutBackdrop
 import xyz.five82.takeup.ui.components.ErrorState
+import xyz.five82.takeup.ui.components.GauzeBackground
 import xyz.five82.takeup.ui.components.logoLaneHeight
 import xyz.five82.takeup.ui.components.LoadingState
 import xyz.five82.takeup.ui.components.RowLabel
@@ -82,7 +83,6 @@ import xyz.five82.takeup.ui.progressFraction
 import xyz.five82.takeup.ui.remainingLabel
 import xyz.five82.takeup.ui.takeupViewModel
 import xyz.five82.takeup.ui.techBadges
-import xyz.five82.takeup.ui.theme.Ember
 import xyz.five82.takeup.ui.theme.Ink
 import xyz.five82.takeup.ui.theme.Line
 import xyz.five82.takeup.ui.theme.Muted
@@ -187,10 +187,15 @@ fun DetailScreen(repository: LoomRepository, nav: NavState, itemId: Long, topmos
         else -> {
             val seed = rememberWovenSeed(item.id, repository.api.posterUrl(item, 240))
             WovenTheme(seed) {
-                if (item.kind == "show") {
-                    ShowDetail(repository, nav, model, item, state)
-                } else {
-                    MovieDetail(repository, nav, model, item)
+                Box(Modifier.fillMaxSize()) {
+                    // Gauze: the backdrop's color weather behind the whole
+                    // screen, with the dyed stage catching what it misses.
+                    GauzeBackground(repository.api.backdropUrl(item, 240), seed)
+                    if (item.kind == "show") {
+                        ShowDetail(repository, nav, model, item, state)
+                    } else {
+                        MovieDetail(repository, nav, model, item)
+                    }
                 }
             }
         }
@@ -206,7 +211,7 @@ private fun MovieDetail(
     model: DetailViewModel,
     item: Item,
 ) {
-    LazyColumn(Modifier.fillMaxSize().background(Stage), contentPadding = PaddingValues(bottom = 32.dp)) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 32.dp)) {
         item { DetailHead(repository, nav, model, item) }
         item {
             Column(Modifier.padding(horizontal = 20.dp)) {
@@ -246,7 +251,7 @@ private fun ShowDetail(
     item: Item,
     state: DetailState,
 ) {
-    LazyColumn(Modifier.fillMaxSize().background(Stage), contentPadding = PaddingValues(bottom = 32.dp)) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 32.dp)) {
         item { DetailHead(repository, nav, model, item) }
         item {
             Column(Modifier.padding(horizontal = 20.dp)) {
@@ -445,9 +450,6 @@ private fun DetailHead(
     Box(Modifier.fillMaxWidth()) {
         val backdrop = repository.api.backdropUrl(item, 960)
         val logo = repository.api.logoUrl(item)
-        // Raw seed, not colorScheme.primary: the toned primary washes out to
-        // pastel, and the head should match the home hero for the same title.
-        val seed = rememberWovenSeed(item.id, repository.api.posterUrl(item, 240))
         // Cut tailored to the logo: the lane is area-normalized once the art
         // decodes, and the line rides just above it. Animated so the first
         // load settles instead of popping.
@@ -459,7 +461,6 @@ private fun DetailHead(
         )
         BiasCutBackdrop(
             imageUrl = backdrop,
-            tint = seed ?: Ember,
             solidLeft = solid,
             modifier = Modifier.fillMaxWidth(),
         )

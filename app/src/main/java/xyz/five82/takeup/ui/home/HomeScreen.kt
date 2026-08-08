@@ -61,6 +61,9 @@ import xyz.five82.takeup.ui.components.PosterCard
 import xyz.five82.takeup.ui.components.RowLabel
 import xyz.five82.takeup.ui.components.ThreadProgress
 import xyz.five82.takeup.ui.components.navPillClearance
+import xyz.five82.takeup.ui.components.dyeBath
+import xyz.five82.takeup.ui.components.houseLights
+import xyz.five82.takeup.ui.components.threeThreads
 import xyz.five82.takeup.ui.components.ThumbCard
 import xyz.five82.takeup.ui.backdropUrl
 import xyz.five82.takeup.ui.episodeLabel
@@ -75,7 +78,7 @@ import xyz.five82.takeup.ui.theme.Ink
 import xyz.five82.takeup.ui.theme.Muted
 import xyz.five82.takeup.ui.theme.Stage
 import xyz.five82.takeup.ui.theme.Violet
-import xyz.five82.takeup.ui.theme.rememberWovenSeed
+import xyz.five82.takeup.ui.theme.rememberWovenThreads
 
 data class HomeState(
     val loading: Boolean = true,
@@ -172,7 +175,21 @@ private fun HomeContent(
 ) {
     val api = repository.api
     val hero = state.continueWatching.firstOrNull() ?: state.recentlyAdded.firstOrNull()
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = navPillClearance())) {
+    // The hero title colors the whole room, so home is inhabited by whatever
+    // you're mid-watching: its seed dyes the stage, and its swatches sit as
+    // still fields of light down the screen - the dye alone reads flat
+    // because the hero art hides the dye's own glow. Ember house lights hold
+    // the room until the art resolves (and when there is no hero at all).
+    val heroThreads = hero?.let { rememberWovenThreads(it.id, api.posterUrl(it, 240)) }.orEmpty()
+    val room = if (heroThreads.isNotEmpty()) {
+        Modifier.dyeBath(heroThreads.first()).threeThreads(heroThreads)
+    } else {
+        Modifier.houseLights(Ember)
+    }
+    LazyColumn(
+        Modifier.fillMaxSize().then(room),
+        contentPadding = PaddingValues(bottom = navPillClearance()),
+    ) {
         item(key = "hero") {
             Box {
                 if (hero != null) {
@@ -304,7 +321,6 @@ private fun Hero(item: Item, api: xyz.five82.takeup.api.LoomApi, onOpen: () -> U
     ) {
         val backdrop = api.backdropUrl(item, 960) ?: api.thumbUrl(item, 960)
         val logo = api.logoUrl(item)
-        val seed = rememberWovenSeed(item.id, api.posterUrl(item, 240))
         // Same tailoring as the detail head: area-normalized logo lane, line
         // riding above it, 76dp of resume line and progress stacked below.
         var logoAspect by remember(item.id) { mutableStateOf<Float?>(null) }
@@ -315,7 +331,6 @@ private fun Hero(item: Item, api: xyz.five82.takeup.api.LoomApi, onOpen: () -> U
         )
         BiasCutBackdrop(
             imageUrl = backdrop,
-            tint = seed ?: Ember,
             solidLeft = solid,
             modifier = Modifier.fillMaxWidth(),
             contentDescription = item.title,

@@ -55,6 +55,7 @@ import xyz.five82.takeup.data.LoomRepository
 import xyz.five82.takeup.ui.NavState
 import xyz.five82.takeup.ui.Screen
 import xyz.five82.takeup.ui.components.EmptyState
+import xyz.five82.takeup.ui.components.houseLights
 import xyz.five82.takeup.ui.episodeLabel
 import xyz.five82.takeup.ui.posterUrl
 import xyz.five82.takeup.ui.takeupViewModel
@@ -62,7 +63,6 @@ import xyz.five82.takeup.ui.theme.Amber
 import xyz.five82.takeup.ui.theme.Ember
 import xyz.five82.takeup.ui.theme.Ink
 import xyz.five82.takeup.ui.theme.Muted
-import xyz.five82.takeup.ui.theme.Stage
 import xyz.five82.takeup.ui.theme.Surface1
 import xyz.five82.takeup.ui.theme.Teal
 
@@ -110,7 +110,7 @@ fun SearchScreen(repository: LoomRepository, nav: NavState, initialQuery: String
     Column(
         Modifier
             .fillMaxSize()
-            .background(Stage)
+            .houseLights(Ember)
             .statusBarsPadding()
             .imePadding(),
     ) {
