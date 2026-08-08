@@ -32,6 +32,8 @@ data class LoomItem(
     val backdropImageTag: String = "",
     val logoImageId: Long = 0,
     val logoImageTag: String = "",
+    val thumbImageId: Long = 0,
+    val thumbImageTag: String = "",
     // Loom only attaches the media object to single-item responses, so duration,
     // streams, and size stay empty for items that came from a list endpoint.
     // mediaTag is the exception: every item response carries the version the last
@@ -64,6 +66,9 @@ data class LoomItem(
 
     fun logoUrl(serverUrl: String): String? =
         imageUrl(serverUrl, logoImageId, logoImageTag)
+
+    fun thumbUrl(serverUrl: String): String? =
+        imageUrl(serverUrl, thumbImageId, thumbImageTag)
 
     fun episodeLabel(): String? {
         if (kind != "episode" || episodeNumber <= 0) return null
@@ -187,8 +192,8 @@ enum class ArtworkKind(val apiValue: String) {
     LOGO("logo"),
 
     // Loom splits TMDB backdrops into textless backdrops and thumbs, the
-    // language-tagged ones with title art baked in. Takeup only selects thumbs
-    // for now; no screen draws them yet.
+    // language-tagged ones with title art baked in. The home screen's landscape
+    // rows draw thumbs, since their cards have no logo over the art.
     THUMB("thumb"),
 }
 

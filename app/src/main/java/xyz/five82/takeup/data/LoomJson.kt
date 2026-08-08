@@ -141,6 +141,8 @@ internal object LoomJson {
             backdropImageTag = value.string("backdrop_image_tag"),
             logoImageId = value.long("logo_image_id"),
             logoImageTag = value.string("logo_image_tag"),
+            thumbImageId = value.long("thumb_image_id"),
+            thumbImageTag = value.string("thumb_image_tag"),
             mediaDurationMs = media?.long("duration_ms") ?: 0L,
             mediaStreams = streams,
             mediaChapterStartsMs = media?.let(::chapterStartsMs).orEmpty(),

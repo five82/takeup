@@ -112,7 +112,12 @@ internal fun LandscapeMediaCard(
                     .clip(MaterialTheme.shapes.extraLarge),
             ) {
                 MediaArtwork(
-                    url = item.backdropUrl(serverUrl) ?: item.posterUrl(serverUrl),
+                    // A thumb carries the title art, which these cards need
+                    // because they draw no logo of their own; a textless
+                    // backdrop is the fallback when Loom has no thumb.
+                    url = item.thumbUrl(serverUrl)
+                        ?: item.backdropUrl(serverUrl)
+                        ?: item.posterUrl(serverUrl),
                     modifier = Modifier
                         .fillMaxWidth()
                         .aspectRatio(16f / 9f),
