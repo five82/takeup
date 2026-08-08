@@ -29,12 +29,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.carousel.CarouselState
-import androidx.compose.material3.carousel.HorizontalCenteredHeroCarousel
-import androidx.compose.material3.carousel.rememberCarouselState
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -85,7 +81,6 @@ internal fun HomeScreen(
     onOpenGenreHub: () -> Unit,
     onCollectionSelected: (LoomCollection) -> Unit,
     onOpenCollectionHub: () -> Unit,
-    onHeroSeedUrlChanged: (String?) -> Unit,
 ) {
     UseLightStatusBarIcons()
     // Downloads are playable without Loom, so a library that is empty only because
@@ -113,7 +108,6 @@ internal fun HomeScreen(
                 onOpenGenreHub = onOpenGenreHub,
                 onCollectionSelected = onCollectionSelected,
                 onOpenCollectionHub = onOpenCollectionHub,
-                onHeroSeedUrlChanged = onHeroSeedUrlChanged,
             )
         }
         Box(
@@ -143,9 +137,9 @@ private fun LoadingHome() {
         verticalArrangement = Arrangement.spacedBy(28.dp),
     ) {
         item {
-            PulsingPlaceholder(
+            ArtworkPlaceholder(
                 modifier = Modifier
-                    .padding(horizontal = 24.dp)
+                    .padding(horizontal = 16.dp)
                     .fillMaxWidth()
                     .aspectRatio(4f / 5f)
                     .clip(MaterialTheme.shapes.extraLarge),
@@ -178,27 +172,19 @@ private fun HomeList(
     onOpenGenreHub: () -> Unit,
     onCollectionSelected: (LoomCollection) -> Unit,
     onOpenCollectionHub: () -> Unit,
-    onHeroSeedUrlChanged: (String?) -> Unit,
 ) {
     val content = state.content
-    val heroes = remember(content) { state.heroItems() }
-    val dayOfYear = remember { LocalDate.now().dayOfYear }
-    val spotlights = remember(content, dayOfYear) { state.genreSpotlights(dayOfYear) }
+    val today = remember { LocalDate.now() }
+    val spotlight = remember(content, today) { state.spotlightItem(today.toEpochDay()) }
+    val spotlights = remember(content, today) { state.genreSpotlights(today.dayOfYear) }
     val genreEntries = remember(content) { state.genreBrowseEntries() }
-    val carouselState = rememberCarouselState { heroes.size }
-    val heroItem = heroes.getOrNull(carouselState.currentItem)
-    val heroBackdropUrl = heroItem?.let {
-        it.backdropUrl(state.serverUrl) ?: it.posterUrl(state.serverUrl)
-    }
-    LaunchedEffect(heroBackdropUrl) { onHeroSeedUrlChanged(heroBackdropUrl) }
 
     PullToRefreshBox(
         isRefreshing = state.isLoading,
         onRefresh = onRetry,
         modifier = Modifier.fillMaxSize(),
     ) {
-        AmbientGlow(url = heroBackdropUrl)
-        var entranceIndex = 0
+        AmbientGlow()
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             // The toolbar is hidden offline, so its reserved space would be a gap.
@@ -218,24 +204,17 @@ private fun HomeList(
                     )
                 }
             }
-            if (heroes.isNotEmpty()) {
-                val entrance = entranceIndex++
-                item {
-                    Box(Modifier.staggeredEntrance(entrance)) {
-                        HeroCarousel(
-                            serverUrl = state.serverUrl,
-                            heroes = heroes,
-                            continueWatchingIds = content.continueWatching.map { it.id }.toSet(),
-                            recentlyAddedIds = content.recentlyAdded.map { it.id }.toSet(),
-                            carouselState = carouselState,
-                            onPlayItem = onPlayItem,
-                            onItemSelected = onItemSelected,
-                        )
-                    }
+            spotlight?.let { item ->
+                item(key = "spotlight") {
+                    SpotlightHero(
+                        serverUrl = state.serverUrl,
+                        item = item,
+                        onPlay = { onPlayItem(item) },
+                        onDetails = { onItemSelected(item) },
+                    )
                 }
             }
             if (content.continueWatching.isNotEmpty()) {
-                val entrance = entranceIndex++
                 item {
                     MediaRow(
                         title = stringResource(R.string.continue_watching),
@@ -243,14 +222,12 @@ private fun HomeList(
                         items = content.continueWatching,
                         landscape = true,
                         onItemSelected = onItemSelected,
-                        modifier = Modifier.staggeredEntrance(entrance),
                     )
                 }
             }
             // Directly below Continue Watching: the two rows are one story, and a
             // show crosses from one to the other as an episode finishes.
             if (content.nextUp.isNotEmpty()) {
-                val entrance = entranceIndex++
                 item {
                     MediaRow(
                         title = stringResource(R.string.next_up),
@@ -258,7 +235,6 @@ private fun HomeList(
                         items = content.nextUp,
                         landscape = true,
                         onItemSelected = onItemSelected,
-                        modifier = Modifier.staggeredEntrance(entrance),
                     )
                 }
             }
@@ -268,50 +244,45 @@ private fun HomeList(
                         text = stringResource(R.string.offline_downloads_only),
                         modifier = Modifier
                             .statusBarsPadding()
-                            .padding(horizontal = 16.dp),
+                            // Wide end padding keeps the banner clear of the
+                            // settings button floating in the top-end corner.
+                            .padding(start = 16.dp, end = 72.dp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
             }
             if (downloads.isNotEmpty()) {
-                val entrance = entranceIndex++
                 item {
                     DownloadRow(
                         entries = remember(downloads) { downloadedRowItems(downloads) },
                         onItemSelected = onItemSelected,
-                        modifier = Modifier.staggeredEntrance(entrance),
                     )
                 }
             }
             if (content.recentlyAdded.isNotEmpty()) {
-                val entrance = entranceIndex++
                 item {
                     MediaRow(
                         title = stringResource(R.string.recently_added),
                         serverUrl = state.serverUrl,
                         items = content.recentlyAdded,
                         onItemSelected = onItemSelected,
-                        modifier = Modifier.staggeredEntrance(entrance),
                     )
                 }
             }
             // Above the generated rows: a curated shelf is the most interesting
             // thing on Home that the user did not already ask for.
             if (content.collections.isNotEmpty()) {
-                val entrance = entranceIndex++
                 item(key = "collections") {
                     CollectionRow(
                         serverUrl = state.serverUrl,
                         collections = content.collections,
                         onCollectionSelected = onCollectionSelected,
                         onOpenCollectionHub = onOpenCollectionHub,
-                        modifier = Modifier.staggeredEntrance(entrance),
                     )
                 }
             }
             spotlights.forEach { (genre, items) ->
-                val entrance = entranceIndex++
                 item(key = "spotlight:${genre.id}") {
                     MediaRow(
                         title = stringResource(R.string.genre_spotlight, genre.name),
@@ -320,12 +291,10 @@ private fun HomeList(
                         actionText = stringResource(R.string.see_all),
                         onAction = { onGenreSelected(genre) },
                         onItemSelected = onItemSelected,
-                        modifier = Modifier.staggeredEntrance(entrance),
                     )
                 }
             }
             if (content.movies.isNotEmpty()) {
-                val entrance = entranceIndex++
                 item {
                     MediaRow(
                         title = stringResource(R.string.movies),
@@ -334,12 +303,10 @@ private fun HomeList(
                         actionText = stringResource(R.string.see_all),
                         onAction = onShowMovies,
                         onItemSelected = onItemSelected,
-                        modifier = Modifier.staggeredEntrance(entrance),
                     )
                 }
             }
             if (content.shorts.isNotEmpty()) {
-                val entrance = entranceIndex++
                 item {
                     MediaRow(
                         title = stringResource(R.string.shorts),
@@ -348,12 +315,10 @@ private fun HomeList(
                         actionText = stringResource(R.string.see_all),
                         onAction = onShowShorts,
                         onItemSelected = onItemSelected,
-                        modifier = Modifier.staggeredEntrance(entrance),
                     )
                 }
             }
             if (content.shows.isNotEmpty()) {
-                val entrance = entranceIndex++
                 item {
                     MediaRow(
                         title = stringResource(R.string.shows),
@@ -362,22 +327,19 @@ private fun HomeList(
                         actionText = stringResource(R.string.see_all),
                         onAction = onShowShows,
                         onItemSelected = onItemSelected,
-                        modifier = Modifier.staggeredEntrance(entrance),
                     )
                 }
             }
             if (genreEntries.isNotEmpty()) {
-                val entrance = entranceIndex++
                 item(key = "genreBrowse") {
                     GenreBrowseRow(
                         entries = genreEntries,
                         onGenreSelected = onGenreSelected,
                         onOpenGenreHub = onOpenGenreHub,
-                        modifier = Modifier.staggeredEntrance(entrance),
                     )
                 }
             }
-            if (heroes.isEmpty() && downloads.isEmpty()) {
+            if (spotlight == null && downloads.isEmpty()) {
                 item {
                     Text(
                         text = stringResource(R.string.no_home_items),
@@ -392,55 +354,28 @@ private fun HomeList(
     }
 }
 
+/**
+ * The one hero: a static full-width card for the day's pick. Deliberately not
+ * a carousel - no paging state, nothing animating over image loads, and the
+ * single card can never mirror the rows below it because the pick excludes
+ * anything watched or in progress.
+ */
 @Composable
-private fun HeroCarousel(
-    serverUrl: String,
-    heroes: List<LoomItem>,
-    continueWatchingIds: Set<Long>,
-    recentlyAddedIds: Set<Long>,
-    carouselState: CarouselState,
-    onPlayItem: (LoomItem) -> Unit,
-    onItemSelected: (LoomItem) -> Unit,
-) {
-    HorizontalCenteredHeroCarousel(
-        state = carouselState,
-        modifier = Modifier
-            .statusBarsPadding()
-            .padding(top = 8.dp)
-            .fillMaxWidth()
-            .aspectRatio(4f / 5f),
-        itemSpacing = 8.dp,
-        contentPadding = PaddingValues(horizontal = 16.dp),
-    ) { index ->
-        val item = heroes[index]
-        HeroItem(
-            serverUrl = serverUrl,
-            item = item,
-            label = stringResource(
-                when {
-                    item.id in continueWatchingIds -> R.string.continue_watching
-                    item.id in recentlyAddedIds -> R.string.recently_added
-                    item.kind == "show" -> R.string.shows
-                    else -> R.string.movies
-                },
-            ),
-            modifier = Modifier.maskClip(MaterialTheme.shapes.extraLarge),
-            onPlay = { onPlayItem(item) },
-            onDetails = { onItemSelected(item) },
-        )
-    }
-}
-
-@Composable
-private fun HeroItem(
+private fun SpotlightHero(
     serverUrl: String,
     item: LoomItem,
-    label: String,
-    modifier: Modifier = Modifier,
     onPlay: () -> Unit,
     onDetails: () -> Unit,
 ) {
-    Box(modifier = modifier.fillMaxSize()) {
+    Box(
+        modifier = Modifier
+            .statusBarsPadding()
+            .padding(top = 8.dp)
+            .padding(horizontal = 16.dp)
+            .fillMaxWidth()
+            .aspectRatio(4f / 5f)
+            .clip(MaterialTheme.shapes.extraLarge),
+    ) {
         MediaArtwork(
             url = item.backdropUrl(serverUrl) ?: item.posterUrl(serverUrl),
             modifier = Modifier.fillMaxSize(),
@@ -464,7 +399,7 @@ private fun HeroItem(
                 shape = MaterialTheme.shapes.extraLarge,
             ) {
                 Text(
-                    text = label,
+                    text = stringResource(R.string.tonights_pick),
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                     style = MaterialTheme.typography.labelMediumEmphasized,
                 )
@@ -482,7 +417,7 @@ private fun HeroItem(
                     color = Color.White,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.headlineMediumEmphasized,
+                    style = MaterialTheme.typography.displaySmallEmphasized,
                 )
             }
             val metadata = listOfNotNull(
@@ -495,10 +430,9 @@ private fun HeroItem(
                     color = Color.White.copy(alpha = 0.82f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.labelLarge,
                 )
             }
-            item.progress?.let { PlaybackStatus(it) }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Button(
                     onClick = onPlay,
@@ -514,11 +448,7 @@ private fun HeroItem(
                     )
                     Text(
                         stringResource(
-                            when {
-                                item.kind == "show" -> R.string.view_details
-                                (item.progress?.resumePositionMs ?: 0L) > 0 -> R.string.resume
-                                else -> R.string.play
-                            },
+                            if (item.kind == "show") R.string.view_details else R.string.play,
                         ),
                     )
                 }

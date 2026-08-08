@@ -3,11 +3,6 @@
 package xyz.five82.takeup.ui
 
 import androidx.activity.compose.LocalActivity
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -43,8 +38,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.BlendMode
@@ -66,7 +59,6 @@ import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
 import coil3.request.ImageRequest
 import coil3.request.crossfade
-import coil3.size.Size
 import java.util.Locale
 import xyz.five82.takeup.R
 import xyz.five82.takeup.data.LoomItem
@@ -185,7 +177,7 @@ internal fun MediaArtwork(
         contentAlignment = Alignment.Center,
     ) {
         if (isLoading) {
-            PulsingPlaceholder(Modifier.fillMaxSize())
+            ArtworkPlaceholder(Modifier.fillMaxSize())
         }
         if (isError) {
             Icon(
@@ -211,86 +203,51 @@ internal fun MediaArtwork(
     }
 }
 
-/** Soft breathing surface shown while artwork loads. */
+/**
+ * Calm static surface shown while artwork loads. Deliberately not animated:
+ * a screen full of loading cards used to run one infinite pulse animation
+ * per image, which cost frames exactly when image decoding needed them.
+ */
 @Composable
-internal fun PulsingPlaceholder(modifier: Modifier = Modifier) {
-    val transition = rememberInfiniteTransition(label = "placeholderPulse")
-    val alpha by transition.animateFloat(
-        initialValue = 0.5f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 900),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "placeholderAlpha",
-    )
+internal fun ArtworkPlaceholder(modifier: Modifier = Modifier) {
     Box(
-        modifier = modifier.background(
-            MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = alpha),
-        ),
+        modifier = modifier.background(MaterialTheme.colorScheme.surfaceContainerHighest),
     )
 }
 
 /**
- * The one ambient background: a heavily blurred copy of the screen's artwork
- * glowing at the top and dissolving into the neutral stage. Real artwork
- * color carries the screen instead of a derived tint, so it can never go
- * muddy. Used behind Home and every detail screen.
+ * The one ambient background: a faint wash of the fixed accent glowing from
+ * the top edge and dissolving into the neutral stage within the first third
+ * of the screen. One flat gradient, identical everywhere it appears - no
+ * artwork blur, so it cannot band or bleed past a hero's edges.
  */
 @Composable
-internal fun AmbientGlow(
-    url: String?,
-    modifier: Modifier = Modifier,
-) {
-    if (url == null) return
+internal fun AmbientGlow(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(480.dp),
-    ) {
-        AsyncImage(
-            // A tiny decode is all a heavy blur needs; keeps the effect cheap.
-            // The smallest Loom variant is shared with seed extraction, so the
-            // glow costs no extra download.
-            model = ImageRequest.Builder(LocalContext.current)
-                .data(imageUrlAtWidth(url, 64))
-                .size(Size(64, 64))
-                .crossfade(true)
-                .build(),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .fillMaxSize()
-                .blur(40.dp)
-                .alpha(0.55f),
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        0f to Color.Transparent,
-                        1f to MaterialTheme.colorScheme.surface,
-                    ),
+            .height(360.dp)
+            .background(
+                Brush.verticalGradient(
+                    0f to MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                    1f to Color.Transparent,
                 ),
-        )
-    }
+            ),
+    )
 }
 
 @Composable
 internal fun FadingBackdropArtwork(
     url: String?,
     modifier: Modifier = Modifier,
-    // Only heroes with text overlaying their lower edge (Season) need extra
-    // darkening; elsewhere it would drag the dissolve back toward black.
-    darkenBottomForText: Boolean = false,
 ) {
     Box(modifier = modifier) {
         MediaArtwork(
             url = url,
-            // Dissolve the image itself to transparent so whatever sits behind
-            // (the tinted DetailBackground) shows through, instead of fading
-            // the artwork into an opaque block of surface color.
+            // The one fade over detail artwork: the image's own alpha dissolves
+            // to fully transparent at its bottom edge, landing directly on the
+            // flat stage surface behind it. Nothing extends past the artwork
+            // and no second gradient competes with this one.
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
@@ -298,7 +255,7 @@ internal fun FadingBackdropArtwork(
                     drawContent()
                     drawRect(
                         brush = Brush.verticalGradient(
-                            0.5f to Color.Black,
+                            0.55f to Color.Black,
                             1f to Color.Transparent,
                         ),
                         blendMode = BlendMode.DstIn,
@@ -310,19 +267,6 @@ internal fun FadingBackdropArtwork(
                 .fillMaxSize()
                 .background(topScrim()),
         )
-        if (darkenBottomForText) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            0.45f to Color.Transparent,
-                            1f to MaterialTheme.colorScheme.surfaceContainerLowest
-                                .copy(alpha = 0.45f),
-                        ),
-                    ),
-            )
-        }
     }
 }
 
@@ -349,13 +293,15 @@ internal fun TitleLogo(
     )
 }
 
+// Watched and unwatched badges wear Mint (`secondary`), the palette's state
+// color: never used for actions, so it always reads as "done".
 @Composable
 internal fun WatchedBadge(modifier: Modifier = Modifier) {
     val description = stringResource(R.string.watched)
     Surface(
         modifier = modifier.semantics { contentDescription = description },
-        color = MaterialTheme.colorScheme.primary,
-        contentColor = MaterialTheme.colorScheme.onPrimary,
+        color = MaterialTheme.colorScheme.secondary,
+        contentColor = MaterialTheme.colorScheme.onSecondary,
         shape = CircleShape,
         shadowElevation = 2.dp,
     ) {
@@ -375,8 +321,8 @@ internal fun UnwatchedBadge(count: Int, modifier: Modifier = Modifier) {
     val description = pluralStringResource(R.plurals.unwatched_count, count, count)
     Surface(
         modifier = modifier.semantics { contentDescription = description },
-        color = MaterialTheme.colorScheme.primary,
-        contentColor = MaterialTheme.colorScheme.onPrimary,
+        color = MaterialTheme.colorScheme.secondary,
+        contentColor = MaterialTheme.colorScheme.onSecondary,
         shape = CircleShape,
         shadowElevation = 2.dp,
     ) {
@@ -406,9 +352,11 @@ internal fun MediaBadges(
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         labels.forEach { label ->
+            // Neutral on purpose: these are facts about the file, not states
+            // or actions, so they take no accent at all.
             Surface(
-                color = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 shape = MaterialTheme.shapes.extraLarge,
             ) {
                 Text(

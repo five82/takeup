@@ -2,6 +2,7 @@ package xyz.five82.takeup.ui.theme
 
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Typography
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
@@ -43,54 +44,55 @@ private val TextFontFamily = googleSansFlexFamily(opticalSize = 16f, roundness =
 
 private val BaseTypography = Typography()
 
+// The weight ladder is the hierarchy: heroes and screen titles land heavy,
+// section titles stay clearly bold, and running text keeps stock weights so
+// the jump reads intentional. The variable font has all of 100-900 registered,
+// so each override just picks a different wght instance.
+private fun TextStyle.display() = copy(
+    fontFamily = DisplayFontFamily,
+    fontWeight = FontWeight.ExtraBold,
+)
+
+private fun TextStyle.headline() = copy(
+    fontFamily = HeadlineFontFamily,
+    fontWeight = FontWeight.Bold,
+)
+
+private fun TextStyle.text(weight: FontWeight? = null) = copy(
+    fontFamily = TextFontFamily,
+    fontWeight = weight ?: fontWeight,
+)
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 internal val TakeupTypography = BaseTypography.copy(
-    displayLarge = BaseTypography.displayLarge.copy(fontFamily = DisplayFontFamily),
-    displayMedium = BaseTypography.displayMedium.copy(fontFamily = DisplayFontFamily),
-    displaySmall = BaseTypography.displaySmall.copy(fontFamily = DisplayFontFamily),
-    headlineLarge = BaseTypography.headlineLarge.copy(fontFamily = HeadlineFontFamily),
-    headlineMedium = BaseTypography.headlineMedium.copy(fontFamily = HeadlineFontFamily),
-    headlineSmall = BaseTypography.headlineSmall.copy(fontFamily = HeadlineFontFamily),
-    titleLarge = BaseTypography.titleLarge.copy(fontFamily = HeadlineFontFamily),
-    titleMedium = BaseTypography.titleMedium.copy(fontFamily = TextFontFamily),
-    titleSmall = BaseTypography.titleSmall.copy(fontFamily = TextFontFamily),
-    bodyLarge = BaseTypography.bodyLarge.copy(fontFamily = TextFontFamily),
-    bodyMedium = BaseTypography.bodyMedium.copy(fontFamily = TextFontFamily),
-    bodySmall = BaseTypography.bodySmall.copy(fontFamily = TextFontFamily),
-    labelLarge = BaseTypography.labelLarge.copy(fontFamily = TextFontFamily),
-    labelMedium = BaseTypography.labelMedium.copy(fontFamily = TextFontFamily),
-    labelSmall = BaseTypography.labelSmall.copy(fontFamily = TextFontFamily),
-    displayLargeEmphasized = BaseTypography.displayLargeEmphasized.copy(
-        fontFamily = DisplayFontFamily,
-    ),
-    displayMediumEmphasized = BaseTypography.displayMediumEmphasized.copy(
-        fontFamily = DisplayFontFamily,
-    ),
-    displaySmallEmphasized = BaseTypography.displaySmallEmphasized.copy(
-        fontFamily = DisplayFontFamily,
-    ),
-    headlineLargeEmphasized = BaseTypography.headlineLargeEmphasized.copy(
-        fontFamily = HeadlineFontFamily,
-    ),
-    headlineMediumEmphasized = BaseTypography.headlineMediumEmphasized.copy(
-        fontFamily = HeadlineFontFamily,
-    ),
-    headlineSmallEmphasized = BaseTypography.headlineSmallEmphasized.copy(
-        fontFamily = HeadlineFontFamily,
-    ),
-    titleLargeEmphasized = BaseTypography.titleLargeEmphasized.copy(
-        fontFamily = HeadlineFontFamily,
-    ),
-    titleMediumEmphasized = BaseTypography.titleMediumEmphasized.copy(
-        fontFamily = TextFontFamily,
-    ),
-    titleSmallEmphasized = BaseTypography.titleSmallEmphasized.copy(
-        fontFamily = TextFontFamily,
-    ),
-    bodyLargeEmphasized = BaseTypography.bodyLargeEmphasized.copy(fontFamily = TextFontFamily),
-    bodyMediumEmphasized = BaseTypography.bodyMediumEmphasized.copy(fontFamily = TextFontFamily),
-    bodySmallEmphasized = BaseTypography.bodySmallEmphasized.copy(fontFamily = TextFontFamily),
-    labelLargeEmphasized = BaseTypography.labelLargeEmphasized.copy(fontFamily = TextFontFamily),
-    labelMediumEmphasized = BaseTypography.labelMediumEmphasized.copy(fontFamily = TextFontFamily),
-    labelSmallEmphasized = BaseTypography.labelSmallEmphasized.copy(fontFamily = TextFontFamily),
+    displayLarge = BaseTypography.displayLarge.display(),
+    displayMedium = BaseTypography.displayMedium.display(),
+    displaySmall = BaseTypography.displaySmall.display(),
+    headlineLarge = BaseTypography.headlineLarge.headline(),
+    headlineMedium = BaseTypography.headlineMedium.headline(),
+    headlineSmall = BaseTypography.headlineSmall.headline(),
+    titleLarge = BaseTypography.titleLarge.headline(),
+    titleMedium = BaseTypography.titleMedium.text(FontWeight.SemiBold),
+    titleSmall = BaseTypography.titleSmall.text(FontWeight.SemiBold),
+    bodyLarge = BaseTypography.bodyLarge.text(),
+    bodyMedium = BaseTypography.bodyMedium.text(),
+    bodySmall = BaseTypography.bodySmall.text(),
+    labelLarge = BaseTypography.labelLarge.text(FontWeight.SemiBold),
+    labelMedium = BaseTypography.labelMedium.text(),
+    labelSmall = BaseTypography.labelSmall.text(),
+    displayLargeEmphasized = BaseTypography.displayLargeEmphasized.display(),
+    displayMediumEmphasized = BaseTypography.displayMediumEmphasized.display(),
+    displaySmallEmphasized = BaseTypography.displaySmallEmphasized.display(),
+    headlineLargeEmphasized = BaseTypography.headlineLargeEmphasized.headline(),
+    headlineMediumEmphasized = BaseTypography.headlineMediumEmphasized.headline(),
+    headlineSmallEmphasized = BaseTypography.headlineSmallEmphasized.headline(),
+    titleLargeEmphasized = BaseTypography.titleLargeEmphasized.headline(),
+    titleMediumEmphasized = BaseTypography.titleMediumEmphasized.text(FontWeight.Bold),
+    titleSmallEmphasized = BaseTypography.titleSmallEmphasized.text(FontWeight.Bold),
+    bodyLargeEmphasized = BaseTypography.bodyLargeEmphasized.text(),
+    bodyMediumEmphasized = BaseTypography.bodyMediumEmphasized.text(),
+    bodySmallEmphasized = BaseTypography.bodySmallEmphasized.text(),
+    labelLargeEmphasized = BaseTypography.labelLargeEmphasized.text(FontWeight.Bold),
+    labelMediumEmphasized = BaseTypography.labelMediumEmphasized.text(FontWeight.SemiBold),
+    labelSmallEmphasized = BaseTypography.labelSmallEmphasized.text(FontWeight.SemiBold),
 )

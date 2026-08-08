@@ -84,9 +84,7 @@ import xyz.five82.takeup.ui.SearchScreen
 import xyz.five82.takeup.ui.SeasonScreen
 import xyz.five82.takeup.ui.ShelfLandingScreen
 import xyz.five82.takeup.ui.ShowDetailsScreen
-import xyz.five82.takeup.ui.seedArtworkUrl
 import xyz.five82.takeup.ui.theme.TakeupTheme
-import xyz.five82.takeup.ui.theme.rememberSeedColor
 
 private const val LOCAL_NETWORK_PERMISSION = "android.permission.ACCESS_LOCAL_NETWORK"
 
@@ -113,16 +111,7 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
         )
         setContent {
-            val state by viewModel.uiState.collectAsStateWithLifecycle()
-            // The Home hero carousel reports its focused item so the theme can
-            // follow swipes; every other screen derives its seed from state.
-            var heroSeedUrl by remember { mutableStateOf<String?>(null) }
-            val seedUrl = if (state is MainUiState.Home) {
-                heroSeedUrl ?: seedArtworkUrl(state)
-            } else {
-                seedArtworkUrl(state)
-            }
-            TakeupTheme(seedColor = rememberSeedColor(seedUrl)) {
+            TakeupTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
@@ -130,7 +119,6 @@ class MainActivity : ComponentActivity() {
                     PermissionAwareApp(
                         viewModel = viewModel,
                         container = container,
-                        onHeroSeedUrlChanged = { heroSeedUrl = it },
                     )
                 }
             }
@@ -142,7 +130,6 @@ class MainActivity : ComponentActivity() {
 private fun PermissionAwareApp(
     viewModel: MainViewModel,
     container: AppContainer,
-    onHeroSeedUrlChanged: (String?) -> Unit,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -179,7 +166,7 @@ private fun PermissionAwareApp(
 
     if (permissionGranted) {
         LaunchedEffect(viewModel) { viewModel.start() }
-        TakeupApp(viewModel, container, onHeroSeedUrlChanged)
+        TakeupApp(viewModel, container)
     } else {
         LocalNetworkPermissionScreen(
             wasDenied = permissionDenied,
@@ -202,7 +189,6 @@ private fun PermissionAwareApp(
 private fun TakeupApp(
     viewModel: MainViewModel,
     container: AppContainer,
-    onHeroSeedUrlChanged: (String?) -> Unit,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     // Downloads ride alongside the UI state rather than inside it: every one of the
@@ -286,7 +272,6 @@ private fun TakeupApp(
                 onOpenGenreHub = viewModel::openGenreHub,
                 onCollectionSelected = viewModel::openCollection,
                 onOpenCollectionHub = viewModel::openCollectionHub,
-                onHeroSeedUrlChanged = onHeroSeedUrlChanged,
             )
         }
         is MainUiState.Library -> saveableStateHolder.SaveableStateProvider(
@@ -326,7 +311,6 @@ private fun TakeupApp(
                 emptyMessage = stringResource(R.string.no_movies_for_genre),
                 onBack = viewModel::backFromGenreLanding,
                 onItemSelected = viewModel::selectGenreItem,
-                onPlayItem = viewModel::playGenreItem,
                 isLoading = current.isLoading,
                 error = current.error,
                 onRetry = viewModel::retryGenreLanding,

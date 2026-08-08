@@ -54,9 +54,7 @@ internal fun ShowDetailsScreen(
     UseLightStatusBarIcons()
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     Box(Modifier.fillMaxSize()) {
-    AmbientGlow(
-        url = state.show.backdropUrl(state.serverUrl) ?: state.show.posterUrl(state.serverUrl),
-    )
+    AmbientGlow()
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = Color.Transparent,
@@ -117,76 +115,70 @@ internal fun ShowDetailsScreen(
                 }
             }
             item {
-                Card(
-                    modifier = Modifier.padding(horizontal = 12.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                    ),
-                    shape = MaterialTheme.shapes.extraLarge,
+                // Directly on the stage: the backdrop above dissolved into this
+                // surface, so a floating card here would restart the layering.
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.Top,
                 ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        verticalAlignment = Alignment.Top,
+                    MediaArtwork(
+                        url = state.show.posterUrl(state.serverUrl),
+                        modifier = Modifier
+                            .width(112.dp)
+                            .aspectRatio(2f / 3f)
+                            .clip(MaterialTheme.shapes.medium),
+                    )
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        MediaArtwork(
-                            url = state.show.posterUrl(state.serverUrl),
-                            modifier = Modifier
-                                .width(112.dp)
-                                .aspectRatio(2f / 3f)
-                                .clip(MaterialTheme.shapes.medium),
-                        )
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            val logoUrl = state.show.logoUrl(state.serverUrl)
-                            if (logoUrl != null) {
-                                TitleLogo(
-                                    url = logoUrl,
-                                    title = state.show.title,
-                                    modifier = Modifier.fillMaxWidth(),
-                                )
-                            } else {
-                                Text(
-                                    text = state.show.title,
-                                    style = MaterialTheme.typography.headlineSmallEmphasized,
-                                )
-                            }
-                            if (state.show.tagline.isNotBlank()) {
-                                Text(
-                                    text = state.show.tagline,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontStyle = FontStyle.Italic,
-                                )
-                            }
-                            val metadata = listOfNotNull(
-                                state.show.contentRating.takeIf { it.isNotBlank() },
-                                state.show.subtitle(),
-                                formatScore(state.show.voteAverage),
-                            ).joinToString(" \u00B7 ")
-                            if (metadata.isNotBlank()) {
-                                Text(
-                                    text = metadata,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                )
-                            }
-                            showRun(state.show)?.let {
-                                Text(
-                                    text = it,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                )
-                            }
-                            episodeRollup(state.show)?.let {
-                                Text(
-                                    text = it,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                )
-                            }
+                        val logoUrl = state.show.logoUrl(state.serverUrl)
+                        if (logoUrl != null) {
+                            TitleLogo(
+                                url = logoUrl,
+                                title = state.show.title,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        } else {
+                            Text(
+                                text = state.show.title,
+                                style = MaterialTheme.typography.headlineMediumEmphasized,
+                            )
+                        }
+                        if (state.show.tagline.isNotBlank()) {
+                            Text(
+                                text = state.show.tagline,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontStyle = FontStyle.Italic,
+                            )
+                        }
+                        val metadata = listOfNotNull(
+                            state.show.contentRating.takeIf { it.isNotBlank() },
+                            state.show.subtitle(),
+                            formatScore(state.show.voteAverage),
+                        ).joinToString(" \u00B7 ")
+                        if (metadata.isNotBlank()) {
+                            Text(
+                                text = metadata,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.labelLarge,
+                            )
+                        }
+                        showRun(state.show)?.let {
+                            Text(
+                                text = it,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.labelLarge,
+                            )
+                        }
+                        episodeRollup(state.show)?.let {
+                            Text(
+                                text = it,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.labelLarge,
+                            )
                         }
                     }
                 }

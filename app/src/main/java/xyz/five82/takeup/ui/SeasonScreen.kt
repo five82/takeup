@@ -56,10 +56,7 @@ internal fun SeasonScreen(
     UseLightStatusBarIcons()
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     Box(Modifier.fillMaxSize()) {
-    AmbientGlow(
-        url = state.show.backdropUrl(state.serverUrl)
-            ?: state.season.posterUrl(state.serverUrl),
-    )
+    AmbientGlow()
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = Color.Transparent,
@@ -209,27 +206,23 @@ private fun EpisodeList(
 
 @Composable
 private fun SeasonHero(state: MainUiState.Season) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .aspectRatio(4f / 3f),
-    ) {
+    // The title block sits below the artwork on the stage rather than over the
+    // fade zone: text over the dissolve needed an extra darkening gradient
+    // that dragged the whole fade back toward black.
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         FadingBackdropArtwork(
             url = state.show.backdropUrl(state.serverUrl)
                 ?: state.season.backdropUrl(state.serverUrl),
             // Shares the show's key so ShowDetails -> Season morphs the hero.
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
+                .aspectRatio(16f / 9f)
                 .itemArtworkSharedBounds(state.show.id),
-            darkenBottomForText = true,
         )
         Row(
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 20.dp),
+            modifier = Modifier.padding(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.Bottom,
+            verticalAlignment = Alignment.Top,
         ) {
             MediaArtwork(
                 url = state.season.posterUrl(state.serverUrl),
@@ -254,13 +247,13 @@ private fun SeasonHero(state: MainUiState.Season) {
                         text = state.show.title,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
-                        style = MaterialTheme.typography.headlineLargeEmphasized,
+                        style = MaterialTheme.typography.headlineMediumEmphasized,
                     )
                 }
                 Text(
                     text = state.season.title,
                     color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.headlineSmallEmphasized,
+                    style = MaterialTheme.typography.titleLargeEmphasized,
                 )
                 if (state.episodes.isNotEmpty()) {
                     Text(
@@ -270,7 +263,7 @@ private fun SeasonHero(state: MainUiState.Season) {
                             state.episodes.size,
                         ),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodyLarge,
+                        style = MaterialTheme.typography.labelLarge,
                     )
                 }
             }

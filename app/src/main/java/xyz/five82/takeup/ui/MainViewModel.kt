@@ -189,18 +189,42 @@ internal sealed interface MainUiState {
     ) : MainUiState
 }
 
-// Pool of items the home hero features: in-progress items first, then fresh
-// arrivals, with a plain library item as a last resort so the hero never
-// renders empty on a populated server.
-internal fun MainUiState.Home.heroItems(): List<LoomItem> {
-    val pool = (content.continueWatching.take(3) + content.recentlyAdded)
-        .distinctBy { it.id }
-        .take(6)
-    if (pool.isNotEmpty()) return pool
-    return listOfNotNull(
-        content.movies.firstOrNull()
-            ?: content.shows.firstOrNull()
-            ?: content.shorts.firstOrNull(),
+// The home spotlight: one title a day instead of a carousel. A deterministic
+// day-seeded pick among untouched movies with backdrop art - anything watched
+// or in progress is excluded so the spotlight never mirrors the Continue
+// Watching row below it. Stable within a day, rotates across days without any
+// saved state. The pick can shift when the library changes size; fine for a
+// daily rotation.
+internal fun MainUiState.Home.spotlightItem(epochDay: Long): LoomItem? {
+    val movies = content.movies
+    val untouched = movies.filter {
+        it.progress?.played != true && (it.progress?.resumePositionMs ?: 0L) <= 0L
+    }
+    val pool = untouched.filter { it.backdropImageId > 0 }
+        .ifEmpty { movies.filter { it.backdropImageId > 0 } }
+        .ifEmpty { movies }
+    if (pool.isEmpty()) {
+        return content.shows.firstOrNull() ?: content.shorts.firstOrNull()
+    }
+    return pool[(epochDay.mod(pool.size.toLong())).toInt()]
+}
+
+// Losing the last local network is definitive - Loom lives on the LAN, so it is
+// unreachable - and Home switches to the downloads-only offline layout right
+// away instead of waiting for a request to fail. Mirrors loadHome's failure
+// rule: offline mode only exists when there is something downloaded to show.
+internal fun offlineHomeAfterLoss(
+    state: MainUiState,
+    hasDownloads: Boolean,
+): MainUiState.Home? {
+    if (!hasDownloads) return null
+    // A loading Home is left alone: the in-flight request fails on its own and
+    // lands the same offline state through loadHome.
+    if (state !is MainUiState.Home || state.isOffline || state.isLoading) return null
+    return MainUiState.Home(
+        serverUrl = state.serverUrl,
+        content = EMPTY_HOME_CONTENT,
+        isOffline = true,
     )
 }
 
@@ -241,30 +265,6 @@ internal fun MainUiState.Home.genreBrowseEntries(): List<GenreSummary> {
     return byGenre.values
         .sortedByDescending { it.second }
         .map { (genre, count) -> GenreSummary(id = genre.id, name = genre.name, itemCount = count) }
-}
-
-// Artwork that seeds the app-wide color scheme for a given destination.
-// Screens without dominant artwork return null and use the brand seed.
-internal fun seedArtworkUrl(state: MainUiState): String? = when (state) {
-    is MainUiState.Home -> state.heroItems().firstOrNull()?.let {
-        it.backdropUrl(state.serverUrl) ?: it.posterUrl(state.serverUrl)
-    }
-    is MainUiState.Details ->
-        state.item.backdropUrl(state.serverUrl) ?: state.item.posterUrl(state.serverUrl)
-    is MainUiState.ShowDetails ->
-        state.show.backdropUrl(state.serverUrl) ?: state.show.posterUrl(state.serverUrl)
-    is MainUiState.Season ->
-        state.show.backdropUrl(state.serverUrl) ?: state.season.posterUrl(state.serverUrl)
-    is MainUiState.Artwork ->
-        state.item.backdropUrl(state.serverUrl) ?: state.item.posterUrl(state.serverUrl)
-    is MainUiState.GenreLanding -> state.items.firstOrNull()?.let {
-        it.backdropUrl(state.serverUrl) ?: it.posterUrl(state.serverUrl)
-    }
-    is MainUiState.CollectionLanding -> state.collection.artworkUrl(state.serverUrl)
-    // The player accent follows the item being watched.
-    is MainUiState.Playback ->
-        state.item.backdropUrl(state.serverUrl) ?: state.item.posterUrl(state.serverUrl)
-    else -> null
 }
 
 internal val EMPTY_HOME_CONTENT = HomeContent(
@@ -394,18 +394,27 @@ internal class MainViewModel(
     }
 
     /**
-     * Joining a local network is the moment Loom might be reachable again, so retry
-     * rather than making the user pull to refresh. Only while already offline: a
-     * network change proves nothing on its own, and re-checking otherwise would
-     * reload a library that is working fine.
+     * Connectivity drives Home in both directions. Joining a local network is
+     * the moment Loom might be reachable again, so retry rather than making the
+     * user pull to refresh - only while already offline, since a network change
+     * proves nothing about a library that is working fine. Losing the last
+     * local network flips Home to the downloads-only offline layout on the
+     * spot: Loom is on the LAN, so no request needs to fail first.
      */
     private fun watchForLoomComingBack() {
         val monitor = networkMonitor ?: return
         viewModelScope.launch {
-            monitor.networksAvailable.collect {
+            monitor.wifiAvailable.collect { available ->
                 val state = _uiState.value
-                if (state is MainUiState.Home && state.isOffline && !state.isLoading) {
-                    loadHome(state.serverUrl)
+                if (available) {
+                    if (state is MainUiState.Home && state.isOffline && !state.isLoading) {
+                        loadHome(state.serverUrl)
+                    }
+                } else {
+                    offlineHomeAfterLoss(
+                        state = state,
+                        hasDownloads = !downloads?.downloads?.value.isNullOrEmpty(),
+                    )?.let { _uiState.value = it }
                 }
             }
         }
@@ -630,15 +639,6 @@ internal class MainViewModel(
             selectShow(item, BrowseOrigin.Genre)
         } else {
             selectItem(item, BrowseOrigin.Genre)
-        }
-    }
-
-    fun playGenreItem(item: LoomItem) {
-        val state = _uiState.value as? MainUiState.GenreLanding ?: return
-        if (item.kind == "show") {
-            selectShow(item, BrowseOrigin.Genre)
-        } else {
-            startPlayback(state.serverUrl, item, BrowseOrigin.Genre)
         }
     }
 

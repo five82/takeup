@@ -91,7 +91,7 @@ internal fun DetailsScreen(
         ?: downloadEntry?.posterPath
         ?: state.item.posterUrl(state.serverUrl)
     Box(Modifier.fillMaxSize()) {
-    AmbientGlow(url = backdropUrl)
+    AmbientGlow()
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = Color.Transparent,
@@ -137,7 +137,7 @@ internal fun DetailsScreen(
         ) {
             item {
                 FadingBackdropArtwork(
-                    url = state.item.backdropUrl(state.serverUrl),
+                    url = backdropUrl,
                     modifier = Modifier
                         .fillMaxWidth()
                         .aspectRatio(16f / 9f)
@@ -157,122 +157,119 @@ internal fun DetailsScreen(
                 }
             }
             item {
-                Surface(
-                    modifier = Modifier.padding(horizontal = 12.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainer,
-                    shape = MaterialTheme.shapes.extraLarge,
+                // The title block sits directly on the stage rather than in a
+                // floating card: the backdrop above already dissolved into this
+                // surface, and a container here would restart the layering.
+                Column(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.Top,
                     ) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(16.dp),
-                            verticalAlignment = Alignment.Top,
+                        MediaArtwork(
+                            url = state.item.posterUrl(state.serverUrl),
+                            modifier = Modifier
+                                .width(112.dp)
+                                .aspectRatio(2f / 3f)
+                                .clip(MaterialTheme.shapes.medium),
+                        )
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            MediaArtwork(
-                                url = state.item.posterUrl(state.serverUrl),
-                                modifier = Modifier
-                                    .width(112.dp)
-                                    .aspectRatio(2f / 3f)
-                                    .clip(MaterialTheme.shapes.medium),
-                            )
-                            Column(
-                                modifier = Modifier.weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                val logoUrl = if (state.item.kind == "movie") {
-                                    state.item.logoUrl(state.serverUrl)
-                                } else {
-                                    null
-                                }
-                                if (logoUrl != null) {
-                                    TitleLogo(
-                                        url = logoUrl,
-                                        title = state.item.title,
-                                        modifier = Modifier.fillMaxWidth(),
-                                    )
-                                } else {
-                                    Text(
-                                        text = state.item.title,
-                                        style = MaterialTheme.typography.headlineSmallEmphasized,
-                                    )
-                                }
-                                val seriesContext = listOf(
-                                    state.item.seriesTitle,
-                                    state.item.seasonTitle,
-                                ).filter { it.isNotBlank() }.joinToString(" \u00B7 ")
-                                if (seriesContext.isNotBlank()) {
-                                    Text(
-                                        text = seriesContext,
-                                        color = MaterialTheme.colorScheme.primary,
-                                        style = MaterialTheme.typography.titleMedium,
-                                    )
-                                }
-                                if (state.item.tagline.isNotBlank()) {
-                                    Text(
-                                        text = state.item.tagline,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontStyle = FontStyle.Italic,
-                                    )
-                                }
-                                val metadata = listOfNotNull(
-                                    // The certification leads: it is the one fact
-                                    // worth checking before putting something on for
-                                    // the room.
-                                    state.item.contentRating.takeIf { it.isNotBlank() },
-                                    state.item.subtitle(),
-                                    state.item.mediaDurationMs.takeIf { it > 0 }?.let(::formatRuntime),
-                                    state.item.releaseDate
-                                        .takeIf { state.item.kind == "episode" && it.isNotBlank() }
-                                        ?.let(::formatReleaseDate),
-                                    formatScore(state.item.voteAverage),
-                                ).joinToString(" \u00B7 ")
-                                if (metadata.isNotBlank()) {
-                                    Text(
-                                        text = metadata,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        style = MaterialTheme.typography.bodyLarge,
-                                    )
-                                }
-                                state.item.progress?.let { progress ->
-                                    PlaybackStatus(progress)
-                                }
+                            val logoUrl = if (state.item.kind == "movie") {
+                                state.item.logoUrl(state.serverUrl)
+                            } else {
+                                null
+                            }
+                            if (logoUrl != null) {
+                                TitleLogo(
+                                    url = logoUrl,
+                                    title = state.item.title,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            } else {
+                                Text(
+                                    text = state.item.title,
+                                    style = MaterialTheme.typography.headlineMediumEmphasized,
+                                )
+                            }
+                            val seriesContext = listOf(
+                                state.item.seriesTitle,
+                                state.item.seasonTitle,
+                            ).filter { it.isNotBlank() }.joinToString(" \u00B7 ")
+                            if (seriesContext.isNotBlank()) {
+                                Text(
+                                    text = seriesContext,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    style = MaterialTheme.typography.titleMedium,
+                                )
+                            }
+                            if (state.item.tagline.isNotBlank()) {
+                                Text(
+                                    text = state.item.tagline,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontStyle = FontStyle.Italic,
+                                )
+                            }
+                            val metadata = listOfNotNull(
+                                // The certification leads: it is the one fact
+                                // worth checking before putting something on for
+                                // the room.
+                                state.item.contentRating.takeIf { it.isNotBlank() },
+                                state.item.subtitle(),
+                                state.item.mediaDurationMs.takeIf { it > 0 }?.let(::formatRuntime),
+                                state.item.releaseDate
+                                    .takeIf { state.item.kind == "episode" && it.isNotBlank() }
+                                    ?.let(::formatReleaseDate),
+                                formatScore(state.item.voteAverage),
+                            ).joinToString(" \u00B7 ")
+                            if (metadata.isNotBlank()) {
+                                Text(
+                                    text = metadata,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    style = MaterialTheme.typography.labelLarge,
+                                )
+                            }
+                            state.item.progress?.let { progress ->
+                                PlaybackStatus(progress)
                             }
                         }
-                        // The actions span the card instead of sharing the
-                        // column beside the poster, where "Resume" had no room
-                        // left next to the download and artwork buttons.
-                        DetailActionRow(
-                            playLabel = stringResource(
-                                if ((state.item.progress?.resumePositionMs ?: 0L) > 0) {
-                                    R.string.resume
-                                } else {
-                                    R.string.play
-                                },
-                            ),
-                            enabled = !state.isLoading,
-                            onPlay = onPlay,
-                            downloadEntry = downloadEntry,
-                            // Loom's current version for this item. Comparing
-                            // against the download's own snapshot would always
-                            // match.
-                            itemTag = state.item.mediaTag,
-                            onDownload = {
-                                when (downloadAction(downloadEntry, state.item.mediaTag)) {
-                                    // Deleting finished bytes is worth a prompt;
-                                    // abandoning a partial transfer is not.
-                                    DownloadAction.Remove -> confirmRemoval = true
-                                    DownloadAction.Cancel -> onRemoveDownload()
-                                    else -> onDownload()
-                                }
-                            },
-                            onEditArtwork = onEditArtwork.takeIf {
-                                state.item.kind == "movie" && state.item.tmdbId > 0
-                            },
-                        )
                     }
+                    // The actions span the screen instead of sharing the column
+                    // beside the poster, where "Resume" had no room left next
+                    // to the download and artwork buttons.
+                    DetailActionRow(
+                        playLabel = stringResource(
+                            if ((state.item.progress?.resumePositionMs ?: 0L) > 0) {
+                                R.string.resume
+                            } else {
+                                R.string.play
+                            },
+                        ),
+                        enabled = !state.isLoading,
+                        onPlay = onPlay,
+                        downloadEntry = downloadEntry,
+                        // Loom's current version for this item. Comparing
+                        // against the download's own snapshot would always
+                        // match.
+                        itemTag = state.item.mediaTag,
+                        onDownload = {
+                            when (downloadAction(downloadEntry, state.item.mediaTag)) {
+                                // Deleting finished bytes is worth a prompt;
+                                // abandoning a partial transfer is not.
+                                DownloadAction.Remove -> confirmRemoval = true
+                                DownloadAction.Cancel -> onRemoveDownload()
+                                else -> onDownload()
+                            }
+                        },
+                        onEditArtwork = onEditArtwork.takeIf {
+                            state.item.kind == "movie" && state.item.tmdbId > 0
+                        },
+                    )
                 }
             }
             if (state.item.genres.isNotEmpty()) {
@@ -512,10 +509,13 @@ internal fun CreditSection(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             credits.forEach { credit ->
-                val subtitle = if (credit.role == CREDIT_ROLE_DIRECTOR) {
-                    stringResource(R.string.director)
-                } else {
-                    credit.character
+                // The role line always renders - "Cast" when Loom sent no
+                // character - so every pill is two lines tall and the names
+                // sit on one baseline across the row.
+                val subtitle = when {
+                    credit.role == CREDIT_ROLE_DIRECTOR -> stringResource(R.string.director)
+                    credit.character.isNotBlank() -> credit.character
+                    else -> stringResource(R.string.cast)
                 }
                 Surface(
                     onClick = { onPersonSelected(credit) },
@@ -530,13 +530,12 @@ internal fun CreditSection(
                             text = credit.name,
                             style = MaterialTheme.typography.labelLargeEmphasized,
                         )
-                        if (subtitle.isNotBlank()) {
-                            Text(
-                                text = subtitle,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                style = MaterialTheme.typography.labelSmall,
-                            )
-                        }
+                        Text(
+                            text = subtitle,
+                            maxLines = 1,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.labelSmall,
+                        )
                     }
                 }
             }
@@ -544,7 +543,11 @@ internal fun CreditSection(
     }
 }
 
-/** Tappable genre pills linking into the genre landing. */
+/**
+ * Tappable genre pills linking into the genre landing. Tertiary is the browse
+ * accent: genre chips stay visually distinct from actions (primary) and
+ * done-states (secondary).
+ */
 @Composable
 internal fun GenreChipRow(
     genres: List<Genre>,
@@ -559,8 +562,8 @@ internal fun GenreChipRow(
         genres.forEach { genre ->
             Surface(
                 onClick = { onGenreSelected(genre) },
-                color = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                color = MaterialTheme.colorScheme.tertiaryContainer,
+                contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
                 shape = MaterialTheme.shapes.extraLarge,
             ) {
                 Text(

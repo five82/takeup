@@ -10,7 +10,7 @@ import xyz.five82.takeup.data.LoomItem
 import xyz.five82.takeup.data.PlaybackProgress
 import xyz.five82.takeup.ui.theme.TakeupTheme
 
-// Artwork never loads in previews (no server), so cards render their pulse
+// Artwork never loads in previews (no server), so cards render their static
 // placeholder; layout, typography, and color roles are still representative.
 
 private val previewItem = LoomItem(

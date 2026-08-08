@@ -11,52 +11,47 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import xyz.five82.takeup.R
 import xyz.five82.takeup.data.LoomItem
-import xyz.five82.takeup.ui.theme.heroBottomScrim
 
 /**
- * A named shelf of movies: a hero drawn from its first artwork-bearing title
- * over a grid of the rest. Genres and collections differ only in where the list
- * comes from, so both land here.
+ * A named shelf of movies: an identity header over the complete grid. Genres
+ * and collections differ only in where the list comes from, so both land here.
+ * The header carries the shelf's own color-and-motif identity (the same one
+ * its card wears) rather than featuring one of its titles - a featured title
+ * duplicated a movie the grid already showed one row further down.
  *
  * A collection arrives complete with the home load and cannot fail, which is why
  * the loading and error parameters default to having nothing to say.
- *
- * Omitting [onPlayItem] leaves the hero a plain banner. The featured title is in
- * the grid below like any other, so a shelf that wants its header to name the
- * shelf rather than push one of its titles loses no way in.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,7 +62,6 @@ internal fun ShelfLandingScreen(
     emptyMessage: String,
     onBack: () -> Unit,
     onItemSelected: (LoomItem) -> Unit,
-    onPlayItem: ((LoomItem) -> Unit)? = null,
     isLoading: Boolean = false,
     error: String? = null,
     onRetry: () -> Unit = {},
@@ -75,12 +69,8 @@ internal fun ShelfLandingScreen(
     BackHandler(onBack = onBack)
     UseLightStatusBarIcons()
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
-    val featured = items.firstOrNull { it.backdropUrl(serverUrl) != null }
-        ?: items.firstOrNull()
     Box(Modifier.fillMaxSize()) {
-    AmbientGlow(
-        url = featured?.let { it.backdropUrl(serverUrl) ?: it.posterUrl(serverUrl) },
-    )
+    AmbientGlow()
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = Color.Transparent,
@@ -127,22 +117,14 @@ internal fun ShelfLandingScreen(
                 contentPadding = PaddingValues(
                     start = 12.dp,
                     end = 12.dp,
+                    top = contentPadding.calculateTopPadding(),
                     bottom = contentPadding.calculateBottomPadding() + 24.dp,
                 ),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                featured?.let { item ->
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        ShelfHero(
-                            serverUrl = serverUrl,
-                            shelfTitle = title,
-                            itemCount = items.size,
-                            item = item,
-                            onPlay = onPlayItem?.let { play -> { play(item) } },
-                            onDetails = { onItemSelected(item) },
-                        )
-                    }
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    ShelfHeader(title = title, itemCount = items.size)
                 }
                 error?.let { message ->
                     item(span = { GridItemSpan(maxLineSpan) }) {
@@ -155,9 +137,7 @@ internal fun ShelfLandingScreen(
                     item(span = { GridItemSpan(maxLineSpan) }) {
                         Text(
                             text = emptyMessage,
-                            modifier = Modifier
-                                .padding(contentPadding)
-                                .padding(12.dp),
+                            modifier = Modifier.padding(12.dp),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -178,106 +158,59 @@ internal fun ShelfLandingScreen(
 }
 
 /**
- * Featured title for the shelf: full-bleed backdrop, with the CTA pair only when
- * [onPlay] is given. Without it the hero is a banner and nothing is tappable.
+ * The shelf's identity writ large: the same color and motif its card wears,
+ * with the name in the heaviest weight on the screen. No artwork - the grid
+ * below is all artwork, and the header's job is to say where you are.
  */
 @Composable
-private fun ShelfHero(
-    serverUrl: String,
-    shelfTitle: String,
+private fun ShelfHeader(
+    title: String,
     itemCount: Int,
-    item: LoomItem,
-    onPlay: (() -> Unit)?,
-    onDetails: () -> Unit,
 ) {
-    Box(
+    val identity = shelfIdentity(title)
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(16f / 11f),
+            .padding(top = 4.dp, bottom = 8.dp),
+        shape = MaterialTheme.shapes.extraLarge,
+        color = identity.color,
+        contentColor = Color.White,
     ) {
-        FadingBackdropArtwork(
-            url = item.backdropUrl(serverUrl) ?: item.posterUrl(serverUrl),
-            modifier = Modifier.fillMaxSize(),
-        )
         Box(
             modifier = Modifier
-                .fillMaxSize()
-                .background(heroBottomScrim(MaterialTheme.colorScheme.surface)),
-        )
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+                .height(148.dp)
+                .background(
+                    Brush.linearGradient(
+                        0f to identity.color,
+                        1f to shelfGradientEnd(identity.color),
+                    ),
+                ),
         ) {
-            Surface(
-                color = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                shape = MaterialTheme.shapes.extraLarge,
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = 40.dp, y = (-40).dp)
+                    .size(164.dp)
+                    .rotate(-15f)
+                    .background(Color.White.copy(alpha = 0.18f), identity.motif.toShape()),
+            )
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 Text(
-                    text = pluralStringResource(
-                        R.plurals.title_count,
-                        itemCount,
-                        itemCount,
-                    ).let { "$shelfTitle · $it" },
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                    style = MaterialTheme.typography.labelMediumEmphasized,
-                )
-            }
-            val logoUrl = item.logoUrl(serverUrl)
-            if (logoUrl != null) {
-                TitleLogo(
-                    url = logoUrl,
-                    title = item.title,
-                    modifier = Modifier.fillMaxWidth(0.72f),
-                )
-            } else {
-                Text(
-                    text = item.title,
-                    maxLines = 2,
+                    text = title,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.headlineMediumEmphasized,
+                    style = MaterialTheme.typography.headlineLargeEmphasized,
                 )
-            }
-            if (onPlay != null) {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Button(
-                    onClick = onPlay,
-                    shapes = ButtonDefaults.shapesFor(ButtonDefaults.MediumContainerHeight),
-                    modifier = Modifier.height(ButtonDefaults.MediumContainerHeight),
-                    contentPadding = ButtonDefaults.contentPaddingFor(
-                        ButtonDefaults.MediumContainerHeight,
-                    ),
-                ) {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_play),
-                        contentDescription = null,
-                    )
-                    Text(
-                        stringResource(
-                            when {
-                                item.kind == "show" -> R.string.view_details
-                                (item.progress?.resumePositionMs ?: 0L) > 0 -> R.string.resume
-                                else -> R.string.play
-                            },
-                        ),
-                    )
-                }
-                if (item.kind != "show") {
-                    FilledTonalButton(
-                        onClick = onDetails,
-                        shapes = ButtonDefaults.shapesFor(ButtonDefaults.MediumContainerHeight),
-                        modifier = Modifier.height(ButtonDefaults.MediumContainerHeight),
-                        contentPadding = ButtonDefaults.contentPaddingFor(
-                            ButtonDefaults.MediumContainerHeight,
-                        ),
-                    ) {
-                        Text(stringResource(R.string.view_details))
-                    }
-                }
-            }
+                Text(
+                    text = pluralStringResource(R.plurals.title_count, itemCount, itemCount),
+                    color = Color.White.copy(alpha = 0.75f),
+                    style = MaterialTheme.typography.labelLarge,
+                )
             }
         }
     }

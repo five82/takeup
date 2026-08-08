@@ -24,39 +24,60 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.graphics.shapes.RoundedPolygon
 import xyz.five82.takeup.R
 import kotlin.math.abs
 
-// Curated card palette: genre cards keep a fixed identity regardless of the
-// current artwork seed. Dark, saturated bases with white text.
+// Curated card palette: cool-leaning dark saturated bases with white text.
+// Twelve entries so repeats are rare across a genre grid; no browns or tans -
+// the two warm survivors (crimson, magenta) stay because dark red reads as
+// velvet rather than rust.
 private val GenreCardColors = listOf(
     Color(0xFF7D2231), // crimson
-    Color(0xFF7D3A14), // ember
-    Color(0xFF7A5A18), // gold
-    Color(0xFF175A34), // forest
-    Color(0xFF12525E), // teal
-    Color(0xFF1D4B7D), // azure
-    Color(0xFF4A1876), // violet
     Color(0xFF6A2550), // magenta
+    Color(0xFF7A2D6E), // orchid
+    Color(0xFF4A1876), // violet
+    Color(0xFF35318F), // indigo
+    Color(0xFF3D49A5), // iris
+    Color(0xFF1D4B7D), // cobalt
+    Color(0xFF135F8C), // azure
+    Color(0xFF0E5A6B), // cyan
+    Color(0xFF12525E), // teal
+    Color(0xFF175A34), // emerald
+    Color(0xFF3A4354), // slate
 )
 
-// Decorative marks from the Material shape library, one per card corner.
-private val genreMotifs
-    @Composable get() = listOf(
-        MaterialShapes.Sunny,
-        MaterialShapes.Cookie9Sided,
-        MaterialShapes.Clover4Leaf,
-        MaterialShapes.SoftBurst,
-        MaterialShapes.Gem,
-        MaterialShapes.Flower,
-        MaterialShapes.Cookie12Sided,
-        MaterialShapes.Puffy,
-    )
+// Decorative marks from the Material shape library.
+private val GenreMotifs = listOf(
+    MaterialShapes.Sunny,
+    MaterialShapes.Cookie9Sided,
+    MaterialShapes.Clover4Leaf,
+    MaterialShapes.SoftBurst,
+    MaterialShapes.Gem,
+    MaterialShapes.Flower,
+    MaterialShapes.Cookie12Sided,
+    MaterialShapes.Puffy,
+)
+
+internal data class ShelfIdentity(val color: Color, val motif: RoundedPolygon)
 
 /**
- * Color-blocked genre card with a Material-shape motif. Color and motif are
- * derived from the genre name, so a genre looks the same wherever it appears.
+ * The stable visual identity for a named shelf: color and motif derived from
+ * the name, so a genre or collection looks the same wherever it appears -
+ * card, browse row, and landing header alike.
  */
+internal fun shelfIdentity(name: String): ShelfIdentity {
+    val hash = abs(name.hashCode())
+    return ShelfIdentity(
+        color = GenreCardColors[hash % GenreCardColors.size],
+        motif = GenreMotifs[(hash / GenreCardColors.size) % GenreMotifs.size],
+    )
+}
+
+// The gradient's dark end, shared by cards and landing headers.
+internal fun shelfGradientEnd(base: Color): Color = lerp(base, Color(0xFF0C0E12), 0.55f)
+
+/** Color-blocked genre card with a Material-shape motif. */
 @Composable
 internal fun GenreCard(
     name: String,
@@ -64,15 +85,12 @@ internal fun GenreCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val hash = abs(name.hashCode())
-    val base = GenreCardColors[hash % GenreCardColors.size]
-    val motifs = genreMotifs
-    val motif = motifs[(hash / GenreCardColors.size) % motifs.size].toShape()
+    val identity = shelfIdentity(name)
     Surface(
         onClick = onClick,
         modifier = modifier,
         shape = MaterialTheme.shapes.medium,
-        color = base,
+        color = identity.color,
         contentColor = Color.White,
     ) {
         Box(
@@ -80,8 +98,8 @@ internal fun GenreCard(
                 .fillMaxSize()
                 .background(
                     Brush.linearGradient(
-                        0f to base,
-                        1f to lerp(base, Color(0xFF0C0E12), 0.55f),
+                        0f to identity.color,
+                        1f to shelfGradientEnd(identity.color),
                     ),
                 ),
         ) {
@@ -91,7 +109,7 @@ internal fun GenreCard(
                     .offset(x = 26.dp, y = (-26).dp)
                     .size(92.dp)
                     .rotate(-15f)
-                    .background(Color.White.copy(alpha = 0.18f), motif),
+                    .background(Color.White.copy(alpha = 0.18f), identity.motif.toShape()),
             )
             Column(
                 modifier = Modifier

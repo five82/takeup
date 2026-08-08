@@ -41,7 +41,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalIconButton
@@ -691,131 +690,111 @@ private fun PlaybackButtonGroup(
     }
     val previousChapterMs = previousChapterPositionMs(chapterStartsMs, positionMs)
     val nextChapterMs = nextChapterPositionMs(chapterStartsMs, positionMs)
+    // Rounded squares per the design language; the pressed shapes keep the
+    // stock Expressive press morph.
     val smallShapes = IconButtonDefaults.shapes(
-        shape = IconButtonDefaults.smallRoundShape,
+        shape = IconButtonDefaults.smallSquareShape,
         pressedShape = IconButtonDefaults.smallPressedShape,
     )
     val mediumShapes = IconButtonDefaults.shapes(
-        shape = IconButtonDefaults.mediumRoundShape,
+        shape = IconButtonDefaults.mediumSquareShape,
         pressedShape = IconButtonDefaults.mediumPressedShape,
     )
     val extraLargeShapes = IconButtonDefaults.shapes(
-        shape = IconButtonDefaults.extraLargeRoundShape,
+        shape = IconButtonDefaults.extraLargeSquareShape,
         pressedShape = IconButtonDefaults.extraLargePressedShape,
     )
 
-    ButtonGroup(
-        overflowIndicator = {},
+    // A plain centered row, not a ButtonGroup: the group's overflow machinery
+    // went unused here, and it top-aligns its items - which is exactly what
+    // hung the 64dp seek buttons from the top of the 96dp play button.
+    Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         if (chapterStartsMs.isNotEmpty()) {
-            customItem(
-                buttonGroupContent = {
-                    FilledTonalIconButton(
-                        onClick = {
-                            previousChapterMs?.let(player::seekTo)
-                            onInteraction()
-                        },
-                        shapes = smallShapes,
-                        modifier = Modifier.size(48.dp),
-                        enabled = previousChapterMs != null,
-                    ) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_skip_previous),
-                            contentDescription = stringResource(R.string.previous_chapter),
-                            modifier = Modifier.size(24.dp),
-                        )
-                    }
+            FilledTonalIconButton(
+                onClick = {
+                    previousChapterMs?.let(player::seekTo)
+                    onInteraction()
                 },
-                menuContent = {},
+                shapes = smallShapes,
+                modifier = Modifier.size(48.dp),
+                enabled = previousChapterMs != null,
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_skip_previous),
+                    contentDescription = stringResource(R.string.previous_chapter),
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+        }
+        FilledTonalIconButton(
+            onClick = {
+                seekBackState.onClick()
+                onInteraction()
+            },
+            shapes = mediumShapes,
+            modifier = Modifier.size(64.dp),
+            enabled = seekBackState.isEnabled,
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.ic_seek_back_10),
+                contentDescription = stringResource(R.string.seek_back_10),
+                modifier = Modifier.size(28.dp),
             )
         }
-        customItem(
-            buttonGroupContent = {
-                FilledTonalIconButton(
-                    onClick = {
-                        seekBackState.onClick()
-                        onInteraction()
-                    },
-                    shapes = mediumShapes,
-                    modifier = Modifier.size(64.dp),
-                    enabled = seekBackState.isEnabled,
-                ) {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_seek_back_10),
-                        contentDescription = stringResource(R.string.seek_back_10),
-                        modifier = Modifier.size(28.dp),
-                    )
-                }
+        FilledIconButton(
+            onClick = {
+                playPauseState.onClick()
+                onInteraction()
             },
-            menuContent = {},
-        )
-        customItem(
-            buttonGroupContent = {
-                FilledIconButton(
-                    onClick = {
-                        playPauseState.onClick()
-                        onInteraction()
-                    },
-                    shapes = extraLargeShapes,
-                    modifier = Modifier.size(96.dp),
-                    enabled = playPauseState.isEnabled,
-                ) {
-                    Icon(
-                        painter = painterResource(
-                            if (playPauseState.showPlay) R.drawable.ic_play else R.drawable.ic_pause,
-                        ),
-                        contentDescription = stringResource(
-                            if (playPauseState.showPlay) R.string.play else R.string.pause,
-                        ),
-                        modifier = Modifier.size(40.dp),
-                    )
-                }
-            },
-            menuContent = {},
-        )
-        customItem(
-            buttonGroupContent = {
-                FilledTonalIconButton(
-                    onClick = {
-                        seekForwardState.onClick()
-                        onInteraction()
-                    },
-                    shapes = mediumShapes,
-                    modifier = Modifier.size(64.dp),
-                    enabled = seekForwardState.isEnabled,
-                ) {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_seek_forward_10),
-                        contentDescription = stringResource(R.string.seek_forward_10),
-                        modifier = Modifier.size(28.dp),
-                    )
-                }
-            },
-            menuContent = {},
-        )
-        if (chapterStartsMs.isNotEmpty()) {
-            customItem(
-                buttonGroupContent = {
-                    FilledTonalIconButton(
-                        onClick = {
-                            nextChapterMs?.let(player::seekTo)
-                            onInteraction()
-                        },
-                        shapes = smallShapes,
-                        modifier = Modifier.size(48.dp),
-                        enabled = nextChapterMs != null,
-                    ) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_skip_next),
-                            contentDescription = stringResource(R.string.next_chapter),
-                            modifier = Modifier.size(24.dp),
-                        )
-                    }
-                },
-                menuContent = {},
+            shapes = extraLargeShapes,
+            modifier = Modifier.size(96.dp),
+            enabled = playPauseState.isEnabled,
+        ) {
+            Icon(
+                painter = painterResource(
+                    if (playPauseState.showPlay) R.drawable.ic_play else R.drawable.ic_pause,
+                ),
+                contentDescription = stringResource(
+                    if (playPauseState.showPlay) R.string.play else R.string.pause,
+                ),
+                modifier = Modifier.size(40.dp),
             )
+        }
+        FilledTonalIconButton(
+            onClick = {
+                seekForwardState.onClick()
+                onInteraction()
+            },
+            shapes = mediumShapes,
+            modifier = Modifier.size(64.dp),
+            enabled = seekForwardState.isEnabled,
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.ic_seek_forward_10),
+                contentDescription = stringResource(R.string.seek_forward_10),
+                modifier = Modifier.size(28.dp),
+            )
+        }
+        if (chapterStartsMs.isNotEmpty()) {
+            FilledTonalIconButton(
+                onClick = {
+                    nextChapterMs?.let(player::seekTo)
+                    onInteraction()
+                },
+                shapes = smallShapes,
+                modifier = Modifier.size(48.dp),
+                enabled = nextChapterMs != null,
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_skip_next),
+                    contentDescription = stringResource(R.string.next_chapter),
+                    modifier = Modifier.size(24.dp),
+                )
+            }
         }
     }
 }
@@ -1175,7 +1154,7 @@ private fun PlaybackHeader(
     val mediumContainerSize = IconButtonDefaults.mediumContainerSize()
     val mediumIconSize = IconButtonDefaults.mediumIconSize
     val mediumShapes = IconButtonDefaults.shapes(
-        shape = IconButtonDefaults.mediumRoundShape,
+        shape = IconButtonDefaults.mediumSquareShape,
         pressedShape = IconButtonDefaults.mediumPressedShape,
     )
 
@@ -1189,7 +1168,9 @@ private fun PlaybackHeader(
                 ),
             )
             .heightIn(min = 72.dp)
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+            // Wide enough to clear the display's rounded corners, which the
+            // safe-drawing insets do not account for.
+            .padding(horizontal = 22.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -1216,7 +1197,11 @@ private fun PlaybackHeader(
             FilledTonalIconToggleButton(
                 checked = cropToFill,
                 onCheckedChange = { onToggleCrop() },
-                shapes = IconButtonDefaults.toggleableShapes(),
+                shapes = IconButtonDefaults.toggleableShapes(
+                    shape = IconButtonDefaults.mediumSquareShape,
+                    pressedShape = IconButtonDefaults.mediumPressedShape,
+                    checkedShape = IconButtonDefaults.mediumSelectedSquareShape,
+                ),
                 modifier = Modifier.size(mediumContainerSize),
             ) {
                 Icon(
