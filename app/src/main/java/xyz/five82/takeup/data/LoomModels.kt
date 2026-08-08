@@ -8,6 +8,18 @@ data class LoomItem(
     val title: String,
     val year: Int,
     val overview: String,
+    val tagline: String = "",
+    // TMDB's audience score, out of ten. Zero when TMDB has no votes for the
+    // title, which is why nothing here treats it as a real score of zero.
+    val voteAverage: Double = 0.0,
+    // The certification from the US board, blank when TMDB files the title
+    // under no US board at all.
+    val contentRating: String = "",
+    // Status and totalSeasons describe a show's whole run rather than the part
+    // of it this library holds, so nothing should read them as a count of what
+    // is here. Loom leaves both empty for movies and episodes.
+    val status: String = "",
+    val totalSeasons: Int = 0,
     val tmdbId: Long = 0,
     val parentId: Long = 0,
     val seasonNumber: Int = 0,

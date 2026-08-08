@@ -352,6 +352,65 @@ class LoomJsonTest {
     }
 
     @Test
+    fun `parses the detail fields on a show`() {
+        val show = LoomJson.item(
+            """
+            {
+              "id": 265,
+              "kind": "show",
+              "title": "Severance",
+              "tagline": "Who are you at work?",
+              "vote_average": 8.4,
+              "content_rating": "TV-MA",
+              "status": "Returning Series",
+              "total_seasons": 2
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals("Who are you at work?", show.tagline)
+        assertEquals(8.4, show.voteAverage, 0.001)
+        assertEquals("TV-MA", show.contentRating)
+        assertEquals("Returning Series", show.status)
+        assertEquals(2, show.totalSeasons)
+    }
+
+    @Test
+    fun `parses the detail fields on a movie`() {
+        val movie = LoomJson.item(
+            """
+            {
+              "id": 42,
+              "kind": "movie",
+              "title": "Arrival",
+              "tagline": "Why are they here?",
+              "vote_average": 7.6,
+              "content_rating": "PG-13"
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals("Why are they here?", movie.tagline)
+        assertEquals(7.6, movie.voteAverage, 0.001)
+        assertEquals("PG-13", movie.contentRating)
+        // Loom stores neither for a movie, whose status is "Released" for all
+        // but a handful and says nothing a screen can use.
+        assertEquals("", movie.status)
+        assertEquals(0, movie.totalSeasons)
+    }
+
+    @Test
+    fun `treats omitted detail fields as blank`() {
+        val item = LoomJson.item("""{"id":42,"kind":"movie","title":"Arrival"}""")
+
+        assertEquals("", item.tagline)
+        assertEquals(0.0, item.voteAverage, 0.001)
+        assertEquals("", item.contentRating)
+        assertEquals("", item.status)
+        assertEquals(0, item.totalSeasons)
+    }
+
+    @Test
     fun `parses artwork options`() {
         val options = LoomJson.artworkOptions(
             """

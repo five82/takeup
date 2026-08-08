@@ -26,6 +26,10 @@
         <item quantity="one">%d episode</item>
         <item quantity="other">%d episodes</item>
     </plurals>
+    <plurals name="season_count">
+        <item quantity="one">%d season</item>
+        <item quantity="other">%d seasons</item>
+    </plurals>
     <plurals name="unwatched_count">
         <item quantity="one">%d unwatched episode</item>
         <item quantity="other">%d unwatched episodes</item>

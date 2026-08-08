@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import xyz.five82.takeup.R
 import xyz.five82.takeup.data.LoomItem
@@ -150,7 +151,27 @@ internal fun ShowDetailsScreen(
                                     style = MaterialTheme.typography.headlineSmallEmphasized,
                                 )
                             }
-                            state.show.subtitle()?.let {
+                            if (state.show.tagline.isNotBlank()) {
+                                Text(
+                                    text = state.show.tagline,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontStyle = FontStyle.Italic,
+                                )
+                            }
+                            val metadata = listOfNotNull(
+                                state.show.contentRating.takeIf { it.isNotBlank() },
+                                state.show.subtitle(),
+                                formatScore(state.show.voteAverage),
+                            ).joinToString(" \u00B7 ")
+                            if (metadata.isNotBlank()) {
+                                Text(
+                                    text = metadata,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                )
+                            }
+                            showRun(state.show)?.let {
                                 Text(
                                     text = it,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -245,6 +266,24 @@ internal fun ShowDetailsScreen(
         }
     }
     }
+}
+
+/**
+ * "Ended - 5 seasons" for the show's whole run, which is TMDB's account of it
+ * and not a count of what this library holds. It sits above the episode rollup
+ * for that reason: the rollup is the shelf, this is the series. The status is
+ * TMDB's own wording ("Ended", "Returning Series") rather than a mapping onto
+ * strings of ours, because a value we do not recognize should still show.
+ */
+@Composable
+private fun showRun(show: LoomItem): String? {
+    val parts = listOfNotNull(
+        show.status.takeIf { it.isNotBlank() },
+        show.totalSeasons.takeIf { it > 0 }?.let {
+            pluralStringResource(R.plurals.season_count, it, it)
+        },
+    )
+    return parts.joinToString(" \u00B7 ").ifBlank { null }
 }
 
 /**

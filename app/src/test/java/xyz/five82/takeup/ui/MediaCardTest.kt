@@ -1,6 +1,7 @@
 package xyz.five82.takeup.ui
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 import java.util.Locale
 import xyz.five82.takeup.data.LoomItem
@@ -99,6 +100,13 @@ class MediaCardTest {
     fun `formats release dates and preserves invalid values`() {
         assertEquals("Aug 2, 2026", formatReleaseDate("2026-08-02", Locale.US))
         assertEquals("not-a-date", formatReleaseDate("not-a-date", Locale.US))
+    }
+
+    @Test
+    fun `formats an audience score and drops one Loom never had`() {
+        assertEquals("7.6/10", formatScore(7.6, Locale.US))
+        assertEquals("8.0/10", formatScore(8.0, Locale.US))
+        assertNull(formatScore(0.0, Locale.US))
     }
 
     @Test

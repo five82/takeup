@@ -49,6 +49,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import xyz.five82.takeup.R
 import xyz.five82.takeup.data.DownloadEntry
@@ -158,96 +159,116 @@ internal fun DetailsScreen(
                     color = MaterialTheme.colorScheme.surfaceContainer,
                     shape = MaterialTheme.shapes.extraLarge,
                 ) {
-                    Row(
+                    Column(
                         modifier = Modifier.padding(16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        verticalAlignment = Alignment.Top,
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        MediaArtwork(
-                            url = state.item.posterUrl(state.serverUrl),
-                            modifier = Modifier
-                                .width(112.dp)
-                                .aspectRatio(2f / 3f)
-                                .clip(MaterialTheme.shapes.medium),
-                        )
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            verticalAlignment = Alignment.Top,
                         ) {
-                            val logoUrl = if (state.item.kind == "movie") {
-                                state.item.logoUrl(state.serverUrl)
-                            } else {
-                                null
-                            }
-                            if (logoUrl != null) {
-                                TitleLogo(
-                                    url = logoUrl,
-                                    title = state.item.title,
-                                    modifier = Modifier.fillMaxWidth(),
-                                )
-                            } else {
-                                Text(
-                                    text = state.item.title,
-                                    style = MaterialTheme.typography.headlineSmallEmphasized,
-                                )
-                            }
-                            val seriesContext = listOf(
-                                state.item.seriesTitle,
-                                state.item.seasonTitle,
-                            ).filter { it.isNotBlank() }.joinToString(" \u00B7 ")
-                            if (seriesContext.isNotBlank()) {
-                                Text(
-                                    text = seriesContext,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    style = MaterialTheme.typography.titleMedium,
-                                )
-                            }
-                            val metadata = listOfNotNull(
-                                state.item.subtitle(),
-                                state.item.mediaDurationMs.takeIf { it > 0 }?.let(::formatRuntime),
-                                state.item.releaseDate
-                                    .takeIf { state.item.kind == "episode" && it.isNotBlank() }
-                                    ?.let(::formatReleaseDate),
-                            ).joinToString(" \u00B7 ")
-                            if (metadata.isNotBlank()) {
-                                Text(
-                                    text = metadata,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                )
-                            }
-                            state.item.progress?.let { progress ->
-                                PlaybackStatus(progress)
-                            }
-                            DetailActionRow(
-                                playLabel = stringResource(
-                                    if ((state.item.progress?.resumePositionMs ?: 0L) > 0) {
-                                        R.string.resume
-                                    } else {
-                                        R.string.play
-                                    },
-                                ),
-                                enabled = !state.isLoading,
-                                onPlay = onPlay,
-                                downloadEntry = downloadEntry,
-                                // Loom's current version for this item. Comparing
-                                // against the download's own snapshot would always
-                                // match.
-                                itemTag = state.item.mediaTag,
-                                onDownload = {
-                                    when (downloadAction(downloadEntry, state.item.mediaTag)) {
-                                        // Deleting finished bytes is worth a prompt;
-                                        // abandoning a partial transfer is not.
-                                        DownloadAction.Remove -> confirmRemoval = true
-                                        DownloadAction.Cancel -> onRemoveDownload()
-                                        else -> onDownload()
-                                    }
-                                },
-                                onEditArtwork = onEditArtwork.takeIf {
-                                    state.item.kind == "movie" && state.item.tmdbId > 0
-                                },
+                            MediaArtwork(
+                                url = state.item.posterUrl(state.serverUrl),
+                                modifier = Modifier
+                                    .width(112.dp)
+                                    .aspectRatio(2f / 3f)
+                                    .clip(MaterialTheme.shapes.medium),
                             )
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                val logoUrl = if (state.item.kind == "movie") {
+                                    state.item.logoUrl(state.serverUrl)
+                                } else {
+                                    null
+                                }
+                                if (logoUrl != null) {
+                                    TitleLogo(
+                                        url = logoUrl,
+                                        title = state.item.title,
+                                        modifier = Modifier.fillMaxWidth(),
+                                    )
+                                } else {
+                                    Text(
+                                        text = state.item.title,
+                                        style = MaterialTheme.typography.headlineSmallEmphasized,
+                                    )
+                                }
+                                val seriesContext = listOf(
+                                    state.item.seriesTitle,
+                                    state.item.seasonTitle,
+                                ).filter { it.isNotBlank() }.joinToString(" \u00B7 ")
+                                if (seriesContext.isNotBlank()) {
+                                    Text(
+                                        text = seriesContext,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        style = MaterialTheme.typography.titleMedium,
+                                    )
+                                }
+                                if (state.item.tagline.isNotBlank()) {
+                                    Text(
+                                        text = state.item.tagline,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontStyle = FontStyle.Italic,
+                                    )
+                                }
+                                val metadata = listOfNotNull(
+                                    // The certification leads: it is the one fact
+                                    // worth checking before putting something on for
+                                    // the room.
+                                    state.item.contentRating.takeIf { it.isNotBlank() },
+                                    state.item.subtitle(),
+                                    state.item.mediaDurationMs.takeIf { it > 0 }?.let(::formatRuntime),
+                                    state.item.releaseDate
+                                        .takeIf { state.item.kind == "episode" && it.isNotBlank() }
+                                        ?.let(::formatReleaseDate),
+                                    formatScore(state.item.voteAverage),
+                                ).joinToString(" \u00B7 ")
+                                if (metadata.isNotBlank()) {
+                                    Text(
+                                        text = metadata,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                    )
+                                }
+                                state.item.progress?.let { progress ->
+                                    PlaybackStatus(progress)
+                                }
+                            }
                         }
+                        // The actions span the card instead of sharing the
+                        // column beside the poster, where "Resume" had no room
+                        // left next to the download and artwork buttons.
+                        DetailActionRow(
+                            playLabel = stringResource(
+                                if ((state.item.progress?.resumePositionMs ?: 0L) > 0) {
+                                    R.string.resume
+                                } else {
+                                    R.string.play
+                                },
+                            ),
+                            enabled = !state.isLoading,
+                            onPlay = onPlay,
+                            downloadEntry = downloadEntry,
+                            // Loom's current version for this item. Comparing
+                            // against the download's own snapshot would always
+                            // match.
+                            itemTag = state.item.mediaTag,
+                            onDownload = {
+                                when (downloadAction(downloadEntry, state.item.mediaTag)) {
+                                    // Deleting finished bytes is worth a prompt;
+                                    // abandoning a partial transfer is not.
+                                    DownloadAction.Remove -> confirmRemoval = true
+                                    DownloadAction.Cancel -> onRemoveDownload()
+                                    else -> onDownload()
+                                }
+                            },
+                            onEditArtwork = onEditArtwork.takeIf {
+                                state.item.kind == "movie" && state.item.tmdbId > 0
+                            },
+                        )
                     }
                 }
             }
@@ -525,6 +546,20 @@ internal fun formatReleaseDate(
 ): String = runCatching {
     LocalDate.parse(value).format(DateTimeFormatter.ofPattern("MMM d, uuuu", locale))
 }.getOrDefault(value)
+
+/**
+ * TMDB's audience score as "7.4/10". Null when Loom sent no score, which it
+ * does for a title TMDB has no votes for and for anything it never matched.
+ * The denominator stays because a bare "7.4" beside a year and a runtime does
+ * not read as a score.
+ */
+internal fun formatScore(
+    voteAverage: Double,
+    locale: Locale = Locale.getDefault(),
+): String? {
+    if (voteAverage <= 0) return null
+    return String.format(locale, "%.1f/10", voteAverage)
+}
 
 internal fun formatRuntime(durationMs: Long): String {
     val totalMinutes = durationMs / 60_000

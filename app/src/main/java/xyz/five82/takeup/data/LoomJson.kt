@@ -110,6 +110,11 @@ internal object LoomJson {
             title = value.requiredString("title"),
             year = value.int("year"),
             overview = value.string("overview"),
+            tagline = value.string("tagline"),
+            voteAverage = value.double("vote_average"),
+            contentRating = value.string("content_rating"),
+            status = value.string("status"),
+            totalSeasons = value.int("total_seasons"),
             tmdbId = value.long("tmdb_id"),
             parentId = value.long("parent_id"),
             seasonNumber = value.int("season_number"),
@@ -213,6 +218,9 @@ internal object LoomJson {
 
     private fun JsonObject.long(name: String): Long =
         get(name)?.takeUnless { it.isJsonNull }?.asLong ?: 0L
+
+    private fun JsonObject.double(name: String): Double =
+        get(name)?.takeUnless { it.isJsonNull }?.asDouble ?: 0.0
 
     private fun JsonObject.int(name: String): Int =
         get(name)?.takeUnless { it.isJsonNull }?.asInt ?: 0
