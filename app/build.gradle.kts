@@ -44,15 +44,14 @@ dependencies {
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material.icons.core)
 
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.ui)
-    implementation(libs.androidx.media3.ui.compose.material3)
+    implementation(libs.okhttp)
 
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
-    implementation(libs.haze)
-    implementation(libs.haze.materials)
     implementation(libs.material.kolor)
     implementation(libs.gson)
     implementation(libs.kotlinx.coroutines.android)

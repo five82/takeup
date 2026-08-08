@@ -1,0 +1,114 @@
+package xyz.five82.takeup
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import xyz.five82.takeup.api.Collection
+import xyz.five82.takeup.api.Genre
+import xyz.five82.takeup.api.Item
+import xyz.five82.takeup.api.Progress
+import xyz.five82.takeup.ui.home.discoveryRows
+
+class DiscoveryTest {
+
+    private val sciFi = Genre(id = 1, name = "Sci-Fi")
+    private val drama = Genre(id = 2, name = "Drama")
+
+    private fun movie(
+        id: Long,
+        genre: Genre = sciFi,
+        rating: Double = 8.0,
+        durationMs: Long = 2 * 60 * 60 * 1000L,
+        started: Boolean = false,
+    ) = Item(
+        id = id,
+        kind = "movie",
+        title = "Movie $id",
+        genres = listOf(genre),
+        voteAverage = rating,
+        durationMs = durationMs,
+        progress = if (started) Progress(positionMs = 1) else null,
+    )
+
+    private fun show(id: Long, unwatched: Int = 8) = Item(
+        id = id,
+        kind = "show",
+        title = "Show $id",
+        genres = listOf(drama),
+        voteAverage = 8.0,
+        episodeCount = 8,
+        unwatchedCount = unwatched,
+    )
+
+    private val movies = (1L..20L).map {
+        movie(
+            it,
+            genre = if (it % 2 == 0L) sciFi else drama,
+            durationMs = if (it % 5 == 0L) 80 * 60 * 1000L else 2 * 60 * 60 * 1000L,
+        )
+    }
+    private val shows = (21L..30L).map { show(it) }
+    private val collections = listOf(
+        Collection("first", "First Collection", listOf(movie(1), movie(3))),
+        Collection("second", "Second Collection", listOf(movie(2), movie(4))),
+    )
+    private val recentlyPlayed = listOf(movie(5, started = true), movie(7, started = true), show(21), show(22))
+
+    private fun rowsFor(day: Long) = discoveryRows(movies, shows, collections, recentlyPlayed, day)
+
+    @Test
+    fun sameDayIsStableAndCapped() {
+        val first = rowsFor(100)
+        val second = rowsFor(100)
+        assertEquals(first, second)
+        assertTrue(first.size == 3)
+    }
+
+    @Test
+    fun rowsRotateAcrossDays() {
+        val keysByDay = (0L..14L).map { day -> rowsFor(day).map { it.key } }
+        assertTrue(keysByDay.distinct().size > 1)
+    }
+
+    @Test
+    fun shelvesHonorTheirFilters() {
+        for (day in 0L..30L) {
+            for (row in rowsFor(day)) {
+                when {
+                    row.title.startsWith("Tonight: ") -> {
+                        val genre = row.title.removePrefix("Tonight: ")
+                        assertTrue(row.items.all { item -> item.genres.orEmpty().any { it.name == genre } })
+                        assertTrue(row.items.none { it.progress != null })
+                    }
+                    row.key == "quick" -> assertTrue(
+                        row.items.all { it.kind == "movie" && it.durationMs < 90 * 60 * 1000L },
+                    )
+                    row.key == "again" ->
+                        assertEquals(recentlyPlayed.map { it.id }, row.items.map { it.id })
+                    row.key == "unstarted" -> assertTrue(
+                        row.items.none { it.progress != null || (it.kind == "show" && it.unwatchedCount < it.episodeCount) },
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
+    fun thinShelvesAreSkipped() {
+        // Two finished movies cannot fill the Watch It Again shelf.
+        val sparse = listOf(movie(5, started = true), movie(7, started = true))
+        for (day in 0L..30L) {
+            val rows = discoveryRows(movies, shows, collections, sparse, day)
+            assertTrue(rows.none { it.key == "again" })
+        }
+    }
+
+    @Test
+    fun collectionShelfMayRunThin() {
+        // Collections are exempt from the four-item floor; Loom already
+        // guarantees at least two owned members.
+        val rows = (0L..30L).flatMap { rowsFor(it) }.filter { it.key.startsWith("col-") }
+        assertTrue(rows.isNotEmpty())
+        assertTrue(rows.all { it.items.size == 2 })
+    }
+}
