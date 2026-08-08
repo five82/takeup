@@ -63,6 +63,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import xyz.five82.takeup.ui.AmbientGlow
 import xyz.five82.takeup.ui.ArtworkScreen
 import xyz.five82.takeup.ui.SettingsScreen
 import xyz.five82.takeup.ui.CollectionHubScreen
@@ -116,10 +117,16 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
                 ) {
-                    PermissionAwareApp(
-                        viewModel = viewModel,
-                        container = container,
-                    )
+                    // One glow for the whole app: every screen keeps its
+                    // scaffold transparent so this shows through; the player
+                    // covers it with its own black video surface.
+                    Box(Modifier.fillMaxSize()) {
+                        AmbientGlow()
+                        PermissionAwareApp(
+                            viewModel = viewModel,
+                            container = container,
+                        )
+                    }
                 }
             }
         }

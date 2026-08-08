@@ -90,8 +90,6 @@ internal fun DetailsScreen(
         ?: state.item.backdropUrl(state.serverUrl)
         ?: downloadEntry?.posterPath
         ?: state.item.posterUrl(state.serverUrl)
-    Box(Modifier.fillMaxSize()) {
-    AmbientGlow()
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = Color.Transparent,
@@ -138,9 +136,11 @@ internal fun DetailsScreen(
             item {
                 FadingBackdropArtwork(
                     url = backdropUrl,
+                    // The backdrop owns its aspect ratio: it is taller than the
+                    // 16:9 source because the blurred continuation extends
+                    // below the sharp image.
                     modifier = Modifier
                         .fillMaxWidth()
-                        .aspectRatio(16f / 9f)
                         .itemArtworkSharedBounds(state.item.id),
                 )
             }
@@ -343,7 +343,6 @@ internal fun DetailsScreen(
                 }
             },
         )
-    }
     }
 }
 

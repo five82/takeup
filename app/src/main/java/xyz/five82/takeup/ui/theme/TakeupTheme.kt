@@ -19,23 +19,24 @@ private val IrisSeed = Color(0xFF6B7CFF)
 private val MintSeed = Color(0xFF7EDCC3)
 private val VioletSeed = Color(0xFFC6ADFF)
 
-// The stage: fixed cool near-neutrals for every large surface. Tones sit above
-// OLED black to keep the app off the dated pure-black look; hard black exists
-// only behind video in the player.
-private val StageBackground = Color(0xFF111318)
-private val StageSurfaceDim = Color(0xFF0D0F13)
-private val StageSurfaceBright = Color(0xFF373B45)
-private val StageContainerLowest = Color(0xFF0C0E12)
-private val StageContainerLow = Color(0xFF14161C)
-private val StageContainer = Color(0xFF171A20)
-private val StageContainerHigh = Color(0xFF20242C)
-private val StageContainerHighest = Color(0xFF262A33)
-private val StageOnSurface = Color(0xFFE9EBF1)
-private val StageOnSurfaceVariant = Color(0xFFA6ABB6)
-private val StageOutline = Color(0xFF80858F)
-private val StageOutlineVariant = Color(0xFF3B404B)
-private val StageInverseSurface = Color(0xFFE9EBF1)
-private val StageInverseOnSurface = Color(0xFF23262C)
+// The stage: fixed deep-indigo surfaces for the whole app. These carry real
+// blue chroma on purpose - the first pass used near-neutral greys that read
+// as plain black on the device, which is exactly the look this design is
+// meant to avoid. Hard black exists only behind video in the player.
+private val StageBackground = Color(0xFF171C2E)
+private val StageSurfaceDim = Color(0xFF111624)
+private val StageSurfaceBright = Color(0xFF414B73)
+private val StageContainerLowest = Color(0xFF0F1421)
+private val StageContainerLow = Color(0xFF1B2136)
+private val StageContainer = Color(0xFF1E2540)
+private val StageContainerHigh = Color(0xFF272F4D)
+private val StageContainerHighest = Color(0xFF2D3656)
+private val StageOnSurface = Color(0xFFE7E9F8)
+private val StageOnSurfaceVariant = Color(0xFFA9AFC9)
+private val StageOutline = Color(0xFF7E85A3)
+private val StageOutlineVariant = Color(0xFF3B4462)
+private val StageInverseSurface = Color(0xFFE7E9F8)
+private val StageInverseOnSurface = Color(0xFF272C41)
 
 // Derived once at load: the palette is static, so there is nothing to remember
 // or animate per frame. Vibrant keeps the accent roles at full chroma; the

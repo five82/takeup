@@ -55,8 +55,6 @@ internal fun SeasonScreen(
     BackHandler(onBack = onBack)
     UseLightStatusBarIcons()
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
-    Box(Modifier.fillMaxSize()) {
-    AmbientGlow()
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = Color.Transparent,
@@ -116,7 +114,6 @@ internal fun SeasonScreen(
             onRetry = onRetry,
             onEpisodeSelected = onEpisodeSelected,
         )
-    }
     }
 }
 
@@ -216,7 +213,6 @@ private fun SeasonHero(state: MainUiState.Season) {
             // Shares the show's key so ShowDetails -> Season morphs the hero.
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(16f / 9f)
                 .itemArtworkSharedBounds(state.show.id),
         )
         Row(

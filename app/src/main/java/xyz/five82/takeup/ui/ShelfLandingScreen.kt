@@ -69,8 +69,6 @@ internal fun ShelfLandingScreen(
     BackHandler(onBack = onBack)
     UseLightStatusBarIcons()
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
-    Box(Modifier.fillMaxSize()) {
-    AmbientGlow()
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = Color.Transparent,
@@ -153,7 +151,6 @@ internal fun ShelfLandingScreen(
                 }
             }
         }
-    }
     }
 }
 

@@ -38,6 +38,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.BlendMode
@@ -216,50 +217,96 @@ internal fun ArtworkPlaceholder(modifier: Modifier = Modifier) {
 }
 
 /**
- * The one ambient background: a faint wash of the fixed accent glowing from
- * the top edge and dissolving into the neutral stage within the first third
- * of the screen. One flat gradient, identical everywhere it appears - no
- * artwork blur, so it cannot band or bleed past a hero's edges.
+ * The one ambient background: an iris wash glowing from the top edge and
+ * dissolving into the indigo stage. It lives once behind the whole app (in
+ * MainActivity) rather than per screen, so every surface - search, settings,
+ * hubs - sits in the same light. The eased stops keep the falloff from
+ * reading as a hard band, and there is no artwork blur to bleed or band.
  */
 @Composable
 internal fun AmbientGlow(modifier: Modifier = Modifier) {
+    val glow = MaterialTheme.colorScheme.primary
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(360.dp)
+            .height(520.dp)
             .background(
                 Brush.verticalGradient(
-                    0f to MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                    0f to glow.copy(alpha = 0.26f),
+                    0.35f to glow.copy(alpha = 0.11f),
+                    0.7f to glow.copy(alpha = 0.04f),
                     1f to Color.Transparent,
                 ),
             ),
     )
 }
 
+// Backdrop geometry and fade tuning. The sharp image is cropped taller than
+// its 16:9 source so it arrives slightly zoomed, and the container extends
+// below it for the blurred continuation layer.
+private const val BackdropSharpFadeStart = 0.30f
+private const val BackdropSharpAspect = 16f / 10f
+private const val BackdropTotalAspect = 16f / 12f
+private const val BackdropBlurredUnderlayer = true
+
+// An abrupt-looking fade is rarely the gradient's length; it is the visible
+// corner where a linear ramp begins. Sampling a smoothstep curve into stops
+// removes that corner at both ends of the dissolve.
+private fun easedFadeStops(start: Float, maxAlpha: Float = 1f): Array<Pair<Float, Color>> {
+    val steps = 8
+    return Array(steps + 1) { i ->
+        val x = i / steps.toFloat()
+        val eased = x * x * (3f - 2f * x)
+        (start + x * (1f - start)) to Color.Black.copy(alpha = maxAlpha * (1f - eased))
+    }
+}
+
+private val SharpFadeMask = Brush.verticalGradient(*easedFadeStops(BackdropSharpFadeStart))
+private val BlurFadeMask = Brush.verticalGradient(*easedFadeStops(start = 0.45f, maxAlpha = 0.8f))
+
+// The blurred layer only carries color, so the smallest resize bucket is
+// plenty and skips a second full-size fetch of the backdrop.
+private const val BlurRequestWidth = 240
+
 @Composable
 internal fun FadingBackdropArtwork(
     url: String?,
     modifier: Modifier = Modifier,
 ) {
-    Box(modifier = modifier) {
+    Box(modifier = modifier.aspectRatio(BackdropTotalAspect)) {
+        if (BackdropBlurredUnderlayer && url != null) {
+            // A heavily blurred copy of the same artwork continues past the
+            // sharp image, so the dissolve lands on the picture's own light
+            // instead of dropping straight onto the stage.
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(imageUrlAtWidth(url, BlurRequestWidth))
+                    .crossfade(true)
+                    .build(),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
+                    .drawWithContent {
+                        drawContent()
+                        drawRect(brush = BlurFadeMask, blendMode = BlendMode.DstIn)
+                    }
+                    .blur(64.dp),
+            )
+        }
         MediaArtwork(
             url = url,
-            // The one fade over detail artwork: the image's own alpha dissolves
-            // to fully transparent at its bottom edge, landing directly on the
-            // flat stage surface behind it. Nothing extends past the artwork
-            // and no second gradient competes with this one.
+            // The sharp image's own alpha dissolves out over its lower half,
+            // handing off to the blurred continuation behind it.
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
+                .aspectRatio(BackdropSharpAspect)
+                .align(Alignment.TopCenter)
                 .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
                 .drawWithContent {
                     drawContent()
-                    drawRect(
-                        brush = Brush.verticalGradient(
-                            0.55f to Color.Black,
-                            1f to Color.Transparent,
-                        ),
-                        blendMode = BlendMode.DstIn,
-                    )
+                    drawRect(brush = SharpFadeMask, blendMode = BlendMode.DstIn)
                 },
         )
         Box(

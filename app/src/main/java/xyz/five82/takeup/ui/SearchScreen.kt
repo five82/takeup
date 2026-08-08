@@ -39,6 +39,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -75,9 +76,14 @@ internal fun SearchScreen(
     BackHandler(onBack = onBack)
     Scaffold(
         modifier = modifier,
+        // Transparent so the app-level ambient glow reads behind the results.
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 title = { SearchField(query = state.query, onQueryChanged = onQueryChanged) },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.Transparent,
+                ),
             )
         },
     ) { contentPadding ->

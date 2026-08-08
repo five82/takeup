@@ -74,8 +74,10 @@ internal fun shelfIdentity(name: String): ShelfIdentity {
     )
 }
 
-// The gradient's dark end, shared by cards and landing headers.
-internal fun shelfGradientEnd(base: Color): Color = lerp(base, Color(0xFF0C0E12), 0.55f)
+// The gradient's dark end, shared by cards and landing headers. Pulls toward
+// the stage's indigo (surfaceContainerLowest) so cards sink into the app's
+// background rather than toward black.
+internal fun shelfGradientEnd(base: Color): Color = lerp(base, Color(0xFF0F1421), 0.55f)
 
 /** Color-blocked genre card with a Material-shape motif. */
 @Composable

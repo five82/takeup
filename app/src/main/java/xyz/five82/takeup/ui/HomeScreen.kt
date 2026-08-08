@@ -184,7 +184,6 @@ private fun HomeList(
         onRefresh = onRetry,
         modifier = Modifier.fillMaxSize(),
     ) {
-        AmbientGlow()
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             // The toolbar is hidden offline, so its reserved space would be a gap.
