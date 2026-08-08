@@ -6,7 +6,8 @@ This file provides guidance when working with code in this repository.
 
 - Do not create git branches unless explicitly instructed.
 - Run `./check-ci.sh` before handing work back.
-- Test on the emulator, not the Pixel. Start the emulator yourself if it is not running. The Pixel is only for playback verification.
+- Test on the emulator, not the Pixel. Start the emulator yourself if it is not running.
+- Video playback does not work on the emulator. Anything that needs a playing video - the player screen included - must be verified on the Pixel.
 
 ## Project
 
@@ -43,7 +44,7 @@ Run device tests separately when an emulator or device is available:
 
 ## Emulator
 
-The emulator is the default target for everything: UI, layout, navigation, `connectedCheck`, install-and-poke smoke checks, and reproducing bugs. It is faster and less cumbersome to drive than the Pixel. Playback verification is the only exception - see below.
+The emulator is the default target for everything it can run: UI, layout, navigation, `connectedCheck`, install-and-poke smoke checks, and reproducing bugs. It is faster and less cumbersome to drive than the Pixel. Playback is the one thing it cannot do - see below.
 
 A Pixel connected over USB is not a reason to skip the emulator, and neither is a stopped emulator. If `takeup_pixel10pro` is not running, start it and wait for boot; the one-time boot cost is worth it.
 
@@ -74,4 +75,8 @@ Multicast does not cross the emulator NAT, so enter Loom's IP and port rather th
 
 ## Pixel
 
-Use the physical Pixel only to verify playback, and say so when you do. The emulator has no HDR or Dolby Vision, no audio passthrough, and stutters on high-bitrate HEVC and AV1, so anything that depends on decode, HDR, or audio output has to run on the Pixel. Everything else stays on the emulator.
+Video playback does not work on the emulator, so every change that has to be seen playing is verified on the physical Pixel. Say so when you use it.
+
+That covers more than decode, HDR, and audio output: the player screen itself only exists over a playing video, so transport controls, the scrub bar, seeking, track selection, chapters, and the end-of-playback overlay are all Pixel work. Reaching the player is not enough - if the check needs frames on screen, it belongs on the Pixel.
+
+Everything else stays on the emulator.
