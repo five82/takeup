@@ -265,7 +265,7 @@ private fun MovieDetail(
                     Text(
                         item.tagline,
                         style = MaterialTheme.typography.bodyMedium.copy(fontStyle = FontStyle.Italic),
-                        color = Muted,
+                        color = Ink,
                         modifier = Modifier.padding(top = 6.dp),
                     )
                 }
@@ -658,7 +658,7 @@ private fun MetaLine(item: Item) {
     Text(
         parts.joinToString(" · "),
         style = MaterialTheme.typography.bodySmall,
-        color = Muted,
+        color = Ink,
         modifier = Modifier.padding(top = 14.dp),
     )
 }
