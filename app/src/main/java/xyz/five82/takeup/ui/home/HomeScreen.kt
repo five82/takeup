@@ -44,9 +44,13 @@ import androidx.lifecycle.viewModelScope
 import androidx.compose.animation.core.animateDpAsState
 import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
+import java.time.Duration
 import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import xyz.five82.takeup.api.Item
 import xyz.five82.takeup.data.LoomRepository
@@ -86,6 +90,7 @@ data class HomeState(
     val continueWatching: List<Item> = emptyList(),
     val nextUp: List<Item> = emptyList(),
     val recentlyAdded: List<Item> = emptyList(),
+    val dailyPick: Item? = null,
     val discovery: List<DiscoveryRow> = emptyList(),
 )
 
@@ -95,7 +100,7 @@ class HomeViewModel(private val repository: LoomRepository) : ViewModel() {
 
     fun refresh() {
         viewModelScope.launch {
-            if (state.continueWatching.isEmpty() && state.recentlyAdded.isEmpty()) {
+            if (state.dailyPick == null && state.continueWatching.isEmpty() && state.recentlyAdded.isEmpty()) {
                 state = state.copy(loading = true)
             }
             try {
@@ -107,24 +112,32 @@ class HomeViewModel(private val repository: LoomRepository) : ViewModel() {
                     val shows = async { repository.api.allItems("tv") }
                     val collections = async { repository.api.collections() }
                     val recentlyPlayed = async { repository.api.recentlyPlayed() }
+                    val movieItems = movies.await()
+                    val showItems = shows.await()
+                    val epochDay = LocalDate.now().toEpochDay()
                     state = HomeState(
                         loading = false,
                         continueWatching = continueWatching.await(),
                         nextUp = nextUp.await(),
                         recentlyAdded = recentlyAdded.await(),
+                        dailyPick = dailyPick(movieItems, showItems, epochDay),
                         discovery = discoveryRows(
-                            movies = movies.await(),
-                            shows = shows.await(),
+                            movies = movieItems,
+                            shows = showItems,
                             collections = collections.await(),
                             recentlyPlayed = recentlyPlayed.await(),
-                            epochDay = LocalDate.now().toEpochDay(),
+                            epochDay = epochDay,
                         ),
                     )
                 }
             } catch (e: Exception) {
                 state = state.copy(
                     loading = false,
-                    error = if (state.continueWatching.isEmpty() && state.recentlyAdded.isEmpty()) {
+                    error = if (
+                        state.dailyPick == null &&
+                        state.continueWatching.isEmpty() &&
+                        state.recentlyAdded.isEmpty()
+                    ) {
                         e.message ?: "Loom isn't answering"
                     } else {
                         null
@@ -148,10 +161,22 @@ class HomeViewModel(private val repository: LoomRepository) : ViewModel() {
 fun HomeScreen(repository: LoomRepository, nav: NavState, active: Boolean) {
     val model = takeupHomeViewModel(repository)
 
-    // Refresh whenever the home screen surfaces again, so a finished episode
-    // leaves Continue Watching without a manual reload.
+    // Refresh whenever home surfaces, then at 6 pm for the label and midnight
+    // for the next daily pick. A finished episode also leaves Continue
+    // Watching without a manual reload.
     LaunchedEffect(active) {
-        if (active) model.refresh()
+        if (active) {
+            while (true) {
+                model.refresh()
+                val now = LocalDateTime.now()
+                val nextChange = if (now.hour < 18) {
+                    now.toLocalDate().atTime(18, 0)
+                } else {
+                    now.toLocalDate().plusDays(1).atStartOfDay()
+                }
+                delay(Duration.between(now, nextChange).toMillis().coerceAtLeast(1_000))
+            }
+        }
     }
 
     val state = model.state
@@ -174,12 +199,17 @@ private fun HomeContent(
     state: HomeState,
 ) {
     val api = repository.api
-    val hero = state.continueWatching.firstOrNull() ?: state.recentlyAdded.firstOrNull()
-    // The hero title colors the whole room, so home is inhabited by whatever
-    // you're mid-watching: its seed dyes the stage, and its swatches sit as
-    // still fields of light down the screen - the dye alone reads flat
-    // because the hero art hides the dye's own glow. Ember house lights hold
-    // the room until the art resolves (and when there is no hero at all).
+    val hero = state.dailyPick ?: state.recentlyAdded.firstOrNull()
+    val heroLabel = dailyPickLabel(LocalTime.now().hour)
+    val continueWatching = state.continueWatching.filterNot { it.id == hero?.id }
+    val nextUp = state.nextUp.filterNot { it.id == hero?.id }
+    val recentlyAdded = state.recentlyAdded.filterNot { it.id == hero?.id }
+    val discovery = state.discovery.mapNotNull { row ->
+        row.copy(items = row.items.filterNot { it.id == hero?.id }).takeIf { it.items.isNotEmpty() }
+    }
+    // The daily pick colors the whole room: its seed dyes the stage, and its
+    // swatches sit as still fields of light down the screen. Ember house
+    // lights hold the room until the art resolves (and with no hero at all).
     val heroThreads = hero?.let { rememberWovenThreads(it.id, api.posterUrl(it, 240)) }.orEmpty()
     val room = if (heroThreads.isNotEmpty()) {
         Modifier.dyeBath(heroThreads.first()).threeThreads(heroThreads)
@@ -193,7 +223,7 @@ private fun HomeContent(
         item(key = "hero") {
             Box {
                 if (hero != null) {
-                    Hero(hero, api, onOpen = {
+                    Hero(hero, api, heroLabel, onOpen = {
                         nav.push(if (hero.isPlayable) Screen.Detail(hero.id) else Screen.Detail(hero.id))
                     })
                 } else {
@@ -211,10 +241,10 @@ private fun HomeContent(
             }
         }
 
-        if (state.continueWatching.isNotEmpty()) {
+        if (continueWatching.isNotEmpty()) {
             item(key = "cw") {
                 HomeRow("Continue Watching") {
-                    items(state.continueWatching, key = { "cw-${it.id}" }) { item ->
+                    items(continueWatching, key = { "cw-${it.id}" }) { item ->
                         ThumbCard(
                             title = item.title,
                             imageUrl = api.thumbUrl(item),
@@ -233,10 +263,10 @@ private fun HomeContent(
             }
         }
 
-        if (state.nextUp.isNotEmpty()) {
+        if (nextUp.isNotEmpty()) {
             item(key = "next") {
                 HomeRow("Next Up") {
-                    items(state.nextUp, key = { "nu-${it.id}" }) { item ->
+                    items(nextUp, key = { "nu-${it.id}" }) { item ->
                         ThumbCard(
                             title = item.title,
                             imageUrl = api.thumbUrl(item),
@@ -252,10 +282,10 @@ private fun HomeContent(
             }
         }
 
-        if (state.recentlyAdded.isNotEmpty()) {
+        if (recentlyAdded.isNotEmpty()) {
             item(key = "recent") {
                 HomeRow("Recently Added") {
-                    items(state.recentlyAdded, key = { "ra-${it.id}" }) { item ->
+                    items(recentlyAdded, key = { "ra-${it.id}" }) { item ->
                         PosterCard(
                             title = item.title,
                             imageUrl = api.posterUrl(item),
@@ -267,7 +297,7 @@ private fun HomeContent(
         }
 
         // The rotating shelves: a different slice of the library every day.
-        for (discoveryRow in state.discovery) {
+        for (discoveryRow in discovery) {
             item(key = "d-${discoveryRow.key}") {
                 HomeRow(discoveryRow.title, labelColor = Violet) {
                     items(discoveryRow.items, key = { "${discoveryRow.key}-${it.id}" }) { item ->
@@ -310,7 +340,12 @@ private fun HomeRow(
 }
 
 @Composable
-private fun Hero(item: Item, api: xyz.five82.takeup.api.LoomApi, onOpen: () -> Unit) {
+private fun Hero(
+    item: Item,
+    api: xyz.five82.takeup.api.LoomApi,
+    label: String,
+    onOpen: () -> Unit,
+) {
     // No fixed height: the backdrop sizes itself to 4:3 art plus the logo
     // and resume band, so a tall logo grows the hero instead of squeezing
     // the photo.
@@ -367,12 +402,11 @@ private fun Hero(item: Item, api: xyz.five82.takeup.api.LoomApi, onOpen: () -> U
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            val line = when {
-                item.progress != null && !item.progress.played ->
-                    listOfNotNull("Resume", remainingLabel(item)).joinToString(" · ")
-                item.year > 0 -> "New · ${item.year}"
-                else -> "New"
-            }
+            val line = buildList {
+                add(label)
+                if (item.year > 0) add(item.year.toString())
+                item.genres?.firstOrNull()?.name?.let(::add)
+            }.joinToString(" · ")
             Text(
                 line,
                 style = MaterialTheme.typography.labelSmall,
