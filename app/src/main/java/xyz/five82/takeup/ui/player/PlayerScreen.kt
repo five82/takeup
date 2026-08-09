@@ -74,6 +74,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
+import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import coil3.compose.AsyncImage
 import kotlin.math.cos
@@ -155,6 +156,7 @@ private fun PlayerContent(repository: LoomRepository, nav: NavState, model: Play
     var duration by remember { mutableLongStateOf(0L) }
     var scrubPreview by remember { mutableStateOf<Long?>(null) }
     var sheet by remember { mutableStateOf<PlayerSheet?>(null) }
+    var cropped by remember { mutableStateOf(false) }
     var interactionTick by remember { mutableIntStateOf(0) }
 
     DisposableEffect(player) {
@@ -223,6 +225,11 @@ private fun PlayerContent(repository: LoomRepository, nav: NavState, model: Play
             },
             update = { view ->
                 view.player = player
+                view.resizeMode = if (cropped) {
+                    AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                } else {
+                    AspectRatioFrameLayout.RESIZE_MODE_FIT
+                }
                 view.subtitleView?.setPadding(
                     0, 0, 0,
                     if (controlsVisible && !model.ended) subtitleLiftPx else 0,
@@ -259,7 +266,12 @@ private fun PlayerContent(repository: LoomRepository, nav: NavState, model: Play
                 position = scrubPreview ?: position,
                 duration = duration,
                 tracks = tracks,
+                cropped = cropped,
                 onInteraction = { interactionTick++ },
+                onToggleCrop = {
+                    cropped = !cropped
+                    interactionTick++
+                },
                 onScrubPreview = { preview ->
                     if (preview != null && scrubPreview == null) interactionTick++
                     scrubPreview = preview
@@ -363,7 +375,9 @@ private fun PlayerControls(
     position: Long,
     duration: Long,
     tracks: Tracks,
+    cropped: Boolean,
     onInteraction: () -> Unit,
+    onToggleCrop: () -> Unit,
     onScrubPreview: (Long?) -> Unit,
     onSeek: (Long) -> Unit,
     onOpenSheet: (PlayerSheet) -> Unit,
@@ -416,13 +430,17 @@ private fun PlayerControls(
                 .padding(bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(Modifier.weight(1f)) {
+            Row(
+                Modifier.weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
                 if (chapters.isNotEmpty()) {
                     ConsolePill("Chapters") {
                         onInteraction()
                         onOpenSheet(PlayerSheet.Chapters)
                     }
                 }
+                ConsolePill(if (cropped) "Fit" else "Crop", onClick = onToggleCrop)
             }
             Row(
                 verticalAlignment = Alignment.CenterVertically,
