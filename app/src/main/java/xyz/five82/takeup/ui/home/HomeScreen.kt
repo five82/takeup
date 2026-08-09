@@ -47,7 +47,6 @@ import androidx.compose.animation.core.animateDpAsState
 import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
 import java.time.Duration
-import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import kotlinx.coroutines.async
@@ -119,13 +118,14 @@ class HomeViewModel(private val repository: LoomRepository) : ViewModel() {
                     val recentlyPlayed = async { repository.api.recentlyPlayed() }
                     val movieItems = movies.await()
                     val showItems = shows.await()
-                    val epochDay = LocalDate.now().toEpochDay()
+                    val now = LocalDateTime.now()
+                    val epochDay = now.toLocalDate().toEpochDay()
                     state = HomeState(
                         loading = false,
                         continueWatching = continueWatching.await(),
                         nextUp = nextUp.await(),
                         recentlyAdded = recentlyAdded.await(),
-                        dailyPick = dailyPick(movieItems, showItems, epochDay),
+                        dailyPick = dailyPick(movieItems, epochDay, now.hour),
                         discovery = discoveryRows(
                             movies = movieItems,
                             shows = showItems,
@@ -179,18 +179,17 @@ class HomeViewModel(private val repository: LoomRepository) : ViewModel() {
 fun HomeScreen(repository: LoomRepository, nav: NavState, active: Boolean) {
     val model = takeupHomeViewModel(repository)
 
-    // Refresh whenever home surfaces, then at 6 pm for the label and midnight
-    // for the next daily pick. A finished episode also leaves Continue
-    // Watching without a manual reload.
+    // Refresh whenever home surfaces, then at 6 am and 6 pm for the next pick.
+    // A finished episode also leaves Continue Watching without a manual reload.
     LaunchedEffect(active) {
         if (active) {
             while (true) {
                 model.refresh()
                 val now = LocalDateTime.now()
-                val nextChange = if (now.hour < 18) {
-                    now.toLocalDate().atTime(18, 0)
-                } else {
-                    now.toLocalDate().plusDays(1).atStartOfDay()
+                val nextChange = when {
+                    now.hour < 6 -> now.toLocalDate().atTime(6, 0)
+                    now.hour < 18 -> now.toLocalDate().atTime(18, 0)
+                    else -> now.toLocalDate().plusDays(1).atTime(6, 0)
                 }
                 delay(Duration.between(now, nextChange).toMillis().coerceAtLeast(1_000))
             }
@@ -274,7 +273,7 @@ private fun HomeContent(
     state: HomeState,
 ) {
     val api = repository.api
-    val hero = state.dailyPick ?: state.recentlyAdded.firstOrNull()
+    val hero = state.dailyPick ?: state.recentlyAdded.firstOrNull { it.kind == "movie" }
     val heroLabel = dailyPickLabel(LocalTime.now().hour)
     val continueWatching = state.continueWatching.filterNot { it.id == hero?.id }
     val nextUp = state.nextUp.filterNot { it.id == hero?.id }

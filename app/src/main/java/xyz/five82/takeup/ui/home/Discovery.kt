@@ -16,20 +16,26 @@ private const val QUICK_WATCH_MAX_MS = 90 * 60 * 1000L
 private const val HIGH_RATING = 7.5
 
 /**
- * One unstarted movie or show for the home hero. The date is the only source
- * of randomness, so the title stays put while its "Today's/Tonight's" label
- * changes with the time of day.
+ * One unstarted movie for the home hero. Consecutive 12-hour slots walk a
+ * stable shuffled list, so the pick always changes at 6 am and 6 pm when at
+ * least two candidates are available.
  */
-fun dailyPick(movies: List<Item>, shows: List<Item>, epochDay: Long): Item? {
-    val unstarted = (movies + shows).filter { !it.isStarted }.sortedBy { it.id }
+fun dailyPick(movies: List<Item>, epochDay: Long, hour: Int): Item? {
+    val unstarted = movies.filter { it.kind == "movie" && !it.isStarted }.sortedBy { it.id }
     val candidates = unstarted.filter { it.voteAverage >= HIGH_RATING && it.backdropImageId > 0 }
         .ifEmpty { unstarted.filter { it.voteAverage >= HIGH_RATING } }
         .ifEmpty { unstarted.filter { it.backdropImageId > 0 } }
         .ifEmpty { unstarted }
-    return candidates.shuffled(Random(epochDay)).firstOrNull()
+        .shuffled(Random(0))
+    if (candidates.isEmpty()) return null
+
+    val slot = if (hour < 6) (epochDay - 1) * 2 + 1 else epochDay * 2 + if (hour >= 18) 1 else 0
+    val index = Math.floorMod(slot, candidates.size.toLong()).toInt()
+    return candidates[index]
 }
 
-fun dailyPickLabel(hour: Int): String = if (hour >= 18) "Tonight's Pick" else "Today's Pick"
+fun dailyPickLabel(hour: Int): String =
+    if (hour in 6 until 18) "Today's Pick" else "Tonight's Pick"
 
 /**
  * The day's discovery shelves, drawn from a pool of candidates seeded by

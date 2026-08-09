@@ -1,6 +1,7 @@
 package xyz.five82.takeup
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import xyz.five82.takeup.api.Collection
@@ -66,16 +67,40 @@ class DiscoveryTest {
         val lowRatedArt = movie(100, rating = 5.0, backdropImageId = 100)
         val startedArt = movie(101, started = true, backdropImageId = 101)
 
-        val first = dailyPick(listOf(preferred, lowRatedArt, startedArt), emptyList(), 100)
-        val second = dailyPick(listOf(startedArt, preferred, lowRatedArt), emptyList(), 100)
+        val first = dailyPick(listOf(preferred, lowRatedArt, startedArt), 100, 12)
+        val second = dailyPick(listOf(startedArt, preferred, lowRatedArt), 100, 12)
 
         assertEquals(preferred, first)
         assertEquals(first, second)
     }
 
     @Test
-    fun dailyPickWordingChangesAtSixPm() {
-        assertEquals("Today's Pick", dailyPickLabel(0))
+    fun dailyPickOnlyChoosesMovies() {
+        val preferredMovie = movie(99, backdropImageId = 99)
+        val preferredShow = show(100).copy(backdropImageId = 100)
+
+        assertEquals(preferredMovie, dailyPick(listOf(preferredShow, preferredMovie), 100, 12))
+    }
+
+    @Test
+    fun dailyPickChangesAtSixAmAndSixPm() {
+        val candidates = (1L..4L).map { movie(it, backdropImageId = it) }
+        val today = dailyPick(candidates, 100, 6)
+        val tonight = dailyPick(candidates, 100, 18)
+        val nextToday = dailyPick(candidates, 101, 6)
+
+        assertEquals(today, dailyPick(candidates, 100, 17))
+        assertNotEquals(today, tonight)
+        assertEquals(tonight, dailyPick(candidates, 101, 0))
+        assertEquals(tonight, dailyPick(candidates, 101, 5))
+        assertNotEquals(tonight, nextToday)
+    }
+
+    @Test
+    fun dailyPickWordingChangesAtSixAmAndSixPm() {
+        assertEquals("Tonight's Pick", dailyPickLabel(0))
+        assertEquals("Tonight's Pick", dailyPickLabel(5))
+        assertEquals("Today's Pick", dailyPickLabel(6))
         assertEquals("Today's Pick", dailyPickLabel(17))
         assertEquals("Tonight's Pick", dailyPickLabel(18))
         assertEquals("Tonight's Pick", dailyPickLabel(23))
