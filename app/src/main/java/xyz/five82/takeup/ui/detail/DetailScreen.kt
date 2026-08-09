@@ -989,8 +989,12 @@ private fun CreditCard(name: String, role: String?, nav: NavState) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(Surface1)
-            .border(1.dp, Line, RoundedCornerShape(12.dp))
+            // Frosted, not painted: a translucent ink fill lets the gauze
+            // show through, so the card matches whatever backdrop weather is
+            // behind it. Opaque fills (static or woven) always found some
+            // artwork to clash with.
+            .background(Ink.copy(alpha = 0.05f))
+            .border(1.dp, Ink.copy(alpha = 0.10f), RoundedCornerShape(12.dp))
             .clickable { nav.push(Screen.Search(name)) }
             .defaultMinSize(minHeight = 48.dp)
             .padding(horizontal = 16.dp, vertical = 10.dp),
