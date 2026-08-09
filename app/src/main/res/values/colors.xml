@@ -2,6 +2,6 @@
 <resources>
     <!-- Pre-Compose window background; matches the stage surface in TakeupTheme. -->
     <color name="takeup_background">#111318</color>
-    <!-- Matches TakeupBrandSeed so the icon carries the brand red. -->
-    <color name="launcher_background">#FF4D55</color>
+    <!-- Deep navy from the Takeup app icon artwork. -->
+    <color name="launcher_background">#012141</color>
 </resources>

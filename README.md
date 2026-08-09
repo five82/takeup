@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/takeup-logo.png" alt="Takeup logo" width="220">
+</p>
+
 # Takeup
 
 Takeup is a native Android client for [Loom](https://anvil.home.five82.xyz/five82/loom), a personal media server for movies, short films, and TV. It browses a Loom library, plays original media directly, keeps viewing progress in sync, and supports full-file downloads for offline playback.
