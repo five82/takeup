@@ -586,7 +586,7 @@ private fun EndOverlay(repository: LoomRepository, nav: NavState, model: PlayerV
     // The finished title's colors linger while up-next appears: drifting
     // thread fields over the dark scrim, woven from its poster.
     val finished = model.item
-    val threads = rememberWovenThreads(finished?.let { repository.api.posterUrl(it, 240) })
+    val threads = rememberWovenThreads(finished?.let { repository.api.posterUrl(it, 240) }).orEmpty()
     Box(
         Modifier
             .fillMaxSize()

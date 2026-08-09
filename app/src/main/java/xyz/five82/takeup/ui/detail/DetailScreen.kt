@@ -53,6 +53,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -76,6 +77,7 @@ import coil3.compose.AsyncImagePainter
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import xyz.five82.takeup.api.Item
 import xyz.five82.takeup.data.DownloadAction
@@ -113,7 +115,7 @@ import xyz.five82.takeup.ui.theme.Muted
 import xyz.five82.takeup.ui.theme.Stage
 import xyz.five82.takeup.ui.theme.Surface1
 import xyz.five82.takeup.ui.theme.WovenTheme
-import xyz.five82.takeup.ui.theme.rememberWovenSeed
+import xyz.five82.takeup.ui.theme.rememberWovenThreads
 import xyz.five82.takeup.ui.thumbUrl
 
 data class DetailState(
@@ -234,7 +236,20 @@ fun DetailScreen(repository: LoomRepository, nav: NavState, itemId: Long, topmos
             // the poster: the two often disagree (a warm poster over a cool
             // still) and the buttons sit on the backdrop's weather.
             val artUrl = repository.api.backdropUrl(item, 240) ?: repository.api.posterUrl(item, 240)
-            val seed = rememberWovenSeed(artUrl)
+            val threads = rememberWovenThreads(artUrl)
+            // Hold the spinner a beat longer while the art's colors resolve,
+            // so the first content frame lands already dressed instead of
+            // blooming from gray. The grace cap keeps a slow or broken image
+            // from stalling the screen; the crossfade covers that rare case.
+            val graceOver by produceState(false, item.id) {
+                delay(300)
+                value = true
+            }
+            if (threads == null && !graceOver) {
+                LoadingState()
+                return
+            }
+            val seed = threads?.firstOrNull()
             WovenTheme(seed) {
                 Box(Modifier.fillMaxSize()) {
                     // Gauze: the backdrop's color weather behind the whole

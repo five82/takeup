@@ -23,9 +23,11 @@ object WovenColors {
 
     private val cache = ConcurrentHashMap<String, List<Color>>()
 
-    /** The already-extracted threads for this art, so a revisit can paint the
-     * right colors on its very first frame instead of flashing the fallback. */
-    fun cached(artUrl: String?): List<Color> = artUrl?.let { cache[it] }.orEmpty()
+    /** The already-extracted threads for this art: empty when there is no art
+     * to extract from, null while extraction hasn't finished. Lets a revisit
+     * paint the right colors on its very first frame. */
+    fun cached(artUrl: String?): List<Color>? =
+        if (artUrl == null) emptyList() else cache[artUrl]
 
     /** Up to three hue-separated swatches; empty until the art decodes. */
     suspend fun threadsFor(context: Context, artUrl: String?): List<Color> {
@@ -126,12 +128,13 @@ fun Color.fieldTone(): Color {
 /** Seed color for an artwork, resolving off the main thread; null until known. */
 @Composable
 fun rememberWovenSeed(artUrl: String?): Color? =
-    rememberWovenThreads(artUrl).firstOrNull()
+    rememberWovenThreads(artUrl)?.firstOrNull()
 
-/** Up to three thread colors for an artwork; empty until known. Cached art
- * is served synchronously so revisits never wait a frame for their colors. */
+/** Up to three thread colors for an artwork: null while extraction is still
+ * running, empty when there is no art or it yielded nothing. Cached art is
+ * served synchronously so revisits never wait a frame for their colors. */
 @Composable
-fun rememberWovenThreads(artUrl: String?): List<Color> {
+fun rememberWovenThreads(artUrl: String?): List<Color>? {
     val context = LocalContext.current
     val threads by produceState(initialValue = WovenColors.cached(artUrl), artUrl) {
         value = WovenColors.threadsFor(context, artUrl)

@@ -117,7 +117,7 @@ private fun ItemGridScreen(
     // Shadow weave: the grid's lead poster casts its colors into the top of
     // the screen; the grid's accent holds the room until it decodes.
     val lead = state.items.firstOrNull()
-    val swatches = rememberWovenThreads(lead?.let { repository.api.posterUrl(it, 240) })
+    val swatches = rememberWovenThreads(lead?.let { repository.api.posterUrl(it, 240) }).orEmpty()
     Column(Modifier.fillMaxSize().shadowWeave(swatches, fallback = accent).statusBarsPadding()) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp, end = 20.dp)) {
             IconButton(onClick = { nav.pop() }) {
