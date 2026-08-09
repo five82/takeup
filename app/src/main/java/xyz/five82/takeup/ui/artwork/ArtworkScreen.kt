@@ -85,13 +85,20 @@ class ArtworkViewModel(
         if (options[newKind] == null) load()
     }
 
+    // Optimistic: Loom downloads the full-size original before answering, which
+    // takes seconds on a slow path to TMDB, so the grid updates immediately and
+    // the request runs behind it. On failure the previous selection comes back.
     fun choose(option: ImageOption) {
+        val chosenKind = kind
+        val previous = options[chosenKind] ?: return
+        options[chosenKind] = applySelection(previous, option)
+        error = null
         viewModelScope.launch {
-            busy = true
-            runCatching { repository.api.selectImage(itemId, kind, option.provider, option.providerPath) }
-                .onFailure { error = it.message }
-            busy = false
-            load()
+            runCatching { repository.api.selectImage(itemId, chosenKind, option.provider, option.providerPath) }
+                .onFailure {
+                    options[chosenKind] = previous
+                    error = it.message
+                }
         }
     }
 
@@ -105,6 +112,11 @@ class ArtworkViewModel(
         }
     }
 }
+
+internal fun applySelection(options: List<ImageOption>, chosen: ImageOption): List<ImageOption> =
+    options.map {
+        it.copy(selected = it.provider == chosen.provider && it.providerPath == chosen.providerPath)
+    }
 
 internal fun sortArtworkOptions(options: List<ImageOption>): List<ImageOption> =
     options.sortedWith(
@@ -177,9 +189,16 @@ fun ArtworkScreen(repository: LoomRepository, nav: NavState, itemId: Long, title
                 modifier = Modifier.fillMaxSize().weight(1f),
             ) {
                 item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
-                    Row {
+                    Column {
                         OutlinedButton(onClick = { model.reset() }, enabled = !model.busy) {
                             Text("Reset to default")
+                        }
+                        model.error?.let {
+                            Text(
+                                it,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
                         }
                     }
                 }
