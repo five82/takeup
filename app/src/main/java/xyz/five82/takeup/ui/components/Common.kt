@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -121,7 +122,13 @@ fun LoadingState(modifier: Modifier = Modifier) {
 
 /** Full-screen failure: the loom is dark, honestly dark. */
 @Composable
-fun ErrorState(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier) {
+fun ErrorState(
+    message: String,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+    secondaryAction: String? = null,
+    onSecondaryAction: () -> Unit = {},
+) {
     Column(
         modifier.fillMaxSize().padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -141,7 +148,12 @@ fun ErrorState(message: String, onRetry: () -> Unit, modifier: Modifier = Modifi
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(bottom = 24.dp),
         )
-        Button(onClick = onRetry) { Text("Try again") }
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Button(onClick = onRetry) { Text("Try again") }
+            if (secondaryAction != null) {
+                OutlinedButton(onClick = onSecondaryAction) { Text(secondaryAction) }
+            }
+        }
     }
 }
 

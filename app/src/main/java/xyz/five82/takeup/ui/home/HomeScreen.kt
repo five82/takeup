@@ -200,7 +200,12 @@ fun HomeScreen(repository: LoomRepository, nav: NavState, active: Boolean) {
     when {
         state.loading -> LoadingState()
         state.offline -> OfflineHome(repository, nav, onRetry = { model.refresh() })
-        state.error != null -> ErrorState(state.error, onRetry = { model.refresh() })
+        state.error != null -> ErrorState(
+            state.error,
+            onRetry = { model.refresh() },
+            secondaryAction = "Server settings",
+            onSecondaryAction = { nav.push(Screen.Settings) },
+        )
         else -> HomeContent(repository, nav, model, state)
     }
 }
@@ -230,8 +235,12 @@ private fun OfflineHome(repository: LoomRepository, nav: NavState, onRetry: () -
                     color = Muted,
                     modifier = Modifier.padding(top = 8.dp),
                 )
-                OutlinedButton(onClick = onRetry, modifier = Modifier.padding(top = 12.dp)) {
-                    Text("Retry")
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.padding(top = 12.dp),
+                ) {
+                    OutlinedButton(onClick = onRetry) { Text("Retry") }
+                    OutlinedButton(onClick = { nav.push(Screen.Settings) }) { Text("Server settings") }
                 }
             }
         }
