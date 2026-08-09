@@ -24,7 +24,8 @@ misc.xml
 deploymentTargetDropDown.xml
 render.experimental.xml
 
-# Keystore files
+# Release signing credentials and keystore files
+keystore.properties
 *.jks
 *.keystore
 

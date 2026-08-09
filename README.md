@@ -58,8 +58,52 @@ The APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
 Install it on a connected device or emulator:
 
 ```bash
-./gradlew installDebug
+ANDROID_SERIAL=<device-serial> ./gradlew installDebug
 ```
+
+Debug builds use the application ID `xyz.five82.takeup.debug` and the name
+**Takeup Debug**, so they can be installed alongside the release app.
+
+### Release builds
+
+Release builds must be signed. Create a long-lived signing key once and keep it
+outside the repository:
+
+```bash
+mkdir -p "$HOME/.android/keystores"
+keytool -genkeypair -v \
+  -keystore "$HOME/.android/keystores/takeup-release.jks" \
+  -alias takeup \
+  -keyalg RSA -keysize 2048 -validity 10000
+```
+
+Create an ignored `keystore.properties` file in the project root using the
+passwords entered above:
+
+```properties
+storeFile=/absolute/path/to/.android/keystores/takeup-release.jks
+storePassword=your-store-password
+keyAlias=takeup
+keyPassword=your-key-password
+```
+
+Then install a non-debug build on a specific connected device:
+
+```bash
+ANDROID_SERIAL=<device-serial> ./gradlew installRelease
+```
+
+The first release install cannot replace an older debug-signed build that used
+`xyz.five82.takeup`; uninstall that old build once before installing the release
+build. This clears its local settings and downloads. Subsequent release builds
+update in place, while new debug builds coexist as a separate app.
+
+Back up both the keystore and its passwords. To let a future Google Play build
+update an ADB-installed release without clearing app data, choose the existing
+key when enrolling in Play App Signing rather than having Play generate a
+different app-signing key. Upload an app bundle built with `./gradlew
+bundleRelease`; an invite-only internal or closed testing track can distribute
+it without publishing the app publicly.
 
 Run the canonical local checks (unit tests, Android lint, and a debug build):
 
