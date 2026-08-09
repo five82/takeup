@@ -62,7 +62,6 @@ import xyz.five82.takeup.ui.components.logoLaneHeight
 import xyz.five82.takeup.ui.components.ErrorState
 import xyz.five82.takeup.ui.components.LoadingState
 import xyz.five82.takeup.ui.components.PosterCard
-import xyz.five82.takeup.ui.components.RowLabel
 import xyz.five82.takeup.ui.components.ThreadProgress
 import xyz.five82.takeup.ui.components.navPillClearance
 import xyz.five82.takeup.ui.components.dyeBath
@@ -248,7 +247,9 @@ private fun HomeContent(
                         ThumbCard(
                             title = item.title,
                             imageUrl = api.thumbUrl(item),
+                            width = 200,
                             line = continueLine(item),
+                            lineStyle = MaterialTheme.typography.bodyMedium,
                             progress = progressFraction(item),
                             progressColor = Ember,
                             actions = listOf(
@@ -270,7 +271,9 @@ private fun HomeContent(
                         ThumbCard(
                             title = item.title,
                             imageUrl = api.thumbUrl(item),
+                            width = 200,
                             line = "${episodeLabel(item)} · ${item.title}",
+                            lineStyle = MaterialTheme.typography.bodyMedium,
                             actions = listOf(
                                 CardAction("Play") { nav.push(Screen.Player(item.id)) },
                                 CardAction("Mark watched") { model.setWatched(item, true) },
@@ -289,6 +292,7 @@ private fun HomeContent(
                         PosterCard(
                             title = item.title,
                             imageUrl = api.posterUrl(item),
+                            width = 128,
                             onClick = { nav.push(Screen.Detail(item.id)) },
                         )
                     }
@@ -304,6 +308,7 @@ private fun HomeContent(
                         PosterCard(
                             title = item.title,
                             imageUrl = api.posterUrl(item),
+                            width = 128,
                             progress = progressFraction(item),
                             onClick = { nav.push(Screen.Detail(item.id)) },
                         )
@@ -330,7 +335,14 @@ private fun HomeRow(
     content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit,
 ) {
     Column(Modifier.padding(top = 22.dp)) {
-        RowLabel(label, color = labelColor, modifier = Modifier.padding(start = 20.dp, bottom = 10.dp))
+        Text(
+            label.uppercase(),
+            style = MaterialTheme.typography.titleMedium.copy(
+                letterSpacing = MaterialTheme.typography.labelMedium.letterSpacing,
+            ),
+            color = labelColor,
+            modifier = Modifier.padding(start = 20.dp, bottom = 10.dp),
+        )
         LazyRow(
             contentPadding = PaddingValues(horizontal = 20.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -409,7 +421,7 @@ private fun Hero(
             }.joinToString(" · ")
             Text(
                 line,
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.bodyMedium,
                 color = Ink.copy(alpha = 0.85f),
                 modifier = Modifier.padding(top = 10.dp, bottom = 8.dp),
             )
