@@ -172,6 +172,17 @@ private fun PlayerContent(repository: LoomRepository, nav: NavState, model: Play
             }
         }
         player.addListener(listener)
+        // Sync anything that changed before the listener attached: a fully
+        // cached download reaches READY before first composition, and a
+        // listener only reports transitions, so the initial spinner would
+        // otherwise never clear.
+        playing = player.isPlaying
+        tracks = player.currentTracks
+        if (player.playbackState == Player.STATE_READY ||
+            player.playbackState == Player.STATE_ENDED
+        ) {
+            buffering = false
+        }
         onDispose { player.removeListener(listener) }
     }
 

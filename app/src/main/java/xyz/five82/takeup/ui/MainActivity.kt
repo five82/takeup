@@ -16,6 +16,9 @@ class MainActivity : ComponentActivity() {
         )
         super.onCreate(savedInstanceState)
         val repository = (application as TakeupApplication).repository
+        // No scheduler runs while the process is dead; pick interrupted downloads
+        // back up here. Media3 resumes each with an HTTP range request.
+        repository.downloads.resumeQueued()
         setContent {
             TakeupTheme {
                 TakeupApp(repository)

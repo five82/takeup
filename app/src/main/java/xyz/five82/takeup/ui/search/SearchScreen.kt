@@ -145,12 +145,7 @@ fun SearchScreen(repository: LoomRepository, nav: NavState, initialQuery: String
         LazyColumn(contentPadding = PaddingValues(vertical = 8.dp)) {
             items(model.results, key = { it.id }) { item ->
                 SearchResultRow(repository, item) {
-                    when (item.kind) {
-                        // An episode found by search plays directly; its art
-                        // and context line already say where it belongs.
-                        "episode" -> nav.push(Screen.Player(item.id))
-                        else -> nav.push(Screen.Detail(item.id))
-                    }
+                    nav.push(Screen.Detail(item.id))
                 }
             }
         }

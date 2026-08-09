@@ -1,3 +1,5 @@
+@file:androidx.annotation.OptIn(markerClass = [androidx.media3.common.util.UnstableApi::class])
+
 package xyz.five82.takeup.ui.player
 
 import androidx.compose.runtime.getValue
@@ -10,6 +12,7 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -17,7 +20,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import xyz.five82.takeup.TakeupApplication
 import xyz.five82.takeup.api.Item
+import xyz.five82.takeup.data.DownloadState
 import xyz.five82.takeup.data.LoomRepository
+import xyz.five82.takeup.data.isOfflineError
+import xyz.five82.takeup.data.resolveStreamUrl
 import xyz.five82.takeup.ui.nextEpisodeAfter
 
 /**
@@ -32,7 +38,12 @@ class PlayerViewModel(
     private val itemId: Long,
 ) : ViewModel() {
 
+    // Reads through the download cache (never writing to it), so a downloaded
+    // item plays from disk even when its stream URL points at the server.
     val player: ExoPlayer = ExoPlayer.Builder(application)
+        .setMediaSourceFactory(
+            DefaultMediaSourceFactory(repository.downloads.playbackDataSourceFactory),
+        )
         .setAudioAttributes(
             AudioAttributes.Builder()
                 .setUsage(C.USAGE_MEDIA)
@@ -78,11 +89,20 @@ class PlayerViewModel(
     fun load() {
         viewModelScope.launch {
             error = null
+            val entry = repository.downloads.entry(itemId)
             try {
+                // Loom first even when downloaded: the answer costs milliseconds
+                // on the LAN and carries a fresher resume position than the
+                // snapshot frozen at download time.
                 val loaded = repository.api.item(itemId)
                 item = loaded
                 val playback = repository.api.playback(itemId)
-                player.setMediaItem(MediaItem.fromUri(repository.api.absoluteUrl(playback.streamUrl)))
+                val url = resolveStreamUrl(
+                    entry,
+                    playback.media.tag,
+                    repository.api.absoluteUrl(playback.streamUrl),
+                )
+                player.setMediaItem(MediaItem.fromUri(url))
                 player.prepare()
                 val resume = loaded.progress?.takeIf { !it.played }?.resumePositionMs ?: 0
                 if (resume > 0) player.seekTo(resume)
@@ -91,7 +111,25 @@ class PlayerViewModel(
                     loadNextEpisode(loaded)
                 }
             } catch (e: Exception) {
-                error = e.message ?: "Playback failed"
+                val offline = entry?.takeIf {
+                    it.state == DownloadState.Completed && isOfflineError(e)
+                }
+                if (offline == null) {
+                    error = e.message ?: "Playback failed"
+                    return@launch
+                }
+                // Loom is unreachable but the bytes are local: play the snapshot.
+                // The MediaItem uses the download's exact tagged URL, so every
+                // read is a cache hit and the network is never touched. Next-up
+                // is skipped; it needs the server.
+                item = offline.item
+                player.setMediaItem(MediaItem.fromUri(offline.uri))
+                player.prepare()
+                val resume = repository.offlineProgress.pending(itemId)?.positionMs
+                    ?: offline.item.progress?.takeIf { !it.played }?.resumePositionMs
+                    ?: 0
+                if (resume > 0) player.seekTo(resume)
+                player.playWhenReady = true
             }
         }
     }
@@ -127,7 +165,16 @@ class PlayerViewModel(
     private fun report(positionMs: Long, durationMs: Long) {
         val target = itemId
         application.appScope.launch {
-            runCatching { repository.api.saveProgress(target, positionMs, durationMs) }
+            try {
+                repository.api.saveProgress(target, positionMs, durationMs)
+            } catch (e: Exception) {
+                // Positions from offline playback wait in a queue that Home
+                // flushes on its next successful refresh. A server error is
+                // not queued: the write reached Loom and retrying cannot help.
+                if (isOfflineError(e)) {
+                    repository.offlineProgress.enqueue(target, positionMs, durationMs)
+                }
+            }
         }
     }
 

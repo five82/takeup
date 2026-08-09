@@ -46,7 +46,13 @@ class LoomApi(@Volatile var baseUrl: String? = null) {
     suspend fun collections(): List<Collection> =
         itemsList(get("/api/v1/collections"), Collection::class.java)
 
-    suspend fun item(id: Long): Item = gson.fromJson(get("/api/v1/items/$id"), Item::class.java)
+    suspend fun item(id: Long): Item = gson.fromJson(itemJson(id), Item::class.java)
+
+    /**
+     * Raw item response body. A download stores this verbatim as its offline
+     * snapshot so there is exactly one decoder for online and offline items.
+     */
+    suspend fun itemJson(id: Long): String = get("/api/v1/items/$id")
 
     /** One page of top-level items. Loom caps limit at 200. */
     suspend fun items(
@@ -170,6 +176,17 @@ class LoomApi(@Volatile var baseUrl: String? = null) {
     fun absoluteUrl(path: String): String {
         val base = baseUrl ?: return path
         return if (path.startsWith("http")) path else base + path
+    }
+
+    /** Fetches a URL's body bytes, for copying artwork into offline storage. */
+    suspend fun fetchBytes(url: String): ByteArray = withContext(Dispatchers.IO) {
+        val request = Request.Builder().url(url).build()
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw LoomException(response.code, "Loom returned HTTP ${response.code}")
+            }
+            response.body.bytes()
+        }
     }
 
     // -- plumbing ------------------------------------------------------------

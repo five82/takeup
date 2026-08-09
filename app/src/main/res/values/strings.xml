@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Takeup</string>
+    <!-- Media3's DownloadService requires the channel name as a resource id. -->
+    <string name="download_channel_name">Downloads</string>
 </resources>

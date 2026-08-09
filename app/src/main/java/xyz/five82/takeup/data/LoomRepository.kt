@@ -10,8 +10,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import xyz.five82.takeup.api.Item
 import xyz.five82.takeup.api.Library
 import xyz.five82.takeup.api.LoomApi
+import xyz.five82.takeup.api.LoomException
+import xyz.five82.takeup.api.loomGson
 
 private val Context.dataStore by preferencesDataStore(name = "takeup")
 
@@ -38,6 +41,8 @@ class LoomRepository(
     private val settings: Settings,
     val api: LoomApi,
     scope: CoroutineScope,
+    val downloads: DownloadStore,
+    val offlineProgress: OfflineProgressStore,
 ) {
     val server: StateFlow<ServerConfig> = settings.serverAddress
         .map { address ->
@@ -57,5 +62,37 @@ class LoomRepository(
             runCatching { libraries = api.libraries() }
         }
         return libraries.firstOrNull { it.id == libraryId }?.kind
+    }
+
+    /**
+     * Snapshots the item, checks headroom against the file's live size, and hands
+     * the transfer to Media3. The playback endpoint re-stats the file, so its tag
+     * and size describe the file as of this request rather than the last scan.
+     */
+    suspend fun startDownload(itemId: Long): DownloadResult {
+        val json = api.itemJson(itemId)
+        val item = loomGson.fromJson(json, Item::class.java)
+        val playback = api.playback(itemId)
+        if (!hasRoomFor(playback.media.size, downloads.usableSpaceBytes())) {
+            return DownloadResult.NotEnoughSpace
+        }
+        downloads.enqueue(itemId, api.absoluteUrl(playback.streamUrl), json)
+        runCatching { downloads.artwork.save(item) }
+        return DownloadResult.Started
+    }
+
+    /**
+     * Replays watch positions queued while offline. A [LoomException] also clears
+     * the entry: the server answered, so retrying the same write cannot help.
+     */
+    suspend fun flushPendingProgress() {
+        offlineProgress.all().forEach { (itemId, progress) ->
+            val sent = runCatching {
+                api.saveProgress(itemId, progress.positionMs, progress.durationMs)
+            }
+            if (sent.isSuccess || sent.exceptionOrNull() is LoomException) {
+                offlineProgress.clear(itemId)
+            }
+        }
     }
 }

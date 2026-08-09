@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -40,6 +41,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.compose.animation.core.animateDpAsState
 import coil3.compose.AsyncImage
@@ -53,7 +55,10 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import xyz.five82.takeup.api.Item
+import xyz.five82.takeup.data.DownloadState
 import xyz.five82.takeup.data.LoomRepository
+import xyz.five82.takeup.data.downloadedRowItems
+import xyz.five82.takeup.data.isOfflineError
 import xyz.five82.takeup.ui.NavState
 import xyz.five82.takeup.ui.Screen
 import xyz.five82.takeup.ui.components.BiasCutBackdrop
@@ -86,6 +91,7 @@ import xyz.five82.takeup.ui.theme.rememberWovenThreads
 data class HomeState(
     val loading: Boolean = true,
     val error: String? = null,
+    val offline: Boolean = false,
     val continueWatching: List<Item> = emptyList(),
     val nextUp: List<Item> = emptyList(),
     val recentlyAdded: List<Item> = emptyList(),
@@ -129,19 +135,32 @@ class HomeViewModel(private val repository: LoomRepository) : ViewModel() {
                         ),
                     )
                 }
+                // The server answered, so anything queued while offline can land.
+                repository.flushPendingProgress()
             } catch (e: Exception) {
-                state = state.copy(
-                    loading = false,
-                    error = if (
-                        state.dailyPick == null &&
-                        state.continueWatching.isEmpty() &&
-                        state.recentlyAdded.isEmpty()
-                    ) {
-                        e.message ?: "Loom isn't answering"
-                    } else {
-                        null
-                    },
-                )
+                val hasDownloads = repository.downloads.downloads.value
+                    .any { it.state == DownloadState.Completed }
+                if (isOfflineError(e) && hasDownloads) {
+                    // Drop the cached library rather than keep it: every stale
+                    // poster opens a screen that cannot play. Only a connection
+                    // failure counts - a Loom bug must not masquerade as being
+                    // offline - and only with something downloaded to show.
+                    state = HomeState(loading = false, offline = true)
+                } else {
+                    state = state.copy(
+                        loading = false,
+                        offline = false,
+                        error = if (
+                            state.dailyPick == null &&
+                            state.continueWatching.isEmpty() &&
+                            state.recentlyAdded.isEmpty()
+                        ) {
+                            e.message ?: "Loom isn't answering"
+                        } else {
+                            null
+                        },
+                    )
+                }
             }
         }
     }
@@ -181,8 +200,65 @@ fun HomeScreen(repository: LoomRepository, nav: NavState, active: Boolean) {
     val state = model.state
     when {
         state.loading -> LoadingState()
+        state.offline -> OfflineHome(repository, nav, onRetry = { model.refresh() })
         state.error != null -> ErrorState(state.error, onRetry = { model.refresh() })
         else -> HomeContent(repository, nav, model, state)
+    }
+}
+
+/**
+ * Home with no Loom: only what is truly on this device. The stale library is
+ * deliberately absent - cached posters would open screens that cannot play.
+ */
+@Composable
+private fun OfflineHome(repository: LoomRepository, nav: NavState, onRetry: () -> Unit) {
+    val downloads by repository.downloads.downloads.collectAsStateWithLifecycle()
+    val ready = downloadedRowItems(downloads.filter { it.state == DownloadState.Completed })
+    LazyColumn(
+        Modifier.fillMaxSize().houseLights(Ember),
+        contentPadding = PaddingValues(bottom = navPillClearance()),
+    ) {
+        item(key = "offline-head") {
+            Column(
+                Modifier
+                    .statusBarsPadding()
+                    .padding(start = 20.dp, end = 20.dp, top = 16.dp),
+            ) {
+                Text("Offline", style = MaterialTheme.typography.displaySmall, color = Ink)
+                Text(
+                    "Loom isn't answering. These titles are downloaded on this device.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Muted,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+                OutlinedButton(onClick = onRetry, modifier = Modifier.padding(top = 12.dp)) {
+                    Text("Retry")
+                }
+            }
+        }
+        item(key = "offline-downloads") {
+            HomeRow("Downloaded") {
+                items(ready, key = { "dl-${it.item.id}" }) { entry ->
+                    if (entry.item.kind == "episode") {
+                        ThumbCard(
+                            title = entry.item.title,
+                            imageUrl = entry.thumbPath ?: entry.backdropPath,
+                            width = 200,
+                            line = "${episodeLabel(entry.item)} · ${entry.item.title}",
+                            lineStyle = MaterialTheme.typography.bodyMedium,
+                            onClick = { nav.push(Screen.Player(entry.item.id)) },
+                        )
+                    } else {
+                        PosterCard(
+                            title = entry.item.title,
+                            imageUrl = entry.posterPath,
+                            width = 128,
+                            onClick = { nav.push(Screen.Player(entry.item.id)) },
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 

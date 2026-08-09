@@ -12,8 +12,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -21,23 +24,33 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import xyz.five82.takeup.api.LoomApi
 import xyz.five82.takeup.api.ScanStatus
+import xyz.five82.takeup.data.DownloadEntry
+import xyz.five82.takeup.data.DownloadState
 import xyz.five82.takeup.data.LoomRepository
+import xyz.five82.takeup.data.downloadStatusLabel
+import xyz.five82.takeup.data.downloadedRowItems
+import xyz.five82.takeup.data.formatBytes
+import xyz.five82.takeup.ui.DownloadIcon
 import xyz.five82.takeup.ui.NavState
 import xyz.five82.takeup.ui.components.RowLabel
 import xyz.five82.takeup.ui.components.threeThreads
@@ -110,6 +123,7 @@ class SettingsViewModel(private val repository: LoomRepository) : ViewModel() {
 @Composable
 fun SettingsScreen(repository: LoomRepository, nav: NavState) {
     val model = takeupViewModel { SettingsViewModel(repository) }
+    var confirmRemoveAll by remember { mutableStateOf(false) }
 
     // Poll scan status while the screen is open; it is the only live thing here.
     LaunchedEffect(Unit) {
@@ -174,6 +188,22 @@ fun SettingsScreen(repository: LoomRepository, nav: NavState) {
                 Text("Scan libraries now")
             }
 
+            val downloads by repository.downloads.downloads.collectAsStateWithLifecycle()
+            if (downloads.isNotEmpty()) {
+                RowLabel("Downloads", color = Violet, modifier = Modifier.padding(top = 24.dp))
+                downloadedRowItems(downloads).forEach { entry ->
+                    DownloadRow(entry, onRemove = { repository.downloads.remove(entry.item.id) })
+                }
+                Text(
+                    "${formatBytes(repository.downloads.usableSpaceBytes())} free on this device",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Muted,
+                )
+                OutlinedButton(onClick = { confirmRemoveAll = true }) {
+                    Text("Remove all downloads")
+                }
+            }
+
             RowLabel("About", modifier = Modifier.padding(top = 24.dp))
             Text(
                 "Takeup is the take-up reel on a loom: the beam that winds finished cloth as it is woven.",
@@ -181,5 +211,58 @@ fun SettingsScreen(repository: LoomRepository, nav: NavState) {
                 color = Muted,
             )
         }
+    }
+
+    if (confirmRemoveAll) {
+        AlertDialog(
+            onDismissRequest = { confirmRemoveAll = false },
+            title = { Text("Remove all downloads?") },
+            text = { Text("Nothing will play offline until something is downloaded again.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmRemoveAll = false
+                    repository.downloads.removeAll()
+                }) { Text("Remove all") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmRemoveAll = false }) { Text("Keep") }
+            },
+        )
+    }
+}
+
+/**
+ * One download: state icon and words, then its own Remove. Icon shape carries
+ * the state; colour is reserved for failure, in addition to the words.
+ */
+@Composable
+private fun DownloadRow(entry: DownloadEntry, onRemove: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        val failed = entry.state == DownloadState.Failed
+        Icon(
+            if (entry.state == DownloadState.Completed) Icons.Filled.Check else DownloadIcon,
+            contentDescription = null,
+            tint = if (failed) MaterialTheme.colorScheme.error else Muted,
+            modifier = Modifier.size(18.dp),
+        )
+        Column(Modifier.weight(1f).padding(start = 10.dp)) {
+            Text(
+                entry.item.title,
+                style = MaterialTheme.typography.titleSmall,
+                color = Ink,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                downloadStatusLabel(entry),
+                style = MaterialTheme.typography.labelSmall,
+                color = if (failed) MaterialTheme.colorScheme.error else Muted,
+                modifier = Modifier.padding(top = 1.dp),
+            )
+        }
+        TextButton(onClick = onRemove) { Text("Remove") }
     }
 }

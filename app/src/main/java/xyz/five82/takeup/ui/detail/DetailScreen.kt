@@ -1,5 +1,10 @@
 package xyz.five82.takeup.ui.detail
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -13,6 +18,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -30,14 +36,19 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -50,11 +61,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.compose.animation.core.animateDpAsState
 import coil3.compose.AsyncImage
@@ -64,7 +78,17 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import xyz.five82.takeup.api.Item
+import xyz.five82.takeup.data.DownloadAction
+import xyz.five82.takeup.data.DownloadEntry
+import xyz.five82.takeup.data.DownloadResult
+import xyz.five82.takeup.data.DownloadState
 import xyz.five82.takeup.data.LoomRepository
+import xyz.five82.takeup.data.downloadAction
+import xyz.five82.takeup.data.downloadProgressFraction
+import xyz.five82.takeup.data.downloadStatusLabel
+import xyz.five82.takeup.data.formatBytes
+import xyz.five82.takeup.data.isStaleDownload
+import xyz.five82.takeup.ui.DownloadIcon
 import xyz.five82.takeup.ui.NavState
 import xyz.five82.takeup.ui.Screen
 import xyz.five82.takeup.ui.backdropUrl
@@ -159,6 +183,27 @@ class DetailViewModel(
         }
     }
 
+    var downloadMessage by mutableStateOf<String?>(null)
+        private set
+
+    fun download() {
+        viewModelScope.launch {
+            downloadMessage = null
+            try {
+                if (repository.startDownload(itemId) == DownloadResult.NotEnoughSpace) {
+                    downloadMessage = "Not enough free space for this file"
+                }
+            } catch (e: Exception) {
+                downloadMessage = e.message ?: "Download failed to start"
+            }
+        }
+    }
+
+    fun removeDownload() {
+        downloadMessage = null
+        repository.downloads.remove(itemId)
+    }
+
     /** The episode a show's play button should offer: first not fully watched. */
     fun nextToWatch(): Item? {
         for (season in state.seasons.filter { it.seasonNumber > 0 }) {
@@ -191,10 +236,10 @@ fun DetailScreen(repository: LoomRepository, nav: NavState, itemId: Long, topmos
                     // Gauze: the backdrop's color weather behind the whole
                     // screen, with the dyed stage catching what it misses.
                     GauzeBackground(repository.api.backdropUrl(item, 240), seed)
-                    if (item.kind == "show") {
-                        ShowDetail(repository, nav, model, item, state)
-                    } else {
-                        MovieDetail(repository, nav, model, item)
+                    when (item.kind) {
+                        "show" -> ShowDetail(repository, nav, model, item, state)
+                        "episode" -> EpisodeDetail(repository, nav, model, item)
+                        else -> MovieDetail(repository, nav, model, item)
                     }
                 }
             }
@@ -224,7 +269,55 @@ private fun MovieDetail(
                         modifier = Modifier.padding(top = 6.dp),
                     )
                 }
-                PlayControls(nav, item)
+                PlayControls(repository, nav, model, item)
+                BadgeStrip(item)
+                if (!item.overview.isNullOrEmpty()) {
+                    Text(
+                        item.overview,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = Ink.copy(alpha = 0.92f),
+                        modifier = Modifier.padding(top = 18.dp),
+                    )
+                }
+                ChapterLine(item)
+            }
+        }
+        creditsSection(nav, item)
+    }
+}
+
+// -- episode ------------------------------------------------------------------
+
+/**
+ * An episode's own page: the head carries the show's inherited backdrop and
+ * logo, so the episode names itself in the body, with the overview finally
+ * given room the season list's two-line clamp never had.
+ */
+@Composable
+private fun EpisodeDetail(
+    repository: LoomRepository,
+    nav: NavState,
+    model: DetailViewModel,
+    item: Item,
+) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 32.dp)) {
+        item { DetailHead(repository, nav, model, item) }
+        item {
+            Column(Modifier.padding(horizontal = 20.dp)) {
+                Text(
+                    episodeLabel(item),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(top = 14.dp),
+                )
+                Text(
+                    item.title,
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = Ink,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+                MetaLine(item)
+                PlayControls(repository, nav, model, item)
                 BadgeStrip(item)
                 if (!item.overview.isNullOrEmpty()) {
                     Text(
@@ -348,7 +441,7 @@ private fun EpisodeRow(
             Modifier
                 .fillMaxWidth()
                 .combinedClickable(
-                    onClick = { nav.push(Screen.Player(episode.id)) },
+                    onClick = { nav.push(Screen.Detail(episode.id)) },
                     onLongClick = { menuOpen = true },
                 )
                 .padding(horizontal = 20.dp, vertical = 10.dp),
@@ -570,24 +663,209 @@ private fun MetaLine(item: Item) {
     )
 }
 
+/**
+ * The split pill: Play carries the outer corners on its left, the download
+ * segment completes the pill on the right, and the two read as one control
+ * cut into segments. Below it, watch progress and download state in words.
+ */
 @Composable
-private fun PlayControls(nav: NavState, item: Item) {
+private fun PlayControls(
+    repository: LoomRepository,
+    nav: NavState,
+    model: DetailViewModel,
+    item: Item,
+) {
+    val downloads by repository.downloads.downloads.collectAsStateWithLifecycle()
+    val entry = downloads.firstOrNull { it.item.id == item.id }
+    var confirmRemove by remember { mutableStateOf(false) }
+
+    // Ask for the notification permission at the moment it becomes useful: the
+    // first download. Denial only silences notifications; the transfer runs
+    // regardless, and the status line below still says what is happening.
+    val context = LocalContext.current
+    val notifications =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    fun startDownload() {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        model.download()
+    }
+
     val progress = item.progress
     val resumable = progress != null && !progress.played && progress.resumePositionMs > 0
-    PlayButton(
-        label = when {
-            resumable -> listOfNotNull("Resume", remainingLabel(item)).joinToString(" · ")
-            progress?.played == true -> "Play again"
-            else -> "Play"
-        },
-        onClick = { nav.push(Screen.Player(item.id)) },
-    )
+    Row(
+        Modifier.padding(top = 16.dp).height(48.dp),
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        Button(
+            onClick = { nav.push(Screen.Player(item.id)) },
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+            ),
+            shape = RoundedCornerShape(
+                topStart = 24.dp,
+                bottomStart = 24.dp,
+                topEnd = 6.dp,
+                bottomEnd = 6.dp,
+            ),
+            modifier = Modifier.fillMaxHeight(),
+        ) {
+            Icon(Icons.Filled.PlayArrow, contentDescription = null)
+            Spacer(Modifier.width(6.dp))
+            Text(
+                when {
+                    resumable -> listOfNotNull("Resume", remainingLabel(item)).joinToString(" · ")
+                    progress?.played == true -> "Play again"
+                    else -> "Play"
+                },
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        val action = downloadAction(entry, item.mediaTag.orEmpty())
+        DownloadSegment(
+            entry = entry,
+            action = action,
+            shape = RoundedCornerShape(
+                topStart = 6.dp,
+                bottomStart = 6.dp,
+                topEnd = 24.dp,
+                bottomEnd = 24.dp,
+            ),
+            onClick = {
+                when (action) {
+                    // Deleting finished bytes is worth a prompt; abandoning a
+                    // partial transfer is not.
+                    DownloadAction.Remove -> confirmRemove = true
+                    DownloadAction.Cancel -> model.removeDownload()
+                    else -> startDownload()
+                }
+            },
+        )
+    }
     val fraction = progressFraction(item)
     if (fraction != null) {
         ThreadProgress(
             fraction,
             MaterialTheme.colorScheme.primary,
             Modifier.padding(top = 10.dp).fillMaxWidth(0.55f),
+        )
+    }
+    DownloadStatusLine(entry, item, model.downloadMessage)
+
+    if (confirmRemove) {
+        AlertDialog(
+            onDismissRequest = { confirmRemove = false },
+            title = { Text("Remove download?") },
+            text = {
+                Text(
+                    "\"${item.title}\" (${formatBytes(entry?.totalBytes ?: 0)}) " +
+                        "will no longer play offline.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmRemove = false
+                    model.removeDownload()
+                }) { Text("Remove") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmRemove = false }) { Text("Keep") }
+            },
+        )
+    }
+}
+
+/**
+ * One segment covering every download state. A transfer in progress shows its
+ * fraction in place of the icon so the pill never changes width mid-download.
+ */
+@Composable
+private fun DownloadSegment(
+    entry: DownloadEntry?,
+    action: DownloadAction,
+    shape: RoundedCornerShape,
+    onClick: () -> Unit,
+) {
+    val transferring = entry != null &&
+        (entry.state == DownloadState.Downloading || entry.state == DownloadState.Queued)
+    FilledTonalButton(
+        onClick = onClick,
+        shape = shape,
+        modifier = Modifier.fillMaxHeight(),
+        contentPadding = PaddingValues(horizontal = 18.dp),
+    ) {
+        when {
+            transferring -> CircularProgressIndicator(
+                progress = { downloadProgressFraction(entry) },
+                modifier = Modifier.size(20.dp),
+            )
+            action == DownloadAction.Remove -> Icon(
+                Icons.Filled.Check,
+                contentDescription = "Remove download",
+            )
+            else -> Icon(
+                DownloadIcon,
+                contentDescription = when (action) {
+                    DownloadAction.Retry -> "Retry download"
+                    DownloadAction.Update -> "Update download"
+                    else -> "Download"
+                },
+                tint = if (action == DownloadAction.Retry) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    LocalContentColor.current
+                },
+            )
+        }
+    }
+}
+
+/**
+ * Download state in words next to an icon whose shape differs per state. Never
+ * colour alone: WovenTheme derives primary from the item's own artwork, so a
+ * red poster's "done" would be indistinguishable from "failed".
+ */
+@Composable
+private fun DownloadStatusLine(entry: DownloadEntry?, item: Item, message: String?) {
+    if (message != null) {
+        Text(
+            message,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error,
+            modifier = Modifier.padding(top = 12.dp),
+        )
+    }
+    if (entry == null) return
+    val failed = entry.state == DownloadState.Failed
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(top = 12.dp),
+    ) {
+        Icon(
+            if (entry.state == DownloadState.Completed) Icons.Filled.Check else DownloadIcon,
+            contentDescription = null,
+            tint = if (failed) MaterialTheme.colorScheme.error else Muted,
+            modifier = Modifier.size(16.dp),
+        )
+        val stale = isStaleDownload(entry, item.mediaTag.orEmpty())
+        Text(
+            downloadStatusLabel(entry) + if (stale) " · Update available" else "",
+            style = MaterialTheme.typography.bodySmall,
+            color = if (failed) MaterialTheme.colorScheme.error else Muted,
+            modifier = Modifier.padding(start = 6.dp),
+        )
+    }
+    if (entry.state == DownloadState.Downloading || entry.state == DownloadState.Queued) {
+        ThreadProgress(
+            downloadProgressFraction(entry),
+            MaterialTheme.colorScheme.primary,
+            Modifier.padding(top = 8.dp).fillMaxWidth(0.55f),
         )
     }
 }
