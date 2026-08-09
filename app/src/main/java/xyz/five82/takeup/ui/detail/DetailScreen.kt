@@ -957,11 +957,11 @@ private fun androidx.compose.foundation.lazy.LazyListScope.creditsSection(nav: N
         ) {
             RowLabel("Cast", modifier = Modifier.padding(bottom = 4.dp))
             if (director != null) {
-                CreditCard(director.name, "Director", nav)
+                CreditCard(director.name, director.displayTitle, nav)
             }
             val visible = if (expanded) cast else cast.take(COLLAPSED_CAST_COUNT)
             visible.forEach { credit ->
-                CreditCard(credit.name, credit.character, nav)
+                CreditCard(credit.name, credit.displayTitle, nav)
             }
             if (!expanded && cast.size > COLLAPSED_CAST_COUNT) {
                 Text(

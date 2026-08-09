@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import xyz.five82.takeup.api.Credit
 import xyz.five82.takeup.api.Item
 import xyz.five82.takeup.api.LoomApi
 import xyz.five82.takeup.api.SearchResponse
@@ -63,6 +64,13 @@ class LoomApiTest {
         )
         assertTrue(response.fuzzy)
         assertEquals(listOf("Spider-Man"), response.items.map { it.title })
+    }
+
+    @Test
+    fun creditDisplayTitlesDistinguishCrewFromCast() {
+        assertEquals("Director", Credit(role = "director").displayTitle)
+        assertEquals("Producer", Credit(role = "producer").displayTitle)
+        assertEquals("Indiana Jones", Credit(role = "actor", character = "Indiana Jones").displayTitle)
     }
 
     @Test

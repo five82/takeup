@@ -66,7 +66,14 @@ data class Credit(
     val name: String = "",
     val role: String = "",
     val character: String? = null,
-)
+) {
+    val displayTitle: String?
+        get() = when (role) {
+            "director" -> "Director"
+            "producer" -> "Producer"
+            else -> character
+        }
+}
 
 data class MediaFile(
     val id: Long = 0,
