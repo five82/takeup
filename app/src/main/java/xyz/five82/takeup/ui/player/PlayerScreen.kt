@@ -136,7 +136,7 @@ fun PlayerScreen(repository: LoomRepository, nav: NavState, itemId: Long) {
     }
 
     val item = model.item
-    val seed = rememberWovenSeed(itemId, item?.let { repository.api.posterUrl(it, 240) })
+    val seed = rememberWovenSeed(item?.let { repository.api.posterUrl(it, 240) })
     WovenTheme(seed) {
         PlayerContent(repository, nav, model)
     }
@@ -586,10 +586,7 @@ private fun EndOverlay(repository: LoomRepository, nav: NavState, model: PlayerV
     // The finished title's colors linger while up-next appears: drifting
     // thread fields over the dark scrim, woven from its poster.
     val finished = model.item
-    val threads = rememberWovenThreads(
-        finished?.id ?: 0L,
-        finished?.let { repository.api.posterUrl(it, 240) },
-    )
+    val threads = rememberWovenThreads(finished?.let { repository.api.posterUrl(it, 240) })
     Box(
         Modifier
             .fillMaxSize()

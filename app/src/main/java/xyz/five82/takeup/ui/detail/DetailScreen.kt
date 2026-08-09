@@ -230,7 +230,11 @@ fun DetailScreen(repository: LoomRepository, nav: NavState, itemId: Long, topmos
         item == null && state.loading -> LoadingState()
         item == null -> ErrorState(state.error ?: "Loom isn't answering", onRetry = { model.refresh() })
         else -> {
-            val seed = rememberWovenSeed(item.id, repository.api.posterUrl(item, 240))
+            // Seed from the backdrop this screen hangs behind everything, not
+            // the poster: the two often disagree (a warm poster over a cool
+            // still) and the buttons sit on the backdrop's weather.
+            val artUrl = repository.api.backdropUrl(item, 240) ?: repository.api.posterUrl(item, 240)
+            val seed = rememberWovenSeed(artUrl)
             WovenTheme(seed) {
                 Box(Modifier.fillMaxSize()) {
                     // Gauze: the backdrop's color weather behind the whole

@@ -103,7 +103,7 @@ fun BrowseScreen(repository: LoomRepository, nav: NavState, active: Boolean) {
     // Shadow weave: the first collection's cover casts its colors into the
     // top of the screen; violet holds the room until it decodes.
     val lead = state.collections.firstOrNull()?.items?.firstOrNull()
-    val swatches = rememberWovenThreads(lead?.id ?: 0L, lead?.let { repository.api.posterUrl(it, 240) })
+    val swatches = rememberWovenThreads(lead?.let { repository.api.posterUrl(it, 240) })
     Column(Modifier.fillMaxSize().shadowWeave(swatches, fallback = Violet).statusBarsPadding()) {
         Text(
             "Browse",

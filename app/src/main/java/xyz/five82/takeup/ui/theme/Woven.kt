@@ -15,28 +15,30 @@ import coil3.toBitmap
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * The colors a title weaves through its screens, extracted from poster art.
- * Cached per item id so a detail screen revisit never re-decodes.
+ * The colors a title weaves through its screens, extracted from its art.
+ * Cached per artwork URL - an item's poster and backdrop disagree often
+ * enough that they must not share an entry - so a revisit never re-decodes.
  */
 object WovenColors {
 
-    private val cache = ConcurrentHashMap<Long, List<Color>>()
+    private val cache = ConcurrentHashMap<String, List<Color>>()
 
-    suspend fun seedFor(context: Context, itemId: Long, posterUrl: String?): Color? =
-        threadsFor(context, itemId, posterUrl).firstOrNull()
+    /** The already-extracted threads for this art, so a revisit can paint the
+     * right colors on its very first frame instead of flashing the fallback. */
+    fun cached(artUrl: String?): List<Color> = artUrl?.let { cache[it] }.orEmpty()
 
     /** Up to three hue-separated swatches; empty until the art decodes. */
-    suspend fun threadsFor(context: Context, itemId: Long, posterUrl: String?): List<Color> {
-        if (posterUrl == null) return emptyList()
-        cache[itemId]?.let { return it }
+    suspend fun threadsFor(context: Context, artUrl: String?): List<Color> {
+        if (artUrl == null) return emptyList()
+        cache[artUrl]?.let { return it }
         val request = ImageRequest.Builder(context)
-            .data(posterUrl)
+            .data(artUrl)
             .size(64)
             .allowHardware(false)
             .build()
         val result = context.imageLoader.execute(request) as? SuccessResult ?: return emptyList()
         val threads = threadColors(result.image.toBitmap())
-        if (threads.isNotEmpty()) cache[itemId] = threads
+        if (threads.isNotEmpty()) cache[artUrl] = threads
         return threads
     }
 
@@ -121,17 +123,18 @@ fun Color.fieldTone(): Color {
     return Color.hsv(hsv[0], hsv[1].coerceAtLeast(0.30f), hsv[2].coerceIn(0.48f, 0.62f))
 }
 
-/** Seed color for an item, resolving off the main thread; null until known. */
+/** Seed color for an artwork, resolving off the main thread; null until known. */
 @Composable
-fun rememberWovenSeed(itemId: Long, posterUrl: String?): Color? =
-    rememberWovenThreads(itemId, posterUrl).firstOrNull()
+fun rememberWovenSeed(artUrl: String?): Color? =
+    rememberWovenThreads(artUrl).firstOrNull()
 
-/** Up to three thread colors for an item; empty until known. */
+/** Up to three thread colors for an artwork; empty until known. Cached art
+ * is served synchronously so revisits never wait a frame for their colors. */
 @Composable
-fun rememberWovenThreads(itemId: Long, posterUrl: String?): List<Color> {
+fun rememberWovenThreads(artUrl: String?): List<Color> {
     val context = LocalContext.current
-    val threads by produceState(initialValue = emptyList<Color>(), itemId, posterUrl) {
-        value = WovenColors.threadsFor(context, itemId, posterUrl)
+    val threads by produceState(initialValue = WovenColors.cached(artUrl), artUrl) {
+        value = WovenColors.threadsFor(context, artUrl)
     }
     return threads
 }

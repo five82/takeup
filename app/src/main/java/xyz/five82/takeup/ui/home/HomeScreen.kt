@@ -284,7 +284,7 @@ private fun HomeContent(
     // The daily pick colors the whole room: its seed dyes the stage, and its
     // swatches sit as still fields of light down the screen. Ember house
     // lights hold the room until the art resolves (and with no hero at all).
-    val heroThreads = hero?.let { rememberWovenThreads(it.id, api.posterUrl(it, 240)) }.orEmpty()
+    val heroThreads = hero?.let { rememberWovenThreads(api.posterUrl(it, 240)) }.orEmpty()
     val room = if (heroThreads.isNotEmpty()) {
         Modifier.dyeBath(heroThreads.first()).threeThreads(heroThreads)
     } else {

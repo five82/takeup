@@ -1,5 +1,8 @@
 package xyz.five82.takeup.ui.theme
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
@@ -51,20 +54,23 @@ fun TakeupTheme(content: @Composable () -> Unit) {
 
 /**
  * Wraps a screen in a scheme woven from a title's artwork. Until the seed is
- * known (or when the title has no artwork) the static Takeup scheme shows, so
- * screens never flash a wrong color, just a neutral one.
+ * known (or when the title has no artwork) a gray scheme woven from Muted
+ * shows instead - falling back to the brand scheme here made every push
+ * flash Ember-red buttons for the beat before the art decoded. When the
+ * seed lands the accents crossfade from gray into the title's color.
  */
 @Composable
 fun WovenTheme(seed: Color?, content: @Composable () -> Unit) {
-    if (seed == null) {
-        MaterialTheme(colorScheme = TakeupColors, typography = TakeupType, content = content)
-        return
-    }
     val woven = rememberDynamicColorScheme(
-        seedColor = seed,
+        seedColor = seed ?: Muted,
         isDark = true,
         isAmoled = false,
-        style = PaletteStyle.Vibrant,
+        // Content follows the seed's own chroma, so muted art (a brown
+        // warehouse still) yields muted accents while vivid art stays vivid.
+        // Vibrant forced max chroma from the hue alone, which turned
+        // desaturated backdrops into loud acid accents - and would turn the
+        // gray placeholder into a loud blue; Neutral keeps it actually gray.
+        style = if (seed == null) PaletteStyle.Neutral else PaletteStyle.Content,
     )
     // Keep the shared stage: only the accent roles change per title, so
     // pushing a detail screen never repaints the background a new hue.
@@ -74,5 +80,46 @@ fun WovenTheme(seed: Color?, content: @Composable () -> Unit) {
         surface = Stage,
         onSurface = Ink,
     )
-    MaterialTheme(colorScheme = scheme, typography = TakeupType, content = content)
+    MaterialTheme(colorScheme = scheme.bloomed(), typography = TakeupType, content = content)
+}
+
+/**
+ * Crossfades the accent-bearing roles toward their targets so the gray to
+ * woven swap blooms instead of popping. Cached seeds start at their target,
+ * so revisits do not animate. Stage-pinned, error, and scrim roles never
+ * change between schemes and stay as-is.
+ */
+@Composable
+private fun ColorScheme.bloomed(): ColorScheme {
+    @Composable
+    fun Color.fade(): Color = animateColorAsState(this, tween(450), label = "woven role").value
+    return copy(
+        primary = primary.fade(),
+        onPrimary = onPrimary.fade(),
+        primaryContainer = primaryContainer.fade(),
+        onPrimaryContainer = onPrimaryContainer.fade(),
+        inversePrimary = inversePrimary.fade(),
+        secondary = secondary.fade(),
+        onSecondary = onSecondary.fade(),
+        secondaryContainer = secondaryContainer.fade(),
+        onSecondaryContainer = onSecondaryContainer.fade(),
+        tertiary = tertiary.fade(),
+        onTertiary = onTertiary.fade(),
+        tertiaryContainer = tertiaryContainer.fade(),
+        onTertiaryContainer = onTertiaryContainer.fade(),
+        surfaceVariant = surfaceVariant.fade(),
+        onSurfaceVariant = onSurfaceVariant.fade(),
+        surfaceTint = surfaceTint.fade(),
+        inverseSurface = inverseSurface.fade(),
+        inverseOnSurface = inverseOnSurface.fade(),
+        outline = outline.fade(),
+        outlineVariant = outlineVariant.fade(),
+        surfaceBright = surfaceBright.fade(),
+        surfaceDim = surfaceDim.fade(),
+        surfaceContainer = surfaceContainer.fade(),
+        surfaceContainerLow = surfaceContainerLow.fade(),
+        surfaceContainerLowest = surfaceContainerLowest.fade(),
+        surfaceContainerHigh = surfaceContainerHigh.fade(),
+        surfaceContainerHighest = surfaceContainerHighest.fade(),
+    )
 }
