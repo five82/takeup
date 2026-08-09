@@ -30,6 +30,7 @@ import xyz.five82.takeup.ui.components.EmptyState
 import xyz.five82.takeup.ui.components.ErrorState
 import xyz.five82.takeup.ui.components.LoadingState
 import xyz.five82.takeup.ui.components.PosterCard
+import xyz.five82.takeup.ui.components.houseLights
 import xyz.five82.takeup.ui.components.navPillClearance
 import xyz.five82.takeup.ui.posterUrl
 import xyz.five82.takeup.ui.progressFraction
@@ -88,7 +89,9 @@ fun LibraryScreen(repository: LoomRepository, nav: NavState, library: String, ac
 
     val state = model.state
     val thread = libraryThread(library)
-    Column(Modifier.fillMaxSize().statusBarsPadding()) {
+    // House lights: the wing's thread color pours from the corner, so you
+    // know where you are before reading the title.
+    Column(Modifier.fillMaxSize().houseLights(thread).statusBarsPadding()) {
         Text(
             when (library) {
                 "movies" -> "Movies"

@@ -55,6 +55,7 @@ import xyz.five82.takeup.data.LoomRepository
 import xyz.five82.takeup.ui.NavState
 import xyz.five82.takeup.ui.Screen
 import xyz.five82.takeup.ui.components.EmptyState
+import xyz.five82.takeup.ui.components.houseLights
 import xyz.five82.takeup.ui.episodeLabel
 import xyz.five82.takeup.ui.posterUrl
 import xyz.five82.takeup.ui.takeupViewModel
@@ -62,7 +63,6 @@ import xyz.five82.takeup.ui.theme.Amber
 import xyz.five82.takeup.ui.theme.Ember
 import xyz.five82.takeup.ui.theme.Ink
 import xyz.five82.takeup.ui.theme.Muted
-import xyz.five82.takeup.ui.theme.Stage
 import xyz.five82.takeup.ui.theme.Surface1
 import xyz.five82.takeup.ui.theme.Teal
 
@@ -95,8 +95,9 @@ class SearchViewModel(private val repository: LoomRepository, initialQuery: Stri
 
 /**
  * One field over everything Loom indexes: titles and the people credited on
- * them. Loom ranks exact and prefix matches first, so results are shown in
- * server order.
+ * them. Loom matches on word starts ("hanks" finds Tom Hanks, not
+ * Thanksgiving) and ranks exact and prefix matches first, so results are
+ * shown in server order.
  */
 @Composable
 fun SearchScreen(repository: LoomRepository, nav: NavState, initialQuery: String) {
@@ -110,7 +111,7 @@ fun SearchScreen(repository: LoomRepository, nav: NavState, initialQuery: String
     Column(
         Modifier
             .fillMaxSize()
-            .background(Stage)
+            .houseLights(Ember)
             .statusBarsPadding()
             .imePadding(),
     ) {
@@ -145,12 +146,7 @@ fun SearchScreen(repository: LoomRepository, nav: NavState, initialQuery: String
         LazyColumn(contentPadding = PaddingValues(vertical = 8.dp)) {
             items(model.results, key = { it.id }) { item ->
                 SearchResultRow(repository, item) {
-                    when (item.kind) {
-                        // An episode found by search plays directly; its art
-                        // and context line already say where it belongs.
-                        "episode" -> nav.push(Screen.Player(item.id))
-                        else -> nav.push(Screen.Detail(item.id))
-                    }
+                    nav.push(Screen.Detail(item.id))
                 }
             }
         }

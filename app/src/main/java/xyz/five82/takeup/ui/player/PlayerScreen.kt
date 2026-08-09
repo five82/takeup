@@ -74,6 +74,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
+import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import coil3.compose.AsyncImage
 import kotlin.math.cos
@@ -85,6 +86,7 @@ import xyz.five82.takeup.data.LoomRepository
 import xyz.five82.takeup.ui.NavState
 import xyz.five82.takeup.ui.Screen
 import xyz.five82.takeup.ui.components.ErrorState
+import xyz.five82.takeup.ui.components.threeThreads
 import xyz.five82.takeup.ui.episodeLabel
 import xyz.five82.takeup.ui.formatClock
 import xyz.five82.takeup.ui.takeupViewModel
@@ -93,6 +95,7 @@ import xyz.five82.takeup.ui.theme.Muted
 import xyz.five82.takeup.ui.theme.Surface1
 import xyz.five82.takeup.ui.theme.WovenTheme
 import xyz.five82.takeup.ui.theme.rememberWovenSeed
+import xyz.five82.takeup.ui.theme.rememberWovenThreads
 import xyz.five82.takeup.ui.posterUrl
 import xyz.five82.takeup.ui.thumbUrl
 
@@ -153,6 +156,7 @@ private fun PlayerContent(repository: LoomRepository, nav: NavState, model: Play
     var duration by remember { mutableLongStateOf(0L) }
     var scrubPreview by remember { mutableStateOf<Long?>(null) }
     var sheet by remember { mutableStateOf<PlayerSheet?>(null) }
+    var cropped by remember { mutableStateOf(false) }
     var interactionTick by remember { mutableIntStateOf(0) }
 
     DisposableEffect(player) {
@@ -170,6 +174,17 @@ private fun PlayerContent(repository: LoomRepository, nav: NavState, model: Play
             }
         }
         player.addListener(listener)
+        // Sync anything that changed before the listener attached: a fully
+        // cached download reaches READY before first composition, and a
+        // listener only reports transitions, so the initial spinner would
+        // otherwise never clear.
+        playing = player.isPlaying
+        tracks = player.currentTracks
+        if (player.playbackState == Player.STATE_READY ||
+            player.playbackState == Player.STATE_ENDED
+        ) {
+            buffering = false
+        }
         onDispose { player.removeListener(listener) }
     }
 
@@ -210,6 +225,11 @@ private fun PlayerContent(repository: LoomRepository, nav: NavState, model: Play
             },
             update = { view ->
                 view.player = player
+                view.resizeMode = if (cropped) {
+                    AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                } else {
+                    AspectRatioFrameLayout.RESIZE_MODE_FIT
+                }
                 view.subtitleView?.setPadding(
                     0, 0, 0,
                     if (controlsVisible && !model.ended) subtitleLiftPx else 0,
@@ -246,7 +266,12 @@ private fun PlayerContent(repository: LoomRepository, nav: NavState, model: Play
                 position = scrubPreview ?: position,
                 duration = duration,
                 tracks = tracks,
+                cropped = cropped,
                 onInteraction = { interactionTick++ },
+                onToggleCrop = {
+                    cropped = !cropped
+                    interactionTick++
+                },
                 onScrubPreview = { preview ->
                     if (preview != null && scrubPreview == null) interactionTick++
                     scrubPreview = preview
@@ -350,7 +375,9 @@ private fun PlayerControls(
     position: Long,
     duration: Long,
     tracks: Tracks,
+    cropped: Boolean,
     onInteraction: () -> Unit,
+    onToggleCrop: () -> Unit,
     onScrubPreview: (Long?) -> Unit,
     onSeek: (Long) -> Unit,
     onOpenSheet: (PlayerSheet) -> Unit,
@@ -403,13 +430,17 @@ private fun PlayerControls(
                 .padding(bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(Modifier.weight(1f)) {
+            Row(
+                Modifier.weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
                 if (chapters.isNotEmpty()) {
                     ConsolePill("Chapters") {
                         onInteraction()
                         onOpenSheet(PlayerSheet.Chapters)
                     }
                 }
+                ConsolePill(if (cropped) "Fit" else "Crop", onClick = onToggleCrop)
             }
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -552,10 +583,18 @@ private fun PauseGlyph(accent: Color) {
 @Composable
 private fun EndOverlay(repository: LoomRepository, nav: NavState, model: PlayerViewModel) {
     val next = model.nextEpisode
+    // The finished title's colors linger while up-next appears: drifting
+    // thread fields over the dark scrim, woven from its poster.
+    val finished = model.item
+    val threads = rememberWovenThreads(
+        finished?.id ?: 0L,
+        finished?.let { repository.api.posterUrl(it, 240) },
+    )
     Box(
         Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.72f)),
+            .background(Color.Black.copy(alpha = 0.72f))
+            .threeThreads(threads, drifting = true),
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {

@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -113,6 +114,7 @@ fun ThumbCard(
     modifier: Modifier = Modifier,
     width: Int = 172,
     line: String? = null,
+    lineStyle: TextStyle = MaterialTheme.typography.labelSmall,
     progress: Float? = null,
     progressColor: Color = MaterialTheme.colorScheme.primary,
     fallbackTint: Color = MaterialTheme.colorScheme.primary,
@@ -158,7 +160,7 @@ fun ThumbCard(
             if (line != null) {
                 Text(
                     line,
-                    style = MaterialTheme.typography.labelSmall,
+                    style = lineStyle,
                     color = Muted,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,

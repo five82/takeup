@@ -7,9 +7,9 @@ import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.unit.dp
 
 // The icons-core artifact ships only a small basic set (Home, Search, ...);
-// the media glyphs the nav bar needs live in icons-extended, which is far too
-// large a dependency for four icons. Their Material path data is inlined here
-// instead. Fill color is irrelevant: Icon() tints on top of it.
+// the media glyphs this app needs live in icons-extended, which is far too
+// large a dependency for a handful of icons. Their Material path data is
+// inlined here instead. Fill color is irrelevant: Icon() tints on top of it.
 
 private fun navIcon(name: String, pathData: String): ImageVector =
     ImageVector.Builder(
@@ -42,6 +42,12 @@ val TheatersIcon = navIcon(
     "Theaters",
     "M18 3v2h-2V3H8v2H6V3H4v18h2v-2h2v2h8v-2h2v2h2V3h-2zM8 17H6v-2h2v2zm0-4H6v-2h2v2z" +
         "m0-4H6V7h2v2zm10 8h-2v-2h2v2zm0-4h-2v-2h2v2zm0-4h-2V7h2v2z",
+)
+
+/** Material "Download": an arrow onto a shelf. */
+val DownloadIcon = navIcon(
+    "Download",
+    "M12,16 7,11l1.41,-1.41L11,12.17V4h2v8.17l2.59,-2.58L17,11zM5,20v-2h14v2z",
 )
 
 /** Material "Explore": a compass. */

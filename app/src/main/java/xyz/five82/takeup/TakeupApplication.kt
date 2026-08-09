@@ -4,8 +4,12 @@ import android.app.Application
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import xyz.five82.takeup.api.LoomApi
+import xyz.five82.takeup.data.DownloadStore
 import xyz.five82.takeup.data.LoomRepository
+import xyz.five82.takeup.data.OfflineArtwork
+import xyz.five82.takeup.data.OfflineProgressStore
 import xyz.five82.takeup.data.Settings
 
 class TakeupApplication : Application() {
@@ -14,6 +18,15 @@ class TakeupApplication : Application() {
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     val repository: LoomRepository by lazy {
-        LoomRepository(Settings(this), LoomApi(), appScope)
+        val api = LoomApi()
+        val offlineProgress = OfflineProgressStore(this)
+        appScope.launch { offlineProgress.load() }
+        LoomRepository(
+            Settings(this),
+            api,
+            appScope,
+            DownloadStore(this, appScope, OfflineArtwork(this, api)),
+            offlineProgress,
+        )
     }
 }

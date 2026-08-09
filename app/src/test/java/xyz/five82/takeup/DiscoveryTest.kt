@@ -1,12 +1,15 @@
 package xyz.five82.takeup
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import xyz.five82.takeup.api.Collection
 import xyz.five82.takeup.api.Genre
 import xyz.five82.takeup.api.Item
 import xyz.five82.takeup.api.Progress
+import xyz.five82.takeup.ui.home.dailyPick
+import xyz.five82.takeup.ui.home.dailyPickLabel
 import xyz.five82.takeup.ui.home.discoveryRows
 
 class DiscoveryTest {
@@ -20,6 +23,7 @@ class DiscoveryTest {
         rating: Double = 8.0,
         durationMs: Long = 2 * 60 * 60 * 1000L,
         started: Boolean = false,
+        backdropImageId: Long = 0,
     ) = Item(
         id = id,
         kind = "movie",
@@ -28,6 +32,7 @@ class DiscoveryTest {
         voteAverage = rating,
         durationMs = durationMs,
         progress = if (started) Progress(positionMs = 1) else null,
+        backdropImageId = backdropImageId,
     )
 
     private fun show(id: Long, unwatched: Int = 8) = Item(
@@ -55,6 +60,51 @@ class DiscoveryTest {
     private val recentlyPlayed = listOf(movie(5, started = true), movie(7, started = true), show(21), show(22))
 
     private fun rowsFor(day: Long) = discoveryRows(movies, shows, collections, recentlyPlayed, day)
+
+    @Test
+    fun dailyPickIsStableAndPrefersUnstartedHighlyRatedBackdropArt() {
+        val preferred = movie(99, backdropImageId = 99)
+        val lowRatedArt = movie(100, rating = 5.0, backdropImageId = 100)
+        val startedArt = movie(101, started = true, backdropImageId = 101)
+
+        val first = dailyPick(listOf(preferred, lowRatedArt, startedArt), 100, 12)
+        val second = dailyPick(listOf(startedArt, preferred, lowRatedArt), 100, 12)
+
+        assertEquals(preferred, first)
+        assertEquals(first, second)
+    }
+
+    @Test
+    fun dailyPickOnlyChoosesMovies() {
+        val preferredMovie = movie(99, backdropImageId = 99)
+        val preferredShow = show(100).copy(backdropImageId = 100)
+
+        assertEquals(preferredMovie, dailyPick(listOf(preferredShow, preferredMovie), 100, 12))
+    }
+
+    @Test
+    fun dailyPickChangesAtSixAmAndSixPm() {
+        val candidates = (1L..4L).map { movie(it, backdropImageId = it) }
+        val today = dailyPick(candidates, 100, 6)
+        val tonight = dailyPick(candidates, 100, 18)
+        val nextToday = dailyPick(candidates, 101, 6)
+
+        assertEquals(today, dailyPick(candidates, 100, 17))
+        assertNotEquals(today, tonight)
+        assertEquals(tonight, dailyPick(candidates, 101, 0))
+        assertEquals(tonight, dailyPick(candidates, 101, 5))
+        assertNotEquals(tonight, nextToday)
+    }
+
+    @Test
+    fun dailyPickWordingChangesAtSixAmAndSixPm() {
+        assertEquals("Tonight's Pick", dailyPickLabel(0))
+        assertEquals("Tonight's Pick", dailyPickLabel(5))
+        assertEquals("Today's Pick", dailyPickLabel(6))
+        assertEquals("Today's Pick", dailyPickLabel(17))
+        assertEquals("Tonight's Pick", dailyPickLabel(18))
+        assertEquals("Tonight's Pick", dailyPickLabel(23))
+    }
 
     @Test
     fun sameDayIsStableAndCapped() {
