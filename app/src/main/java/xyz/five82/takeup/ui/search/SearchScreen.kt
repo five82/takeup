@@ -72,6 +72,8 @@ class SearchViewModel(private val repository: LoomRepository, initialQuery: Stri
         private set
     var searched by mutableStateOf(false)
         private set
+    var closestMatches by mutableStateOf(false)
+        private set
 
     init {
         viewModelScope.launch {
@@ -81,11 +83,13 @@ class SearchViewModel(private val repository: LoomRepository, initialQuery: Stri
                 if (trimmed.isEmpty()) {
                     results = emptyList()
                     searched = false
+                    closestMatches = false
                 } else {
                     runCatching { repository.api.search(trimmed) }
-                        .onSuccess {
-                            results = it
+                        .onSuccess { response ->
+                            results = response.items
                             searched = true
+                            closestMatches = response.fuzzy && response.items.isNotEmpty()
                         }
                 }
             }
@@ -95,9 +99,9 @@ class SearchViewModel(private val repository: LoomRepository, initialQuery: Stri
 
 /**
  * One field over everything Loom indexes: titles and the people credited on
- * them. Loom matches on word starts ("hanks" finds Tom Hanks, not
- * Thanksgiving) and ranks exact and prefix matches first, so results are
- * shown in server order.
+ * them. Loom matches on word starts and ranks exact and prefix matches first.
+ * When those find nothing, it returns one-edit fuzzy matches marked as closest
+ * matches. Results are always shown in server order.
  */
 @Composable
 fun SearchScreen(repository: LoomRepository, nav: NavState, initialQuery: String) {
@@ -144,6 +148,16 @@ fun SearchScreen(repository: LoomRepository, nav: NavState, initialQuery: String
             EmptyState("Nothing in the library matches \"${query.trim()}\".")
         }
         LazyColumn(contentPadding = PaddingValues(vertical = 8.dp)) {
+            if (model.closestMatches) {
+                item {
+                    Text(
+                        "Closest matches",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Muted,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                    )
+                }
+            }
             items(model.results, key = { it.id }) { item ->
                 SearchResultRow(repository, item) {
                     nav.push(Screen.Detail(item.id))

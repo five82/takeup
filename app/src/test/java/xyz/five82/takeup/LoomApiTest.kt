@@ -6,6 +6,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import xyz.five82.takeup.api.Item
 import xyz.five82.takeup.api.LoomApi
+import xyz.five82.takeup.api.SearchResponse
 import xyz.five82.takeup.api.loomGson
 
 class LoomApiTest {
@@ -52,6 +53,16 @@ class LoomApiTest {
             api.absoluteUrl("/api/v1/media/3?tag=x"),
         )
         assertEquals("http://other/a", api.absoluteUrl("http://other/a"))
+    }
+
+    @Test
+    fun searchResponseMapsFuzzyFallback() {
+        val response = loomGson.fromJson(
+            """{"items":[{"id":42,"kind":"movie","title":"Spider-Man"}],"fuzzy":true}""",
+            SearchResponse::class.java,
+        )
+        assertTrue(response.fuzzy)
+        assertEquals(listOf("Spider-Man"), response.items.map { it.title })
     }
 
     @Test

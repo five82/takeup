@@ -50,6 +50,11 @@ data class Item(
     val isPlayable: Boolean get() = kind == "movie" || kind == "episode"
 }
 
+data class SearchResponse(
+    val items: List<Item> = emptyList(),
+    val fuzzy: Boolean = false,
+)
+
 data class Genre(
     val id: Long = 0,
     val name: String = "",

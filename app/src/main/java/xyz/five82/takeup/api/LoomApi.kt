@@ -101,8 +101,11 @@ class LoomApi(@Volatile var baseUrl: String? = null) {
         }
     }
 
-    suspend fun search(query: String, limit: Int = 100): List<Item> =
-        itemsList(get("/api/v1/search", "q" to query, "limit" to limit.toString()), Item::class.java)
+    suspend fun search(query: String, limit: Int = 100): SearchResponse =
+        gson.fromJson(
+            get("/api/v1/search", "q" to query, "limit" to limit.toString()),
+            SearchResponse::class.java,
+        )
 
     suspend fun continueWatching(limit: Int = 20): List<Item> =
         itemsList(get("/api/v1/continue-watching", "limit" to limit.toString()), Item::class.java)
