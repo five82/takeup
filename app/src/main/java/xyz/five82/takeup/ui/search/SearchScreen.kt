@@ -95,8 +95,9 @@ class SearchViewModel(private val repository: LoomRepository, initialQuery: Stri
 
 /**
  * One field over everything Loom indexes: titles and the people credited on
- * them. Loom ranks exact and prefix matches first, so results are shown in
- * server order.
+ * them. Loom matches on word starts ("hanks" finds Tom Hanks, not
+ * Thanksgiving) and ranks exact and prefix matches first, so results are
+ * shown in server order.
  */
 @Composable
 fun SearchScreen(repository: LoomRepository, nav: NavState, initialQuery: String) {
