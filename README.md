@@ -1,5 +1,9 @@
 <p align="center">
-  <img src="docs/takeup-logo.png" alt="Takeup logo" width="220">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/takeup-logo-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="docs/takeup-logo-light.png">
+    <img src="docs/takeup-logo-light.png" alt="Takeup logo" width="220">
+  </picture>
 </p>
 
 # Takeup
