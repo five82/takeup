@@ -34,6 +34,11 @@ import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.HazeTint
+import dev.chrisbanes.haze.hazeEffect
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 import xyz.five82.takeup.data.LoomRepository
 import xyz.five82.takeup.ui.artwork.ArtworkScreen
 import xyz.five82.takeup.ui.browse.BrowseScreen
@@ -69,13 +74,14 @@ fun TakeupApp(repository: LoomRepository) {
 @Composable
 private fun MainScaffold(repository: LoomRepository) {
     val nav = remember { NavState() }
+    val navHaze = rememberHazeState()
     BackHandler(enabled = nav.stack.isNotEmpty()) { nav.pop() }
 
     Box(Modifier.fillMaxSize().background(Stage)) {
         // Tab roots stay in composition beneath the overlay stack so their
         // scroll positions survive a trip into detail or the player. The nav
         // pill floats over them; scrollables clear it with navPillClearance.
-        Box(Modifier.fillMaxSize()) {
+        Box(Modifier.fillMaxSize().hazeSource(navHaze)) {
             when (nav.tab) {
                 Tab.Home -> HomeScreen(repository, nav, active = nav.stack.isEmpty())
                 Tab.Movies -> LibraryScreen(repository, nav, "movies", active = nav.stack.isEmpty())
@@ -84,7 +90,7 @@ private fun MainScaffold(repository: LoomRepository) {
                 Tab.Browse -> BrowseScreen(repository, nav, active = nav.stack.isEmpty())
             }
         }
-        TakeupNavPill(nav, Modifier.align(Alignment.BottomCenter))
+        TakeupNavPill(nav, navHaze, Modifier.align(Alignment.BottomCenter))
         nav.stack.forEachIndexed { index, screen ->
             val topmost = index == nav.stack.lastIndex
             key(index, screen) {
@@ -126,16 +132,23 @@ private fun ScreenScoped(content: @Composable () -> Unit) {
 
 /** Floating frosted pill; the active tab shows its thread beneath the icon. */
 @Composable
-private fun TakeupNavPill(nav: NavState, modifier: Modifier = Modifier) {
+private fun TakeupNavPill(
+    nav: NavState,
+    hazeState: HazeState,
+    modifier: Modifier = Modifier,
+) {
     Row(
         modifier
             .navigationBarsPadding()
             .padding(bottom = 12.dp)
             .clip(RoundedCornerShape(50))
-            // Keep some of the screen visible beneath the pill without letting
-            // artwork and text compete with the navigation icons.
-            .background(Surface1.copy(alpha = 0.86f))
-            .border(1.dp, Ink.copy(alpha = 0.16f), RoundedCornerShape(50))
+            .hazeEffect(hazeState) {
+                backgroundColor = Surface1
+                blurRadius = 28.dp
+                tints = listOf(HazeTint(Surface1.copy(alpha = 0.78f)))
+                noiseFactor = 0.06f
+            }
+            .border(1.dp, Ink.copy(alpha = 0.20f), RoundedCornerShape(50))
             .padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
