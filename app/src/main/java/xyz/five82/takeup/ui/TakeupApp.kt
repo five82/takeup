@@ -51,7 +51,6 @@ import xyz.five82.takeup.ui.theme.Amber
 import xyz.five82.takeup.ui.theme.Ember
 import xyz.five82.takeup.ui.theme.Faint
 import xyz.five82.takeup.ui.theme.Ink
-import xyz.five82.takeup.ui.theme.Line
 import xyz.five82.takeup.ui.theme.Stage
 import xyz.five82.takeup.ui.theme.Surface1
 import xyz.five82.takeup.ui.theme.Teal
@@ -125,7 +124,7 @@ private fun ScreenScoped(content: @Composable () -> Unit) {
     CompositionLocalProvider(LocalViewModelStoreOwner provides owner, content = content)
 }
 
-/** Floating icon pill; the active tab shows its thread beneath the icon. */
+/** Floating frosted pill; the active tab shows its thread beneath the icon. */
 @Composable
 private fun TakeupNavPill(nav: NavState, modifier: Modifier = Modifier) {
     Row(
@@ -133,9 +132,11 @@ private fun TakeupNavPill(nav: NavState, modifier: Modifier = Modifier) {
             .navigationBarsPadding()
             .padding(bottom = 12.dp)
             .clip(RoundedCornerShape(50))
-            .background(Surface1.copy(alpha = 0.97f))
-            .border(1.dp, Line, RoundedCornerShape(50))
-            .padding(horizontal = 10.dp, vertical = 4.dp),
+            // Keep some of the screen visible beneath the pill without letting
+            // artwork and text compete with the navigation icons.
+            .background(Surface1.copy(alpha = 0.86f))
+            .border(1.dp, Ink.copy(alpha = 0.16f), RoundedCornerShape(50))
+            .padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         for (tab in Tab.entries) {
@@ -149,9 +150,8 @@ private fun TakeupNavPill(nav: NavState, modifier: Modifier = Modifier) {
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
                     ) { nav.selectTab(tab) }
-                    // 48dp touch target even though the pill draws smaller.
-                    .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
-                    .padding(horizontal = 8.dp),
+                    .defaultMinSize(minWidth = 56.dp, minHeight = 56.dp)
+                    .padding(horizontal = 10.dp),
             ) {
                 Icon(
                     when (tab) {
@@ -163,15 +163,16 @@ private fun TakeupNavPill(nav: NavState, modifier: Modifier = Modifier) {
                     },
                     contentDescription = tab.label,
                     tint = if (selected) Ink else Faint,
+                    modifier = Modifier.size(28.dp),
                 )
                 // The active marker is the tab's thread; Home gets the whole selvedge.
                 Box(
-                    Modifier.padding(top = 3.dp).size(width = 16.dp, height = 3.dp),
+                    Modifier.padding(top = 4.dp).size(width = 18.dp, height = 3.dp),
                     contentAlignment = Alignment.Center,
                 ) {
                     if (selected) {
                         when (tab) {
-                            Tab.Home -> Selvedge(Modifier.width(16.dp), height = 3f)
+                            Tab.Home -> Selvedge(Modifier.width(18.dp), height = 3f)
                             Tab.Movies -> Dot(Ember)
                             Tab.Tv -> Dot(Teal)
                             Tab.Shorts -> Dot(Amber)

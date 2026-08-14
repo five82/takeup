@@ -100,7 +100,7 @@ fun ThreadProgress(fraction: Float, color: Color, modifier: Modifier = Modifier)
  */
 @Composable
 fun navPillClearance(): Dp =
-    WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 84.dp
+    WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 96.dp
 
 /** Caps-and-tracking row label, the proposal's "Continue Watching" voice. */
 @Composable
