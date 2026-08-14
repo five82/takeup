@@ -54,7 +54,7 @@ fun discoveryRows(
     val unstarted = library.filter { !it.isStarted }
     val builders: List<() -> DiscoveryRow?> = listOf(
         { genreSpotlight(unstarted, random) },
-        { row("unstarted", "Haven't Started", unstarted.shuffled(random)) },
+        { row("unstarted", "New to You", unstarted.shuffled(random)) },
         { row("rated", "Highly Rated", unstarted.filter { it.voteAverage >= HIGH_RATING }.shuffled(random)) },
         { collectionSpotlight(collections, random) },
         { row("different", "Something Different", library.shuffled(random)) },

@@ -135,9 +135,14 @@ class DiscoveryTest {
                     )
                     row.key == "again" ->
                         assertEquals(recentlyPlayed.map { it.id }, row.items.map { it.id })
-                    row.key == "unstarted" -> assertTrue(
-                        row.items.none { it.progress != null || (it.kind == "show" && it.unwatchedCount < it.episodeCount) },
-                    )
+                    row.key == "unstarted" -> {
+                        assertEquals("New to You", row.title)
+                        assertTrue(
+                            row.items.none {
+                                it.progress != null || (it.kind == "show" && it.unwatchedCount < it.episodeCount)
+                            },
+                        )
+                    }
                 }
             }
         }
