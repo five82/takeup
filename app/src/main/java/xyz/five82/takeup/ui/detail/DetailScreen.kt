@@ -907,7 +907,8 @@ private fun PlayButton(label: String, onClick: () -> Unit) {
 
 @Composable
 private fun BadgeStrip(item: Item) {
-    val badges = techBadges(item.media)
+    val badges = techBadges(item.media).toMutableList()
+    item.media?.size?.takeIf { it > 0 }?.let { badges += formatBytes(it) }
     if (badges.isEmpty()) return
     Row(
         Modifier.padding(top = 16.dp),
