@@ -33,6 +33,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Crop
+import androidx.compose.material.icons.filled.FitScreen
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -62,6 +64,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -257,7 +260,16 @@ private fun PlayerContent(repository: LoomRepository, nav: NavState, model: Play
             enter = fadeIn(tween(200)) + slideInVertically(tween(200)) { -it / 4 },
             exit = fadeOut(tween(200)) + slideOutVertically(tween(200)) { -it / 4 },
         ) {
-            PlayerTopBar(nav, model, position)
+            PlayerTopBar(
+                nav = nav,
+                model = model,
+                positionMs = position,
+                cropped = cropped,
+                onToggleCrop = {
+                    cropped = !cropped
+                    interactionTick++
+                },
+            )
         }
         AnimatedVisibility(
             visible = chromeVisible,
@@ -271,12 +283,7 @@ private fun PlayerContent(repository: LoomRepository, nav: NavState, model: Play
                 position = scrubPreview ?: position,
                 duration = duration,
                 tracks = tracks,
-                cropped = cropped,
                 onInteraction = { interactionTick++ },
-                onToggleCrop = {
-                    cropped = !cropped
-                    interactionTick++
-                },
                 onScrubPreview = { preview ->
                     if (preview != null && scrubPreview == null) interactionTick++
                     scrubPreview = preview
@@ -316,7 +323,13 @@ private fun PlayerContent(repository: LoomRepository, nav: NavState, model: Play
 }
 
 @Composable
-private fun PlayerTopBar(nav: NavState, model: PlayerViewModel, positionMs: Long) {
+private fun PlayerTopBar(
+    nav: NavState,
+    model: PlayerViewModel,
+    positionMs: Long,
+    cropped: Boolean,
+    onToggleCrop: () -> Unit,
+) {
     val item = model.item
     Row(
         Modifier
@@ -326,50 +339,69 @@ private fun PlayerTopBar(nav: NavState, model: PlayerViewModel, positionMs: Long
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Box(
-            Modifier
-                .size(56.dp)
-                .clip(CircleShape)
-                .background(ChipFill)
-                .border(1.dp, ChipStroke, CircleShape)
-                .clickable { nav.pop() },
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Back",
-                tint = Ink,
-                modifier = Modifier.size(28.dp),
-            )
-        }
-        if (item != null) {
-            val pill = RoundedCornerShape(percent = 50)
-            Column(
-                Modifier
-                    .weight(1f, fill = false)
-                    .clip(pill)
-                    .background(ChipFill)
-                    .border(1.dp, ChipStroke, pill)
-                    .padding(horizontal = 26.dp, vertical = 14.dp),
-                verticalArrangement = Arrangement.spacedBy(3.dp),
-            ) {
-                Text(
-                    if (item.kind == "episode") "${episodeLabel(item)} · ${item.title}" else item.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = Ink,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                val chapter = currentChapter(item.media?.chapters, positionMs)
-                if (chapter != null) {
+        PlayerTopButton(
+            icon = Icons.AutoMirrored.Filled.ArrowBack,
+            contentDescription = "Back",
+            onClick = { nav.pop() },
+        )
+        Box(Modifier.weight(1f)) {
+            if (item != null) {
+                val pill = RoundedCornerShape(percent = 50)
+                Column(
+                    Modifier
+                        .clip(pill)
+                        .background(ChipFill)
+                        .border(1.dp, ChipStroke, pill)
+                        .padding(horizontal = 26.dp, vertical = 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(3.dp),
+                ) {
                     Text(
-                        chapterName(chapter),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = Muted,
+                        if (item.kind == "episode") "${episodeLabel(item)} · ${item.title}" else item.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Ink,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
+                    val chapter = currentChapter(item.media?.chapters, positionMs)
+                    if (chapter != null) {
+                        Text(
+                            chapterName(chapter),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Muted,
+                        )
+                    }
                 }
             }
         }
+        PlayerTopButton(
+            icon = if (cropped) Icons.Filled.FitScreen else Icons.Filled.Crop,
+            contentDescription = if (cropped) "Fit video" else "Crop video",
+            onClick = onToggleCrop,
+        )
+    }
+}
+
+@Composable
+private fun PlayerTopButton(
+    icon: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+) {
+    Box(
+        Modifier
+            .size(56.dp)
+            .clip(CircleShape)
+            .background(ChipFill)
+            .border(1.dp, ChipStroke, CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            icon,
+            contentDescription = contentDescription,
+            tint = Ink,
+            modifier = Modifier.size(28.dp),
+        )
     }
 }
 
@@ -380,9 +412,7 @@ private fun PlayerControls(
     position: Long,
     duration: Long,
     tracks: Tracks,
-    cropped: Boolean,
     onInteraction: () -> Unit,
-    onToggleCrop: () -> Unit,
     onScrubPreview: (Long?) -> Unit,
     onSeek: (Long) -> Unit,
     onOpenSheet: (PlayerSheet) -> Unit,
@@ -445,7 +475,6 @@ private fun PlayerControls(
                         onOpenSheet(PlayerSheet.Chapters)
                     }
                 }
-                ConsolePill(if (cropped) "Fit" else "Crop", onClick = onToggleCrop)
             }
             Row(
                 verticalAlignment = Alignment.CenterVertically,
