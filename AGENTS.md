@@ -7,6 +7,7 @@ This file provides guidance when working with code in this repository.
 - Do not create git branches unless explicitly instructed.
 - Run `./check-ci.sh` before handing work back.
 - Test on the emulator, not the Pixel. Start the emulator yourself if it is not running.
+- Debug builds install as `xyz.five82.takeup.debug`. Launch that, not `xyz.five82.takeup`.
 - Video playback does not work on the emulator. Anything that needs a playing video - the player screen included - must be verified on the Pixel.
 
 ## Project
@@ -70,6 +71,14 @@ adb -s emulator-5554 emu kill
 ```
 
 Always target a device explicitly with `ANDROID_SERIAL` or `adb -s`; the Pixel is often connected over USB at the same time, so a bare `adb` command or `./gradlew installDebug` can land on the wrong one.
+
+`applicationIdSuffix = ".debug"` means `installDebug` installs alongside the release build rather than over it, under a different package and with its own settings and permission grants:
+
+```bash
+adb shell am start -n xyz.five82.takeup.debug/xyz.five82.takeup.ui.MainActivity
+```
+
+The activity keeps its unsuffixed name, so the component is `.debug/xyz.five82.takeup.ui.MainActivity`. Launching `xyz.five82.takeup` instead drives the release build, which silently shows none of the changes just installed - it looks exactly like a change that did not work.
 
 Multicast does not cross the emulator NAT, so enter Loom's IP and port rather than an mDNS name.
 
