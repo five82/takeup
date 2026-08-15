@@ -87,6 +87,12 @@ class DownloadStore(
     private val _downloads = MutableStateFlow<List<DownloadEntry>>(emptyList())
     val downloads: StateFlow<List<DownloadEntry>> = _downloads.asStateFlow()
 
+    // Until the index has been read once, an empty list means "not asked yet"
+    // rather than "nothing is downloaded", and anything that prunes what
+    // downloads leave behind must wait for the difference.
+    private val _loaded = MutableStateFlow(false)
+    val loaded: StateFlow<Boolean> = _loaded.asStateFlow()
+
     // A replacement download must not be added until the superseded one is gone, or
     // Media3 merges the requests and the removal frees the new cache key instead.
     private val pendingReplacements = mutableMapOf<String, DownloadRequest>()
@@ -213,6 +219,7 @@ class DownloadStore(
     private fun refresh() {
         scope.launch {
             val entries = withContext(Dispatchers.IO) { readIndex() }
+            _loaded.value = true
             _downloads.value = entries
             if (entries.any { it.state == DownloadState.Downloading }) startProgressTicker()
         }
@@ -242,6 +249,7 @@ class DownloadStore(
             uri = download.request.uri.toString(),
             bytesDownloaded = download.bytesDownloaded,
             totalBytes = download.contentLength,
+            startTimeMs = download.startTimeMs,
             posterPath = artwork.posterPath(item.id),
             backdropPath = artwork.backdropPath(item.id),
             thumbPath = artwork.thumbPath(item.id),

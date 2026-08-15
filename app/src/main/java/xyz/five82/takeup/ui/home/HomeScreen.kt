@@ -54,10 +54,9 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import xyz.five82.takeup.api.Item
-import xyz.five82.takeup.data.DownloadState
 import xyz.five82.takeup.data.LoomRepository
+import xyz.five82.takeup.data.OfflineCatalog
 import xyz.five82.takeup.data.Reach
-import xyz.five82.takeup.data.downloadedRowItems
 import xyz.five82.takeup.data.isOfflineError
 import xyz.five82.takeup.ui.NavState
 import xyz.five82.takeup.ui.Screen
@@ -66,6 +65,7 @@ import xyz.five82.takeup.ui.components.CardAction
 import xyz.five82.takeup.ui.components.logoLaneHeight
 import xyz.five82.takeup.ui.components.ErrorState
 import xyz.five82.takeup.ui.components.LoadingState
+import xyz.five82.takeup.ui.components.OfflineBanner
 import xyz.five82.takeup.ui.components.OfflineNotice
 import xyz.five82.takeup.ui.components.PosterCard
 import xyz.five82.takeup.ui.components.ThreadProgress
@@ -74,13 +74,17 @@ import xyz.five82.takeup.ui.components.dyeBath
 import xyz.five82.takeup.ui.components.houseLights
 import xyz.five82.takeup.ui.components.threeThreads
 import xyz.five82.takeup.ui.components.ThumbCard
+import xyz.five82.takeup.ui.backdropFor
 import xyz.five82.takeup.ui.backdropUrl
 import xyz.five82.takeup.ui.episodeLabel
 import xyz.five82.takeup.ui.formatRuntime
+import xyz.five82.takeup.ui.logoFor
 import xyz.five82.takeup.ui.logoUrl
+import xyz.five82.takeup.ui.posterFor
 import xyz.five82.takeup.ui.posterUrl
 import xyz.five82.takeup.ui.progressFraction
 import xyz.five82.takeup.ui.remainingLabel
+import xyz.five82.takeup.ui.thumbFor
 import xyz.five82.takeup.ui.thumbUrl
 import xyz.five82.takeup.ui.theme.Ember
 import xyz.five82.takeup.ui.theme.Ink
@@ -251,33 +255,56 @@ fun HomeScreen(repository: LoomRepository, nav: NavState, active: Boolean) {
 }
 
 /**
- * Home with no Loom: only what is truly on this device. The stale library is
- * deliberately absent - cached posters would open screens that cannot play.
+ * Home with no Loom: the same room over what is genuinely on this device. The
+ * stale library stays absent - cached posters would open screens that cannot
+ * play - but a download is a real title, so it gets the hero, the rows and the
+ * dye bath that home gives anything else.
  */
 @Composable
 private fun OfflineHome(repository: LoomRepository, nav: NavState, onRetry: () -> Unit) {
-    val downloads by repository.downloads.downloads.collectAsStateWithLifecycle()
+    val catalog by repository.offlineCatalog.collectAsStateWithLifecycle()
     val reason by repository.network.reason.collectAsStateWithLifecycle()
-    val ready = downloadedRowItems(downloads.filter { it.state == DownloadState.Completed })
+    val continueWatching = catalog.continueWatching()
+    val downloaded = catalog.recent()
+    // Lead with what is half-watched, else with what landed most recently.
+    val hero = continueWatching.firstOrNull() ?: downloaded.firstOrNull()
+    val heroThreads = rememberWovenThreads(
+        hero?.let { repository.posterFor(it, offline = true, widthPx = 240) },
+    ).orEmpty()
+    val room = if (heroThreads.isNotEmpty()) {
+        Modifier.dyeBath(heroThreads.first()).threeThreads(heroThreads)
+    } else {
+        Modifier.houseLights(Ember)
+    }
     LazyColumn(
-        Modifier.fillMaxSize().houseLights(Ember),
+        Modifier.fillMaxSize().then(room),
         contentPadding = PaddingValues(bottom = navPillClearance()),
     ) {
         item(key = "offline-head") {
             // The same two controls the hero carries when there is a hero, so
             // settings and searching what is downloaded stay reachable offline.
             Box(Modifier.fillMaxWidth()) {
-                OfflineNotice(
-                    reason = reason + if (ready.isEmpty()) {
-                        " Nothing is downloaded to this device yet."
-                    } else {
-                        " These titles are downloaded on this device."
-                    },
-                    onRetry = onRetry,
-                    modifier = Modifier
-                        .statusBarsPadding()
-                        .padding(start = 20.dp, end = 20.dp, top = 44.dp),
-                )
+                if (hero != null) {
+                    Hero(
+                        item = hero,
+                        backdrop = repository.backdropFor(hero, offline = true, widthPx = 960),
+                        logo = repository.logoFor(hero, offline = true),
+                        label = if (hero == continueWatching.firstOrNull()) {
+                            "Continue watching"
+                        } else {
+                            "Downloaded"
+                        },
+                        onOpen = { nav.push(Screen.Detail(hero.id)) },
+                    )
+                } else {
+                    OfflineNotice(
+                        reason = "$reason Nothing is downloaded to this device yet.",
+                        onRetry = onRetry,
+                        modifier = Modifier
+                            .statusBarsPadding()
+                            .padding(start = 20.dp, end = 20.dp, top = 44.dp),
+                    )
+                }
                 Row(
                     Modifier
                         .align(Alignment.TopEnd)
@@ -289,31 +316,59 @@ private fun OfflineHome(repository: LoomRepository, nav: NavState, onRetry: () -
                 }
             }
         }
-        if (ready.isEmpty()) return@LazyColumn
-        item(key = "offline-downloads") {
-            HomeRow("Downloaded") {
-                items(ready, key = { "dl-${it.item.id}" }) { entry ->
-                    if (entry.item.kind == "episode") {
+        if (hero == null) return@LazyColumn
+        item(key = "offline-banner") {
+            OfflineBanner(reason, onRetry, Modifier.padding(start = 20.dp, end = 12.dp, top = 12.dp))
+        }
+        if (continueWatching.isNotEmpty()) {
+            item(key = "offline-cw") {
+                HomeRow("Continue Watching") {
+                    items(continueWatching, key = { "ocw-${it.id}" }) { item ->
                         ThumbCard(
-                            title = entry.item.title,
-                            imageUrl = entry.thumbPath ?: entry.backdropPath,
+                            title = item.title,
+                            imageUrl = repository.thumbFor(item, offline = true),
                             width = 200,
-                            line = "${episodeLabel(entry.item)} · ${entry.item.title}",
+                            line = offlineLine(item, catalog),
                             lineStyle = MaterialTheme.typography.bodyMedium,
-                            onClick = { nav.push(Screen.Player(entry.item.id)) },
-                        )
-                    } else {
-                        PosterCard(
-                            title = entry.item.title,
-                            imageUrl = entry.posterPath,
-                            width = 128,
-                            onClick = { nav.push(Screen.Player(entry.item.id)) },
+                            progress = progressFraction(item),
+                            progressColor = Ember,
+                            onClick = { nav.push(Screen.Detail(item.id)) },
                         )
                     }
                 }
             }
         }
+        item(key = "offline-downloads") {
+            HomeRow("Downloaded") {
+                items(downloaded, key = { "dl-${it.id}" }) { item ->
+                    PosterCard(
+                        title = item.title,
+                        imageUrl = repository.posterFor(item, offline = true),
+                        width = 128,
+                        badgeCount = if (item.kind == "show") {
+                            catalog.episodes(item.id).count { it.progress?.played != true }
+                        } else {
+                            0
+                        },
+                        progress = progressFraction(item),
+                        onClick = { nav.push(Screen.Detail(item.id)) },
+                    )
+                }
+            }
+        }
     }
+}
+
+/** Like [continueLine], but naming the show as well: offline nothing else does. */
+private fun offlineLine(item: Item, catalog: OfflineCatalog): String {
+    if (item.kind != "episode") {
+        return remainingLabel(item) ?: formatRuntime(item.media?.durationMs ?: 0)
+    }
+    return listOfNotNull(
+        catalog.showFor(item.id)?.title,
+        "${episodeLabel(item)} · ${item.title}",
+        remainingLabel(item),
+    ).joinToString(" · ")
 }
 
 @Composable
@@ -352,9 +407,13 @@ private fun HomeContent(
         item(key = "hero") {
             Box {
                 if (hero != null) {
-                    Hero(hero, api, heroLabel, onOpen = {
-                        nav.push(if (hero.isPlayable) Screen.Detail(hero.id) else Screen.Detail(hero.id))
-                    })
+                    Hero(
+                        item = hero,
+                        backdrop = api.backdropUrl(hero, 960) ?: api.thumbUrl(hero, 960),
+                        logo = api.logoUrl(hero),
+                        label = heroLabel,
+                        onOpen = { nav.push(Screen.Detail(hero.id)) },
+                    )
                 } else {
                     Box(Modifier.fillMaxWidth().height(220.dp))
                 }
@@ -484,7 +543,8 @@ private fun HomeRow(
 @Composable
 private fun Hero(
     item: Item,
-    api: xyz.five82.takeup.api.LoomApi,
+    backdrop: String?,
+    logo: String?,
     label: String,
     onOpen: () -> Unit,
 ) {
@@ -496,8 +556,6 @@ private fun Hero(
             .fillMaxWidth()
             .clickable(onClick = onOpen),
     ) {
-        val backdrop = api.backdropUrl(item, 960) ?: api.thumbUrl(item, 960)
-        val logo = api.logoUrl(item)
         // Same tailoring as the detail head: area-normalized logo lane, line
         // riding above it, 76dp of resume line and progress stacked below.
         var logoAspect by remember(item.id) { mutableStateOf<Float?>(null) }

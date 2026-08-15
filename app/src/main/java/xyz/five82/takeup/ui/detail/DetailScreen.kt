@@ -95,7 +95,7 @@ import xyz.five82.takeup.data.isStaleDownload
 import xyz.five82.takeup.ui.DownloadIcon
 import xyz.five82.takeup.ui.NavState
 import xyz.five82.takeup.ui.Screen
-import xyz.five82.takeup.ui.backdropUrl
+import xyz.five82.takeup.ui.backdropFor
 import xyz.five82.takeup.ui.components.BiasCutBackdrop
 import xyz.five82.takeup.ui.components.ErrorState
 import xyz.five82.takeup.ui.components.GauzeBackground
@@ -106,8 +106,8 @@ import xyz.five82.takeup.ui.components.RowLabel
 import xyz.five82.takeup.ui.components.ThreadProgress
 import xyz.five82.takeup.ui.episodeLabel
 import xyz.five82.takeup.ui.formatRuntime
-import xyz.five82.takeup.ui.logoUrl
-import xyz.five82.takeup.ui.posterUrl
+import xyz.five82.takeup.ui.logoFor
+import xyz.five82.takeup.ui.posterFor
 import xyz.five82.takeup.ui.progressFraction
 import xyz.five82.takeup.ui.remainingLabel
 import xyz.five82.takeup.ui.takeupViewModel
@@ -119,7 +119,7 @@ import xyz.five82.takeup.ui.theme.Stage
 import xyz.five82.takeup.ui.theme.Surface1
 import xyz.five82.takeup.ui.theme.WovenTheme
 import xyz.five82.takeup.ui.theme.rememberWovenThreads
-import xyz.five82.takeup.ui.thumbUrl
+import xyz.five82.takeup.ui.thumbFor
 
 data class DetailState(
     val loading: Boolean = true,
@@ -186,14 +186,36 @@ class DetailViewModel(
     }
 
     /**
-     * The download's stored snapshot is the whole item offline: seasons and
-     * episodes are a server hierarchy, and only this file is on the device.
+     * The same screen over the offline catalog. A show is browsable with no Loom
+     * because its seasons were captured with the episodes beneath it; what is
+     * missing is only what was never downloaded.
      */
-    private fun offlineState() = DetailState(
-        loading = false,
-        offline = true,
-        item = repository.downloads.entry(itemId)?.item,
-    )
+    private fun offlineState(): DetailState {
+        val catalog = repository.offlineCatalog.value
+        val item = catalog.item(itemId)
+        if (item == null || item.kind != "show") {
+            return DetailState(loading = false, offline = true, item = item)
+        }
+        val seasons = catalog.children(item.id)
+        val episodes = seasons.associate { it.id to catalog.children(it.id) }
+        val selected = state.selectedSeason
+            ?: seasons.firstOrNull { it.seasonNumber > 0 && hasUnwatched(episodes[it.id]) }?.id
+            ?: seasons.firstOrNull { hasUnwatched(episodes[it.id]) }?.id
+            ?: seasons.firstOrNull()?.id
+        return DetailState(
+            loading = false,
+            offline = true,
+            item = item,
+            seasons = seasons,
+            episodesBySeason = episodes,
+            selectedSeason = selected,
+        )
+    }
+
+    // Offline the unwatched count has to come from the episodes on the device;
+    // a season's own count is a server tally of episodes that are not all here.
+    private fun hasUnwatched(episodes: List<Item>?) =
+        episodes?.any { it.progress?.played != true } == true
 
     fun selectSeason(seasonId: Long) {
         state = state.copy(selectedSeason = seasonId)
@@ -270,8 +292,8 @@ fun DetailScreen(repository: LoomRepository, nav: NavState, itemId: Long, topmos
             // Seed from the backdrop this screen hangs behind everything, not
             // the poster: the two often disagree (a warm poster over a cool
             // still) and the buttons sit on the backdrop's weather.
-            val artUrl = offlineBackdrop(repository, item, state.offline, width = 240)
-                ?: repository.api.posterUrl(item, 240).takeIf { !state.offline }
+            val artUrl = repository.backdropFor(item, state.offline, widthPx = 240)
+                ?: repository.posterFor(item, state.offline, widthPx = 240)
             val threads = rememberWovenThreads(artUrl)
             // Hold the spinner a beat longer while the art's colors resolve,
             // so the first content frame lands already dressed instead of
@@ -290,11 +312,11 @@ fun DetailScreen(repository: LoomRepository, nav: NavState, itemId: Long, topmos
                 Box(Modifier.fillMaxSize()) {
                     // Gauze: the backdrop's color weather behind the whole
                     // screen, with the dyed stage catching what it misses.
-                    GauzeBackground(offlineBackdrop(repository, item, state.offline, width = 240), seed)
+                    GauzeBackground(repository.backdropFor(item, state.offline, widthPx = 240), seed)
                     when (item.kind) {
                         "show" -> ShowDetail(repository, nav, model, item, state)
-                        "episode" -> EpisodeDetail(repository, nav, model, item)
-                        else -> MovieDetail(repository, nav, model, item)
+                        "episode" -> EpisodeDetail(repository, nav, model, item, state.offline)
+                        else -> MovieDetail(repository, nav, model, item, state.offline)
                     }
                 }
             }
@@ -310,12 +332,13 @@ private fun MovieDetail(
     nav: NavState,
     model: DetailViewModel,
     item: Item,
+    offline: Boolean,
 ) {
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 32.dp)) {
         item { DetailHead(repository, nav, model, item) }
         item {
             Column(Modifier.padding(horizontal = 20.dp)) {
-                MetaLine(item)
+                MetaLine(item, offline)
                 if (!item.tagline.isNullOrEmpty()) {
                     Text(
                         item.tagline,
@@ -337,7 +360,7 @@ private fun MovieDetail(
                 ChapterLine(item)
             }
         }
-        creditsSection(nav, item)
+        creditsSection(nav, item, offline)
     }
 }
 
@@ -354,6 +377,7 @@ private fun EpisodeDetail(
     nav: NavState,
     model: DetailViewModel,
     item: Item,
+    offline: Boolean,
 ) {
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 32.dp)) {
         item { DetailHead(repository, nav, model, item) }
@@ -371,7 +395,7 @@ private fun EpisodeDetail(
                     color = Ink,
                     modifier = Modifier.padding(top = 2.dp),
                 )
-                MetaLine(item)
+                MetaLine(item, offline)
                 PlayControls(repository, nav, model, item)
                 BadgeStrip(item)
                 if (!item.overview.isNullOrEmpty()) {
@@ -385,7 +409,7 @@ private fun EpisodeDetail(
                 ChapterLine(item)
             }
         }
-        creditsSection(nav, item)
+        creditsSection(nav, item, offline)
     }
 }
 
@@ -403,7 +427,7 @@ private fun ShowDetail(
         item { DetailHead(repository, nav, model, item) }
         item {
             Column(Modifier.padding(horizontal = 20.dp)) {
-                MetaLine(item)
+                MetaLine(item, state.offline)
                 val next = model.nextToWatch()
                 if (next != null) {
                     val started = next.progress != null && !next.progress.played
@@ -430,16 +454,43 @@ private fun ShowDetail(
                         modifier = Modifier.padding(top = 16.dp),
                     )
                 }
+                if (state.offline) {
+                    Text(
+                        offlineEpisodeLine(item, state),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Muted,
+                        modifier = Modifier.padding(top = 14.dp),
+                    )
+                }
             }
         }
-        item {
-            SeasonChips(state) { model.selectSeason(it) }
+        // One season needs no chips to choose between; offline that is the common
+        // case, because a season is only here at all if something under it is.
+        if (state.seasons.size > 1 || !state.offline) {
+            item {
+                SeasonChips(state) { model.selectSeason(it) }
+            }
         }
         val episodes = state.selectedSeason?.let { state.episodesBySeason[it] }.orEmpty()
         items(episodes, key = { it.id }) { episode ->
-            EpisodeRow(repository, nav, model, episode)
+            EpisodeRow(repository, nav, model, episode, state.offline)
         }
-        creditsSection(nav, item)
+        creditsSection(nav, item, state.offline)
+    }
+}
+
+/**
+ * How much of a show is on the device. The episode list below holds only what
+ * was downloaded, so it has to say what it is a part of rather than read as the
+ * whole run.
+ */
+private fun offlineEpisodeLine(item: Item, state: DetailState): String {
+    val downloaded = state.episodesBySeason.values.sumOf { it.size }
+    val noun = if (downloaded == 1) "episode" else "episodes"
+    return if (item.episodeCount > downloaded) {
+        "$downloaded of ${item.episodeCount} $noun on this device"
+    } else {
+        "$downloaded $noun on this device"
     }
 }
 
@@ -469,9 +520,16 @@ private fun SeasonChips(state: DetailState, onSelect: (Long) -> Unit) {
                     style = MaterialTheme.typography.labelLarge,
                     color = if (selected) Ink else Muted,
                 )
-                if (season.unwatchedCount > 0) {
+                // Offline the season's own tally counts episodes that are not on
+                // this device, so what is left comes from the list itself.
+                val left = if (state.offline) {
+                    state.episodesBySeason[season.id].orEmpty().count { it.progress?.played != true }
+                } else {
+                    season.unwatchedCount
+                }
+                if (left > 0) {
                     Text(
-                        "${season.unwatchedCount} left",
+                        "$left left",
                         style = MaterialTheme.typography.labelSmall,
                         color = if (selected) accent else Muted,
                         modifier = Modifier.padding(top = 2.dp),
@@ -489,6 +547,7 @@ private fun EpisodeRow(
     nav: NavState,
     model: DetailViewModel,
     episode: Item,
+    offline: Boolean,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     Box {
@@ -508,7 +567,7 @@ private fun EpisodeRow(
                     .clip(RoundedCornerShape(8.dp))
                     .background(Surface1),
             ) {
-                val thumb = repository.api.thumbUrl(episode, 480)
+                val thumb = repository.thumbFor(episode, offline, widthPx = 480)
                 if (thumb != null) {
                     AsyncImage(
                         model = thumb,
@@ -571,8 +630,10 @@ private fun EpisodeRow(
         }
         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
             val watched = episode.progress?.played == true
+            // A write to Loom, which offline would fail silently.
             DropdownMenuItem(
                 text = { Text(if (watched) "Mark unwatched" else "Mark watched") },
+                enabled = !offline,
                 onClick = {
                     menuOpen = false
                     model.setWatched(episode, !watched)
@@ -598,12 +659,8 @@ private fun DetailHead(
     // No fixed height: the backdrop sizes itself to 4:3 art plus the logo
     // band, so a tall logo grows the head instead of squeezing the photo.
     Box(Modifier.fillMaxWidth()) {
-        val backdrop = offlineBackdrop(repository, item, offline, width = 960)
-        val logo = if (offline) {
-            repository.downloads.entry(item.id)?.logoPath
-        } else {
-            repository.api.logoUrl(item)
-        }
+        val backdrop = repository.backdropFor(item, offline, widthPx = 960)
+        val logo = repository.logoFor(item, offline)
         // Cut tailored to the logo: the lane is area-normalized once the art
         // decodes, and the line rides just above it. Animated so the first
         // load settles instead of popping.
@@ -693,22 +750,6 @@ private fun DetailHead(
     }
 }
 
-/**
- * Backdrop for this screen. Offline the download's own copy is the only one
- * that resolves, so it stands in for the Loom URL rather than leaving the
- * screen to fall back on a flat tint.
- */
-private fun offlineBackdrop(
-    repository: LoomRepository,
-    item: Item,
-    offline: Boolean,
-    width: Int,
-): String? = if (offline) {
-    repository.downloads.entry(item.id)?.let { it.backdropPath ?: it.posterPath }
-} else {
-    repository.api.backdropUrl(item, width)
-}
-
 @Composable
 private fun HeadIconButton(onClick: () -> Unit, content: @Composable () -> Unit) {
     IconButton(
@@ -722,7 +763,7 @@ private fun HeadIconButton(onClick: () -> Unit, content: @Composable () -> Unit)
 }
 
 @Composable
-private fun MetaLine(item: Item) {
+private fun MetaLine(item: Item, offline: Boolean) {
     val parts = mutableListOf<String>()
     if (item.year > 0) parts += item.year.toString()
     item.media?.durationMs?.takeIf { it > 0 }?.let { parts += formatRuntime(it) }
@@ -733,7 +774,9 @@ private fun MetaLine(item: Item) {
         if (item.totalSeasons > 0) {
             parts += "${item.totalSeasons} season" + if (item.totalSeasons > 1) "s" else ""
         }
-        if (item.unwatchedCount > 0) parts += "${item.unwatchedCount} unwatched"
+        // Offline this counts episodes that are not on the device; the line
+        // under the overview says what is actually here instead.
+        if (!offline && item.unwatchedCount > 0) parts += "${item.unwatchedCount} unwatched"
     }
     item.genres?.take(3)?.map { it.name }?.let { parts += it }
     Text(
@@ -757,6 +800,8 @@ private fun PlayControls(
     item: Item,
 ) {
     val downloads by repository.downloads.downloads.collectAsStateWithLifecycle()
+    val reach by repository.network.reach.collectAsStateWithLifecycle()
+    val offline = reach == Reach.Offline
     val entry = downloads.firstOrNull { it.item.id == item.id }
     var confirmRemove by remember { mutableStateOf(false) }
 
@@ -809,9 +854,13 @@ private fun PlayControls(
             )
         }
         val action = downloadAction(entry, item.mediaTag.orEmpty())
+        // Starting, retrying and updating a download all need Loom to hand over a
+        // stream URL; removing bytes that are already here does not.
+        val needsServer = action != DownloadAction.Remove && action != DownloadAction.Cancel
         DownloadSegment(
             entry = entry,
             action = action,
+            enabled = !(offline && needsServer),
             shape = RoundedCornerShape(
                 topStart = 6.dp,
                 bottomStart = 6.dp,
@@ -871,12 +920,14 @@ private fun DownloadSegment(
     entry: DownloadEntry?,
     action: DownloadAction,
     shape: RoundedCornerShape,
+    enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
     val transferring = entry != null &&
         (entry.state == DownloadState.Downloading || entry.state == DownloadState.Queued)
     FilledTonalButton(
         onClick = onClick,
+        enabled = enabled,
         shape = shape,
         modifier = Modifier.fillMaxHeight(),
         contentPadding = PaddingValues(horizontal = 18.dp),
@@ -1007,7 +1058,11 @@ private fun ChapterLine(item: Item) {
 private const val COLLAPSED_CAST_COUNT = 6
 
 /** Film-style billing, director first; tapping a card searches the person. */
-private fun androidx.compose.foundation.lazy.LazyListScope.creditsSection(nav: NavState, item: Item) {
+private fun androidx.compose.foundation.lazy.LazyListScope.creditsSection(
+    nav: NavState,
+    item: Item,
+    offline: Boolean,
+) {
     val credits = item.credits.orEmpty()
     if (credits.isEmpty()) return
     val director = credits.firstOrNull { it.role == "director" }
@@ -1020,11 +1075,11 @@ private fun androidx.compose.foundation.lazy.LazyListScope.creditsSection(nav: N
         ) {
             RowLabel("Cast", modifier = Modifier.padding(bottom = 4.dp))
             if (director != null) {
-                CreditCard(director.name, director.displayTitle, nav)
+                CreditCard(director.name, director.displayTitle, nav, offline)
             }
             val visible = if (expanded) cast else cast.take(COLLAPSED_CAST_COUNT)
             visible.forEach { credit ->
-                CreditCard(credit.name, credit.displayTitle, nav)
+                CreditCard(credit.name, credit.displayTitle, nav, offline)
             }
             if (!expanded && cast.size > COLLAPSED_CAST_COUNT) {
                 Text(
@@ -1046,7 +1101,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.creditsSection(nav: N
 
 /** One person on the bill: name over role, on a card shaped to look tappable. */
 @Composable
-private fun CreditCard(name: String, role: String?, nav: NavState) {
+private fun CreditCard(name: String, role: String?, nav: NavState, offline: Boolean) {
     Column(
         verticalArrangement = Arrangement.Center,
         modifier = Modifier
@@ -1058,7 +1113,9 @@ private fun CreditCard(name: String, role: String?, nav: NavState) {
             // artwork to clash with.
             .background(Ink.copy(alpha = 0.05f))
             .border(1.dp, Ink.copy(alpha = 0.10f), RoundedCornerShape(12.dp))
-            .clickable { nav.push(Screen.Search(name)) }
+            // Offline the search behind this card can only reach the downloads,
+            // so the bill reads rather than leading somewhere empty.
+            .clickable(enabled = !offline) { nav.push(Screen.Search(name)) }
             .defaultMinSize(minHeight = 48.dp)
             .padding(horizontal = 16.dp, vertical = 10.dp),
     ) {

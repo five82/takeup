@@ -51,16 +51,15 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import xyz.five82.takeup.api.Item
-import xyz.five82.takeup.data.DownloadEntry
 import xyz.five82.takeup.data.LoomRepository
 import xyz.five82.takeup.data.Reach
 import xyz.five82.takeup.data.isOfflineError
-import xyz.five82.takeup.data.matchDownloads
 import xyz.five82.takeup.ui.NavState
 import xyz.five82.takeup.ui.Screen
 import xyz.five82.takeup.ui.components.EmptyState
 import xyz.five82.takeup.ui.components.houseLights
 import xyz.five82.takeup.ui.episodeLabel
+import xyz.five82.takeup.ui.posterFor
 import xyz.five82.takeup.ui.posterUrl
 import xyz.five82.takeup.ui.takeupViewModel
 import xyz.five82.takeup.ui.theme.Amber
@@ -75,8 +74,8 @@ class SearchViewModel(private val repository: LoomRepository, initialQuery: Stri
     var results by mutableStateOf<List<Item>>(emptyList())
         private set
 
-    /** Offline hits carry their entry: the poster and the file are both local. */
-    var offlineResults by mutableStateOf<List<DownloadEntry>>(emptyList())
+    /** Hits from the offline catalog: shows, films and episodes on this device. */
+    var offlineResults by mutableStateOf<List<Item>>(emptyList())
         private set
     var offline by mutableStateOf(false)
         private set
@@ -121,7 +120,7 @@ class SearchViewModel(private val repository: LoomRepository, initialQuery: Stri
     private fun searchDownloads(query: String) {
         offline = true
         results = emptyList()
-        offlineResults = matchDownloads(repository.downloads.downloads.value, query)
+        offlineResults = repository.offlineCatalog.value.search(query)
         searched = true
         closestMatches = false
     }
@@ -137,6 +136,7 @@ class SearchViewModel(private val repository: LoomRepository, initialQuery: Stri
 fun SearchScreen(repository: LoomRepository, nav: NavState, initialQuery: String) {
     val model = takeupViewModel { SearchViewModel(repository, initialQuery) }
     val query by model.query.collectAsStateWithLifecycle()
+    val catalog by repository.offlineCatalog.collectAsStateWithLifecycle()
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) {
         if (initialQuery.isEmpty()) focusRequester.requestFocus()
@@ -207,11 +207,15 @@ fun SearchScreen(repository: LoomRepository, nav: NavState, initialQuery: String
                     nav.push(Screen.Detail(item.id))
                 }
             }
-            // Straight to the player: offline there is no details screen to
-            // open, and the poster is a file on disk rather than a Loom URL.
-            items(model.offlineResults, key = { "dl-${it.item.id}" }) { entry ->
-                SearchResultRow(entry.item, entry.posterPath) {
-                    nav.push(Screen.Player(entry.item.id))
+            // The same row and the same destination as an online hit; only the
+            // poster differs, because offline it is a file on disk.
+            items(model.offlineResults, key = { "dl-${it.id}" }) { item ->
+                SearchResultRow(
+                    item = item,
+                    poster = repository.posterFor(item, offline = true, widthPx = 240),
+                    seriesTitle = catalog.showFor(item.id)?.title,
+                ) {
+                    nav.push(Screen.Detail(item.id))
                 }
             }
         }
@@ -219,7 +223,12 @@ fun SearchScreen(repository: LoomRepository, nav: NavState, initialQuery: String
 }
 
 @Composable
-private fun SearchResultRow(item: Item, poster: String?, onClick: () -> Unit) {
+private fun SearchResultRow(
+    item: Item,
+    poster: String?,
+    seriesTitle: String? = null,
+    onClick: () -> Unit,
+) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -253,7 +262,7 @@ private fun SearchResultRow(item: Item, poster: String?, onClick: () -> Unit) {
             )
             val context = when (item.kind) {
                 "episode" -> listOfNotNull(
-                    item.seriesTitle,
+                    seriesTitle ?: item.seriesTitle,
                     episodeLabel(item),
                 ).joinToString(" · ")
                 else -> item.year.takeIf { it > 0 }?.toString()

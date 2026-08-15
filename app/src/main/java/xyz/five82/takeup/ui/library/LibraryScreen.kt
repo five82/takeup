@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.MaterialTheme
@@ -24,22 +25,21 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
 import xyz.five82.takeup.api.Item
-import xyz.five82.takeup.data.DownloadState
 import xyz.five82.takeup.data.LoomRepository
 import xyz.five82.takeup.data.Reach
-import xyz.five82.takeup.data.downloadedRowItems
 import xyz.five82.takeup.data.isOfflineError
 import xyz.five82.takeup.ui.NavState
 import xyz.five82.takeup.ui.Screen
 import xyz.five82.takeup.ui.components.CardAction
-import xyz.five82.takeup.ui.components.DownloadedGrid
 import xyz.five82.takeup.ui.components.EmptyState
 import xyz.five82.takeup.ui.components.ErrorState
 import xyz.five82.takeup.ui.components.LoadingState
+import xyz.five82.takeup.ui.components.OfflineBanner
 import xyz.five82.takeup.ui.components.OfflineNotice
 import xyz.five82.takeup.ui.components.PosterCard
 import xyz.five82.takeup.ui.components.houseLights
 import xyz.five82.takeup.ui.components.navPillClearance
+import xyz.five82.takeup.ui.posterFor
 import xyz.five82.takeup.ui.posterUrl
 import xyz.five82.takeup.ui.progressFraction
 import xyz.five82.takeup.ui.takeupViewModel
@@ -126,73 +126,98 @@ fun LibraryScreen(repository: LoomRepository, nav: NavState, library: String, ac
         )
         when {
             state.loading -> LoadingState()
-            state.offline -> OfflineLibrary(repository, nav, thread) {
+            state.offline -> OfflineLibrary(repository, nav, library, thread) {
                 repository.network.recheck()
                 model.refresh(force = true)
             }
             state.error != null -> ErrorState(state.error, onRetry = { model.refresh() })
             state.items.isEmpty() -> EmptyState("Nothing here yet. Scan the library from Settings.")
-            else -> LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 106.dp),
-                contentPadding = PaddingValues(
-                    start = 20.dp,
-                    end = 20.dp,
-                    top = 8.dp,
-                    bottom = navPillClearance(),
-                ),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.fillMaxSize(),
-            ) {
-                items(state.items, key = { it.id }) { item ->
-                    PosterCard(
-                        title = item.title,
-                        imageUrl = repository.api.posterUrl(item),
-                        badgeCount = item.unwatchedCount,
-                        progress = progressFraction(item),
-                        progressColor = thread,
-                        fallbackTint = thread,
-                        actions = watchedActions(item, model),
-                        onClick = { nav.push(Screen.Detail(item.id)) },
-                    )
-                }
+            else -> LibraryGrid(state.items) { item ->
+                PosterCard(
+                    title = item.title,
+                    imageUrl = repository.api.posterUrl(item),
+                    badgeCount = item.unwatchedCount,
+                    progress = progressFraction(item),
+                    progressColor = thread,
+                    fallbackTint = thread,
+                    actions = watchedActions(item, model),
+                    onClick = { nav.push(Screen.Detail(item.id)) },
+                )
             }
         }
     }
 }
 
+/** The A-Z poster grid a library tab is, whether its items came from Loom or the device. */
+@Composable
+private fun LibraryGrid(
+    items: List<Item>,
+    header: (@Composable () -> Unit)? = null,
+    card: @Composable (Item) -> Unit,
+) {
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(minSize = 106.dp),
+        contentPadding = PaddingValues(
+            start = 20.dp,
+            end = 20.dp,
+            top = 8.dp,
+            bottom = navPillClearance(),
+        ),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        if (header != null) {
+            item(key = "header", span = { GridItemSpan(maxLineSpan) }) { header() }
+        }
+        items(items, key = { it.id }) { item -> card(item) }
+    }
+}
+
 /**
- * A library tab with no Loom. Which library a download came from is a server
- * fact this device does not keep, so every tab offers the same downloads rather
- * than guessing a split that would file the same film under two tabs.
+ * A library tab with no Loom: the same grid, holding this library's downloads.
+ * A show stands for the episodes beneath it, so a downloaded season is one
+ * poster here rather than ten, and its badge counts what is left to watch of
+ * what is actually on the device.
  */
 @Composable
 private fun OfflineLibrary(
     repository: LoomRepository,
     nav: NavState,
+    library: String,
     accent: Color,
     onRetry: () -> Unit,
 ) {
-    val downloads by repository.downloads.downloads.collectAsStateWithLifecycle()
+    val catalog by repository.offlineCatalog.collectAsStateWithLifecycle()
     val reason by repository.network.reason.collectAsStateWithLifecycle()
-    val ready = downloadedRowItems(downloads.filter { it.state == DownloadState.Completed })
-    DownloadedGrid(
-        entries = ready,
-        accent = accent,
-        onOpen = { nav.push(Screen.Player(it)) },
-        bottomPadding = navPillClearance(),
-        header = {
-            OfflineNotice(
-                reason = reason + if (ready.isEmpty()) {
-                    " Nothing is downloaded to this device yet."
-                } else {
-                    " These titles are downloaded on this device."
-                },
-                onRetry = onRetry,
-                onSettings = { nav.push(Screen.Settings) },
-            )
-        },
-    )
+    val items = catalog.library(library)
+    if (items.isEmpty()) {
+        OfflineNotice(
+            reason = "$reason Nothing from here is downloaded to this device.",
+            onRetry = onRetry,
+            onSettings = { nav.push(Screen.Settings) },
+            modifier = Modifier.padding(horizontal = 20.dp),
+        )
+        return
+    }
+    LibraryGrid(
+        items = items,
+        header = { OfflineBanner(reason, onRetry) },
+    ) { item ->
+        PosterCard(
+            title = item.title,
+            imageUrl = repository.posterFor(item, offline = true),
+            badgeCount = if (item.kind == "show") {
+                catalog.episodes(item.id).count { it.progress?.played != true }
+            } else {
+                0
+            },
+            progress = progressFraction(item),
+            progressColor = accent,
+            fallbackTint = accent,
+            onClick = { nav.push(Screen.Detail(item.id)) },
+        )
+    }
 }
 
 private fun watchedActions(item: Item, model: LibraryViewModel): List<CardAction> {

@@ -2,6 +2,7 @@ package xyz.five82.takeup.ui.components
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -27,6 +29,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import xyz.five82.takeup.ui.theme.Amber
@@ -188,6 +191,44 @@ fun OfflineNotice(
                 OutlinedButton(onClick = onSettings) { Text("Settings") }
             }
         }
+    }
+}
+
+/**
+ * Offline once there is something to show. [OfflineNotice] is for a screen with
+ * nothing on it; this is a status line above a screen that is full of downloads,
+ * so being offline reads as a condition rather than as the page's subject.
+ */
+@Composable
+fun OfflineBanner(reason: String, onRetry: () -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier
+                .size(6.dp)
+                .clip(RoundedCornerShape(3.dp))
+                .background(Amber),
+        )
+        Text(
+            reason,
+            style = MaterialTheme.typography.labelLarge,
+            color = Muted,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(start = 8.dp).weight(1f),
+        )
+        Text(
+            "Try again",
+            style = MaterialTheme.typography.labelLarge,
+            color = Ink,
+            modifier = Modifier
+                .padding(start = 8.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .clickable(onClick = onRetry)
+                .padding(horizontal = 10.dp, vertical = 12.dp),
+        )
     }
 }
 

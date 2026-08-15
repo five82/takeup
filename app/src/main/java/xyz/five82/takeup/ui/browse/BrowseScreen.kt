@@ -34,23 +34,23 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import xyz.five82.takeup.api.Collection
 import xyz.five82.takeup.api.Genre
-import xyz.five82.takeup.data.DownloadState
 import xyz.five82.takeup.data.LoomRepository
 import xyz.five82.takeup.data.Reach
-import xyz.five82.takeup.data.downloadedRowItems
 import xyz.five82.takeup.data.isOfflineError
 import xyz.five82.takeup.ui.NavState
 import xyz.five82.takeup.ui.Screen
-import xyz.five82.takeup.ui.components.DownloadedGrid
 import xyz.five82.takeup.ui.components.EmptyState
 import xyz.five82.takeup.ui.components.ErrorState
 import xyz.five82.takeup.ui.components.LoadingState
+import xyz.five82.takeup.ui.components.OfflineBanner
 import xyz.five82.takeup.ui.components.OfflineNotice
 import xyz.five82.takeup.ui.components.PosterCard
 import xyz.five82.takeup.ui.components.RowLabel
 import xyz.five82.takeup.ui.components.navPillClearance
 import xyz.five82.takeup.ui.components.shadowWeave
+import xyz.five82.takeup.ui.posterFor
 import xyz.five82.takeup.ui.posterUrl
+import xyz.five82.takeup.ui.progressFraction
 import xyz.five82.takeup.ui.takeupViewModel
 import xyz.five82.takeup.ui.theme.Ink
 import xyz.five82.takeup.ui.theme.Muted
@@ -145,24 +145,56 @@ fun BrowseScreen(repository: LoomRepository, nav: NavState, active: Boolean) {
     }
 }
 
+/**
+ * Browse with no Loom. Collections and genres are server slices of a library
+ * this device does not hold, so what is left to browse is everything downloaded,
+ * in one grid.
+ */
 @Composable
 private fun OfflineBrowse(repository: LoomRepository, nav: NavState, onRetry: () -> Unit) {
-    val downloads by repository.downloads.downloads.collectAsStateWithLifecycle()
+    val catalog by repository.offlineCatalog.collectAsStateWithLifecycle()
     val reason by repository.network.reason.collectAsStateWithLifecycle()
-    val ready = downloadedRowItems(downloads.filter { it.state == DownloadState.Completed })
-    DownloadedGrid(
-        entries = ready,
-        accent = Violet,
-        onOpen = { nav.push(Screen.Player(it)) },
-        bottomPadding = navPillClearance(),
-        header = {
-            OfflineNotice(
-                reason = reason + " Collections and genres come from Loom.",
-                onRetry = onRetry,
-                onSettings = { nav.push(Screen.Settings) },
+    val items = catalog.all()
+    if (items.isEmpty()) {
+        OfflineNotice(
+            reason = "$reason Nothing is downloaded to this device yet.",
+            onRetry = onRetry,
+            onSettings = { nav.push(Screen.Settings) },
+            modifier = Modifier.padding(horizontal = 20.dp),
+        )
+        return
+    }
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(minSize = 106.dp),
+        contentPadding = PaddingValues(
+            start = 20.dp,
+            end = 20.dp,
+            top = 8.dp,
+            bottom = navPillClearance(),
+        ),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        item(key = "offline-banner", span = { GridItemSpan(maxLineSpan) }) {
+            OfflineBanner("$reason Collections and genres come from Loom.", onRetry)
+        }
+        items(items, key = { it.id }) { item ->
+            PosterCard(
+                title = item.title,
+                imageUrl = repository.posterFor(item, offline = true),
+                badgeCount = if (item.kind == "show") {
+                    catalog.episodes(item.id).count { it.progress?.played != true }
+                } else {
+                    0
+                },
+                progress = progressFraction(item),
+                progressColor = Violet,
+                fallbackTint = Violet,
+                onClick = { nav.push(Screen.Detail(item.id)) },
             )
-        },
-    )
+        }
+    }
 }
 
 @Composable

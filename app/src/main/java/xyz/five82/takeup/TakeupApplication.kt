@@ -14,6 +14,7 @@ import xyz.five82.takeup.data.DownloadStore
 import xyz.five82.takeup.data.LoomRepository
 import xyz.five82.takeup.data.NetworkPolicy
 import xyz.five82.takeup.data.OfflineArtwork
+import xyz.five82.takeup.data.OfflineItemStore
 import xyz.five82.takeup.data.OfflineProgressStore
 import xyz.five82.takeup.data.Settings
 
@@ -27,7 +28,11 @@ class TakeupApplication : Application(), SingletonImageLoader.Factory {
         val network = NetworkPolicy(this, settings, appScope)
         val api = LoomApi(blocked = { network.blocked.value })
         val offlineProgress = OfflineProgressStore(this)
-        appScope.launch { offlineProgress.load() }
+        val offlineItems = OfflineItemStore(this)
+        appScope.launch {
+            offlineProgress.load()
+            offlineItems.load()
+        }
         LoomRepository(
             settings,
             api,
@@ -35,6 +40,7 @@ class TakeupApplication : Application(), SingletonImageLoader.Factory {
             DownloadStore(this, appScope, OfflineArtwork(this, api), network),
             offlineProgress,
             network,
+            offlineItems,
         )
     }
 

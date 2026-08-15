@@ -5,6 +5,9 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.google.gson.JsonParser
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
@@ -19,12 +22,16 @@ class OfflineProgressStore(context: Context) {
     private val dataStore = context.applicationContext.offlineProgressDataStore
 
     // Kept in memory so offline playback can resolve a resume position without
-    // suspending in the middle of preparing the player.
-    @Volatile
-    private var cached: Map<Long, PendingProgress> = emptyMap()
+    // suspending in the middle of preparing the player. A flow as well as a map
+    // because the offline catalog folds these positions over its snapshots, and
+    // has to rebuild when a position lands.
+    private val _pending = MutableStateFlow<Map<Long, PendingProgress>>(emptyMap())
+    val pending: StateFlow<Map<Long, PendingProgress>> = _pending.asStateFlow()
+
+    private val cached: Map<Long, PendingProgress> get() = _pending.value
 
     suspend fun load() {
-        cached = decodePendingProgress(
+        _pending.value = decodePendingProgress(
             dataStore.data.map { it[PENDING] }.first().orEmpty(),
         )
     }
@@ -43,7 +50,7 @@ class OfflineProgressStore(context: Context) {
     }
 
     private suspend fun write(value: Map<Long, PendingProgress>) {
-        cached = value
+        _pending.value = value
         dataStore.edit { it[PENDING] = encodePendingProgress(value) }
     }
 

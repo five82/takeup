@@ -120,8 +120,7 @@ class PlayerViewModel(
                 }
                 // Loom is unreachable but the bytes are local: play the snapshot.
                 // The MediaItem uses the download's exact tagged URL, so every
-                // read is a cache hit and the network is never touched. Next-up
-                // is skipped; it needs the server.
+                // read is a cache hit and the network is never touched.
                 item = offline.item
                 player.setMediaItem(MediaItem.fromUri(offline.uri))
                 player.prepare()
@@ -130,6 +129,15 @@ class PlayerViewModel(
                     ?: 0
                 if (resume > 0) player.seekTo(resume)
                 player.playWhenReady = true
+                if (offline.item.kind == "episode") {
+                    // What follows comes from the catalog rather than the show's
+                    // full episode list, so a season downloaded for a flight
+                    // still chains one episode to the next.
+                    nextEpisode = nextEpisodeAfter(
+                        repository.offlineCatalog.value.siblingEpisodes(itemId),
+                        itemId,
+                    )
+                }
             }
         }
     }
