@@ -1,15 +1,18 @@
 package xyz.five82.takeup.data
 
 import android.content.Context
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import xyz.five82.takeup.api.Item
 import xyz.five82.takeup.api.Library
 import xyz.five82.takeup.api.LoomApi
@@ -18,14 +21,22 @@ import xyz.five82.takeup.api.loomGson
 
 private val Context.dataStore by preferencesDataStore(name = "takeup")
 
-/** Persisted client settings; just the server address today. */
+/** Persisted client settings: the server address and the cellular gate. */
 class Settings(private val context: Context) {
     private val serverKey = stringPreferencesKey("server_address")
+    private val allowCellularKey = booleanPreferencesKey("allow_cellular")
 
     val serverAddress = context.dataStore.data.map { it[serverKey] }
 
+    /** Off until asked for; a phone plan should not pay for a home library. */
+    val allowCellular = context.dataStore.data.map { it[allowCellularKey] ?: false }
+
     suspend fun setServerAddress(value: String) {
         context.dataStore.edit { it[serverKey] = value }
+    }
+
+    suspend fun setAllowCellular(value: Boolean) {
+        context.dataStore.edit { it[allowCellularKey] = value }
     }
 }
 
@@ -43,7 +54,16 @@ class LoomRepository(
     scope: CoroutineScope,
     val downloads: DownloadStore,
     val offlineProgress: OfflineProgressStore,
+    val cellular: CellularPolicy,
 ) {
+    init {
+        // Media3 wants its manager driven from the main thread, the way the
+        // download service drives it.
+        scope.launch(Dispatchers.Main) {
+            cellular.blocked.collect { downloads.setTransfersPaused(it) }
+        }
+    }
+
     val server: StateFlow<ServerConfig> = settings.serverAddress
         .map { address ->
             api.baseUrl = address?.let(LoomApi::normalizeAddress)
@@ -52,6 +72,11 @@ class LoomRepository(
         .stateIn(scope, SharingStarted.Eagerly, ServerConfig(loaded = false, address = null))
 
     suspend fun setServerAddress(value: String) = settings.setServerAddress(value)
+
+    /** Picks up downloads interrupted by a process death, if the gate is open. */
+    fun resumeDownloads() {
+        if (!cellular.blocked.value) downloads.resumeQueued()
+    }
 
     @Volatile
     private var libraries: List<Library> = emptyList()

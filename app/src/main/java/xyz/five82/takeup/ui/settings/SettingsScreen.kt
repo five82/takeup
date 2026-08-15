@@ -23,6 +23,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -98,6 +99,10 @@ class SettingsViewModel(private val repository: LoomRepository) : ViewModel() {
         }
     }
 
+    fun setAllowCellular(value: Boolean) {
+        viewModelScope.launch { repository.cellular.setAllowed(value) }
+    }
+
     fun triggerScan() {
         viewModelScope.launch {
             try {
@@ -168,6 +173,25 @@ fun SettingsScreen(repository: LoomRepository, nav: NavState) {
             )
             Button(onClick = { model.save() }, enabled = !model.saving && model.address.isNotBlank()) {
                 Text(if (model.saving) "Checking..." else "Save")
+            }
+
+            RowLabel("Network", color = Ember, modifier = Modifier.padding(top = 24.dp))
+            val allowCellular by repository.cellular.allowed.collectAsStateWithLifecycle()
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.weight(1f).padding(end = 12.dp)) {
+                    Text("Allow cellular data", style = MaterialTheme.typography.titleSmall, color = Ink)
+                    Text(
+                        if (allowCellular) {
+                            "Streaming and downloads may use the data plan."
+                        } else {
+                            "Off Wi-Fi, only downloaded titles are available."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Muted,
+                        modifier = Modifier.padding(top = 1.dp),
+                    )
+                }
+                Switch(checked = allowCellular, onCheckedChange = { model.setAllowCellular(it) })
             }
 
             RowLabel("Library", color = Amber, modifier = Modifier.padding(top = 24.dp))

@@ -18,13 +18,32 @@ import java.util.concurrent.TimeUnit
 class LoomException(val code: Int, message: String) : IOException(message)
 
 /**
+ * What a request refused by the cellular gate reports, and what the UI shows.
+ * Phrased as the app's own rule: the data plan itself is working, Takeup is
+ * simply not allowed onto it.
+ */
+const val CELLULAR_BLOCKED_MESSAGE = "Cellular data access is disabled in Takeup"
+
+/**
  * Hand-rolled client for Loom's unauthenticated LAN API. The base URL is
  * mutable because the server address is user configuration, not build
  * configuration.
+ *
+ * [blocked] is the cellular gate. A refused request fails as a plain
+ * [IOException] rather than a [LoomException] so it reads as being offline,
+ * which is exactly what it is from the app's point of view.
  */
-class LoomApi(@Volatile var baseUrl: String? = null) {
+class LoomApi(
+    @Volatile var baseUrl: String? = null,
+    private val blocked: () -> Boolean = { false },
+) {
 
-    private val client = OkHttpClient.Builder()
+    /** Shared with Coil so artwork passes the same gate as everything else. */
+    val client = OkHttpClient.Builder()
+        .addInterceptor { chain ->
+            if (blocked()) throw IOException(CELLULAR_BLOCKED_MESSAGE)
+            chain.proceed(chain.request())
+        }
         .connectTimeout(5, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)
         .build()

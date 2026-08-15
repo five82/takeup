@@ -7,6 +7,7 @@ import androidx.core.net.toUri
 import androidx.media3.common.util.NotificationUtil
 import androidx.media3.database.StandaloneDatabaseProvider
 import androidx.media3.datasource.DataSource
+import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.datasource.cache.NoOpCacheEvictor
@@ -26,9 +27,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import xyz.five82.takeup.R
+import xyz.five82.takeup.api.CELLULAR_BLOCKED_MESSAGE
 import xyz.five82.takeup.api.Item
 import xyz.five82.takeup.api.loomGson
 import java.io.File
+import java.io.IOException
 import java.util.concurrent.Executors
 
 /**
@@ -39,6 +42,7 @@ class DownloadStore(
     context: Context,
     private val scope: CoroutineScope,
     val artwork: OfflineArtwork,
+    cellular: CellularPolicy,
 ) {
     private val appContext = context.applicationContext
 
@@ -63,10 +67,17 @@ class DownloadStore(
     /**
      * Reads cached bytes but never writes them. Without the null sink, ordinary
      * streaming would fill a cache whose NoOpCacheEvictor never reclaims anything.
+     *
+     * The upstream is gated: a downloaded title plays untouched because every read
+     * hits the cache, while streaming one that is not downloaded stops at the gate,
+     * including when the phone leaves Wi-Fi mid-film. Downloads use the ungated
+     * factory - [setTransfersPaused] holds those back instead, so they can resume.
      */
     val playbackDataSourceFactory: DataSource.Factory = CacheDataSource.Factory()
         .setCache(cache)
-        .setUpstreamDataSourceFactory(upstreamFactory)
+        .setUpstreamDataSourceFactory {
+            GatedDataSource(upstreamFactory.createDataSource()) { cellular.blocked.value }
+        }
         .setCacheWriteDataSinkFactory(null)
         .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
 
@@ -148,6 +159,15 @@ class DownloadStore(
         val ids = _downloads.value.map { it.item.id }
         DownloadService.sendRemoveAllDownloads(appContext, MediaDownloadService::class.java, false)
         scope.launch { ids.forEach { artwork.delete(it) } }
+    }
+
+    /**
+     * The cellular gate holds transfers rather than failing them: a paused download
+     * keeps the bytes it has and carries on once Wi-Fi is back, where a failed one
+     * would wait for the user to press Retry.
+     */
+    fun setTransfersPaused(paused: Boolean) {
+        if (paused) downloadManager.pauseDownloads() else downloadManager.resumeDownloads()
     }
 
     /** Resumes work interrupted by a process death. No scheduler runs while dead. */
@@ -260,5 +280,16 @@ class DownloadStore(
 
         // Above the download service's own foreground notification id.
         const val TERMINAL_NOTIFICATION_ID_BASE = 100
+    }
+}
+
+/** Refuses to reach the network while [blocked], and delegates everything else. */
+private class GatedDataSource(
+    private val delegate: DataSource,
+    private val blocked: () -> Boolean,
+) : DataSource by delegate {
+    override fun open(dataSpec: DataSpec): Long {
+        if (blocked()) throw IOException(CELLULAR_BLOCKED_MESSAGE)
+        return delegate.open(dataSpec)
     }
 }

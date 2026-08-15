@@ -83,7 +83,7 @@ private fun PermissionAwareApp(repository: LoomRepository) {
     if (permissionGranted) {
         // No scheduler runs while the process is dead; pick interrupted downloads
         // back up only once LAN access is available.
-        LaunchedEffect(repository) { repository.downloads.resumeQueued() }
+        LaunchedEffect(repository) { repository.resumeDownloads() }
         TakeupApp(repository)
     } else {
         LocalNetworkPermissionScreen(

@@ -235,6 +235,7 @@ fun HomeScreen(repository: LoomRepository, nav: NavState, active: Boolean) {
 @Composable
 private fun OfflineHome(repository: LoomRepository, nav: NavState, onRetry: () -> Unit) {
     val downloads by repository.downloads.downloads.collectAsStateWithLifecycle()
+    val blockedByCellular by repository.cellular.blocked.collectAsStateWithLifecycle()
     val ready = downloadedRowItems(downloads.filter { it.state == DownloadState.Completed })
     LazyColumn(
         Modifier.fillMaxSize().houseLights(Ember),
@@ -248,7 +249,12 @@ private fun OfflineHome(repository: LoomRepository, nav: NavState, onRetry: () -
             ) {
                 Text("Offline", style = MaterialTheme.typography.displaySmall, color = Ink)
                 Text(
-                    "Loom isn't answering. These titles are downloaded on this device.",
+                    if (blockedByCellular) {
+                        "Cellular data access is disabled in Takeup. These titles are " +
+                            "downloaded on this device."
+                    } else {
+                        "Loom isn't answering. These titles are downloaded on this device."
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     color = Muted,
                     modifier = Modifier.padding(top = 8.dp),
@@ -258,7 +264,9 @@ private fun OfflineHome(repository: LoomRepository, nav: NavState, onRetry: () -
                     modifier = Modifier.padding(top = 12.dp),
                 ) {
                     OutlinedButton(onClick = onRetry) { Text("Retry") }
-                    OutlinedButton(onClick = { nav.push(Screen.Settings) }) { Text("Server settings") }
+                    OutlinedButton(onClick = { nav.push(Screen.Settings) }) {
+                        Text(if (blockedByCellular) "Settings" else "Server settings")
+                    }
                 }
             }
         }
