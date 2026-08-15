@@ -16,8 +16,10 @@ fun LoomApi.backdropUrl(item: Item, widthPx: Int = 1440): String? =
 fun LoomApi.logoUrl(item: Item, widthPx: Int = 480): String? =
     imageUrl(item.logoImageId, item.logoImageTag, widthPx)
 
+/** Episodes may not have a dedicated thumb; their backdrop is the same 16:9 shape. */
 fun LoomApi.thumbUrl(item: Item, widthPx: Int = 480): String? =
     imageUrl(item.thumbImageId, item.thumbImageTag, widthPx)
+        ?: backdropUrl(item, widthPx)
 
 // The same four, resolved for whichever world the screen is in. Offline the only
 // art that loads is the copy saved beside the download - Loom's URLs are behind
@@ -39,4 +41,8 @@ fun LoomRepository.logoFor(item: Item, offline: Boolean, widthPx: Int = 480): St
     if (offline) downloads.artwork.logoPath(item.id) else api.logoUrl(item, widthPx)
 
 fun LoomRepository.thumbFor(item: Item, offline: Boolean, widthPx: Int = 480): String? =
-    if (offline) downloads.artwork.thumbPath(item.id) else api.thumbUrl(item, widthPx)
+    if (offline) {
+        downloads.artwork.thumbPath(item.id) ?: downloads.artwork.backdropPath(item.id)
+    } else {
+        api.thumbUrl(item, widthPx)
+    }
