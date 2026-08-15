@@ -22,20 +22,16 @@ import xyz.five82.takeup.api.loomGson
 
 private val Context.dataStore by preferencesDataStore(name = "takeup")
 
-/** Persisted client settings: the server address and the two network gates. */
+/** Persisted client settings: the server address and the one network gate. */
 class Settings(private val context: Context) {
     private val serverKey = stringPreferencesKey("server_address")
     private val allowCellularKey = booleanPreferencesKey("allow_cellular")
-    private val allowRemoteKey = booleanPreferencesKey("allow_remote")
     private val libraryKindsKey = stringPreferencesKey("library_kinds")
 
     val serverAddress = context.dataStore.data.map { it[serverKey] }
 
     /** Off until asked for; a phone plan should not pay for a home library. */
     val allowCellular = context.dataStore.data.map { it[allowCellularKey] ?: false }
-
-    /** Off until asked for; away from home, only the tunnel could answer. */
-    val allowRemote = context.dataStore.data.map { it[allowRemoteKey] ?: false }
 
     /**
      * Library kind per library id, learned whenever Loom answers. An item knows
@@ -51,10 +47,6 @@ class Settings(private val context: Context) {
 
     suspend fun setAllowCellular(value: Boolean) {
         context.dataStore.edit { it[allowCellularKey] = value }
-    }
-
-    suspend fun setAllowRemote(value: Boolean) {
-        context.dataStore.edit { it[allowRemoteKey] = value }
     }
 
     suspend fun setLibraryKinds(value: Map<Long, String>) {

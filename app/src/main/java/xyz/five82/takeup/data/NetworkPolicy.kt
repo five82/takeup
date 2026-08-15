@@ -1,10 +1,12 @@
 package xyz.five82.takeup.data
 
 import android.content.Context
+import android.content.pm.ApplicationInfo
 import android.net.ConnectivityManager
 import android.net.InetAddresses
 import android.net.Network
 import android.net.NetworkCapabilities
+import android.os.Build
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -42,17 +44,34 @@ data class NetworkFacts(
     val onCellular: Boolean = false,
     val allowCellular: Boolean = false,
     val onHomeSubnet: Boolean = true,
-    val allowRemote: Boolean = false,
+    val onTailnet: Boolean = false,
 )
 
 /**
  * Policy alone, before anything is asked of the network. Cellular spends a data
- * plan, and a subnet that is not Loom's means any answer would arrive through a
- * tunnel; both are refusals the user has to opt out of.
+ * plan, which is a refusal the user opts out of. Being neither on Loom's subnet
+ * nor on the tailnet is not a preference at all - there is no path to Loom from
+ * there, so no setting can open it.
  */
 fun networkBlocked(facts: NetworkFacts): Boolean = with(facts) {
-    (onCellular && !allowCellular) || (!onHomeSubnet && !allowRemote)
+    (onCellular && !allowCellular) || !(onHomeSubnet || onTailnet)
 }
+
+/**
+ * Whether [address] is Tailscale's, and not merely a tunnel's.
+ *
+ * 100.64.0.0/10 is carrier-grade NAT space, which Tailscale draws its addresses
+ * from - and so do mobile carriers, on the cellular interface. The range alone
+ * would therefore call a bare LTE connection a tunnel, so callers must also
+ * insist the address sits on a VPN's own device. Other VPNs establish one of
+ * those too but number it out of RFC 1918 - Mullvad took the same tun0 slot on
+ * this phone with 10.159.206.81 - and Android runs a single VPN at a time, which
+ * leaves the pair of tests meaning Tailscale and nothing else.
+ */
+fun isTailnetAddress(address: ByteArray): Boolean =
+    address.size == 4 &&
+        (address[0].toInt() and 0xFF) == 100 &&
+        (address[1].toInt() and 0xFF) in 64..127
 
 /**
  * What a probe that was actually made adds up to. Answering from Loom's own
@@ -69,7 +88,7 @@ fun reachFrom(answered: Boolean, onHomeSubnet: Boolean): Reach = when {
 fun offlineReason(facts: NetworkFacts): String = with(facts) {
     when {
         onCellular && !allowCellular -> "Cellular data is off in Takeup."
-        !onHomeSubnet && !allowRemote -> "You are away from your home network."
+        !onHomeSubnet && !onTailnet -> "You are away from home and Tailscale isn't connected."
         else -> "Loom isn't answering."
     }
 }
@@ -96,10 +115,16 @@ fun inSameSubnet(server: ByteArray, local: ByteArray, prefixLength: Int): Boolea
  *
  * Loom is a LAN server, so "online" is not a property of the phone having
  * internet - it is whether this particular network can hand us Loom. Two gates
- * answer that without a single packet: cellular spends a data plan, and being
- * off Loom's subnet means only the tunnel could carry the answer. Either one,
- * unless allowed, makes [blocked] true, which is the single flag the API
+ * answer that without a single packet: cellular spends a data plan, and a
+ * network that is neither Loom's subnet nor the tailnet has no route to Loom at
+ * all. Either one makes [blocked] true, which is the single flag the API
  * client, the playback upstream, and the transfer queue all read.
+ *
+ * The second gate is measured rather than declared. It used to be a switch that
+ * said remote use was permitted, which is a different claim from the tunnel
+ * being up: with it on, a strange Wi-Fi with Tailscale disconnected read exactly
+ * like being at home, and every request went out to a LAN address nothing was
+ * listening at. Looking for the tunnel itself cannot be wrong in that direction.
  *
  * Past those, one short probe settles it. It deliberately does not go through
  * [LoomApi]'s client: that client refuses calls while [blocked], and a probe
@@ -119,6 +144,15 @@ class NetworkPolicy(
     // reach a Loom it has not been told about yet.
     private val onHomeSubnet = MutableStateFlow(true)
 
+    private val onTailnet = MutableStateFlow(false)
+
+    // The emulator is NATed onto a subnet of its own with no tunnel available,
+    // so it can never satisfy the gate honestly and every non-playback check
+    // would be run against a blocked app. Debuggable builds only; the release
+    // the Pixel runs has no such door.
+    private val onEmulator = Build.HARDWARE == "ranchu" &&
+        (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+
     private val serverUrl: StateFlow<String?> = settings.serverAddress
         .map { it?.let(LoomApi::normalizeAddress) }
         .stateIn(scope, SharingStarted.Eagerly, null)
@@ -126,25 +160,22 @@ class NetworkPolicy(
     val allowCellular: StateFlow<Boolean> = settings.allowCellular
         .stateIn(scope, SharingStarted.Eagerly, false)
 
-    val allowRemote: StateFlow<Boolean> = settings.allowRemote
-        .stateIn(scope, SharingStarted.Eagerly, false)
-
     // Named construction, so the four booleans cannot be wired up in the wrong
-    // order. Seeded before DataStore has answered: for the moment the settings
-    // are unknown, a cellular connection stays blocked rather than letting the
-    // first requests out onto the data plan, and anything else is allowed.
+    // order. Seeded before DataStore has answered: for the moment the setting is
+    // unknown, a cellular connection stays blocked rather than letting the first
+    // requests out onto the data plan, and anything else is allowed.
     private val facts: StateFlow<NetworkFacts> =
         combine(
             onCellular,
             onHomeSubnet,
+            onTailnet,
             settings.allowCellular,
-            settings.allowRemote,
-        ) { cellular, homeSubnet, allowCellular, allowRemote ->
+        ) { cellular, homeSubnet, tailnet, allowCellular ->
             NetworkFacts(
                 onCellular = cellular,
                 allowCellular = allowCellular,
                 onHomeSubnet = homeSubnet,
-                allowRemote = allowRemote,
+                onTailnet = tailnet,
             )
         }.stateIn(scope, SharingStarted.Eagerly, NetworkFacts(onCellular = onCellular.value))
 
@@ -178,22 +209,28 @@ class NetworkPolicy(
                     // so tunnelling to Loom does not slip past the gate.
                     onCellular.value =
                         networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
-                    onNetworkChanged()
+                    recheck()
                 }
 
                 override fun onLost(network: Network) {
                     onCellular.value = false
-                    onNetworkChanged()
+                    recheck()
                 }
             },
         )
         // Also covers the first load: the address arrives from DataStore after
         // construction, and the subnet cannot be judged until it does.
-        scope.launch { serverUrl.collect { onNetworkChanged() } }
+        scope.launch { serverUrl.collect { recheck() } }
     }
 
     /** Re-decides from scratch. Safe to call as often as a screen likes. */
     fun recheck() {
+        // Read before launching, not inside the coroutine: the gates are derived
+        // from these by a combine, and the probe below reads the result of that
+        // derivation. Setting them here leaves the debounce as the window it
+        // needs to land in.
+        onHomeSubnet.value = serverHostOnLocalSubnet()
+        onTailnet.value = tailnetInterfaceUp()
         probeJob?.cancel()
         probeJob = scope.launch {
             // Network callbacks arrive in bursts as an interface settles, and a
@@ -222,16 +259,6 @@ class NetworkPolicy(
         recheck()
     }
 
-    suspend fun setAllowRemote(value: Boolean) {
-        settings.setAllowRemote(value)
-        recheck()
-    }
-
-    private fun onNetworkChanged() {
-        onHomeSubnet.value = serverHostOnLocalSubnet()
-        recheck()
-    }
-
     private suspend fun probe(baseUrl: String): Boolean = withContext(Dispatchers.IO) {
         runCatching {
             val request = Request.Builder().url("$baseUrl/api/v1/health").build()
@@ -244,16 +271,29 @@ class NetworkPolicy(
         }.getOrDefault(false)
     }
 
+    /**
+     * Whether Tailscale is up, by the address it puts on its own tun device.
+     * Both halves matter: see [isTailnetAddress].
+     */
+    private fun tailnetInterfaceUp(): Boolean =
+        // No answer means no evidence of a tunnel, so this one fails closed
+        // while the subnet check below fails open. Both land on "assume home".
+        localInterfaces()?.any { nic ->
+            runCatching {
+                nic.isUp && nic.name.startsWith("tun") &&
+                    nic.interfaceAddresses.any { isTailnetAddress(it.address.address) }
+            }.getOrDefault(false)
+        } ?: false
+
     /** Whether any local interface shares a subnet with the configured server. */
     private fun serverHostOnLocalSubnet(): Boolean {
+        if (onEmulator) return true
         val host = serverUrl.value?.toHttpUrlOrNull()?.host ?: return true
         // A hostname would need DNS to compare, and a LAN name only resolves at
         // home anyway; treat it as home rather than block the app on a lookup.
         if (!InetAddresses.isNumericAddress(host)) return true
         val server = runCatching { InetAddress.getByName(host).address }.getOrNull() ?: return true
-        val interfaces = runCatching { NetworkInterface.getNetworkInterfaces().toList() }
-            .getOrNull() ?: return true
-        return interfaces.any { nic ->
+        return localInterfaces()?.any { nic ->
             runCatching {
                 // Tailscale carries a route to the home subnet but holds no
                 // address on it, so the tunnel cannot read as being home. The
@@ -263,8 +303,12 @@ class NetworkPolicy(
                         inSameSubnet(server, it.address.address, it.networkPrefixLength.toInt())
                     }
             }.getOrDefault(false)
-        }
+        } ?: true
     }
+
+    /** Null, not empty, when the list cannot be read: the two callers differ. */
+    private fun localInterfaces(): List<NetworkInterface>? =
+        runCatching { NetworkInterface.getNetworkInterfaces().toList() }.getOrNull()
 
     private fun activeNetworkIsCellular(): Boolean {
         val network = connectivity.activeNetwork ?: return false

@@ -104,10 +104,6 @@ class SettingsViewModel(private val repository: LoomRepository) : ViewModel() {
         viewModelScope.launch { repository.network.setAllowCellular(value) }
     }
 
-    fun setAllowRemote(value: Boolean) {
-        viewModelScope.launch { repository.network.setAllowRemote(value) }
-    }
-
     fun triggerScan() {
         viewModelScope.launch {
             try {
@@ -187,7 +183,6 @@ fun SettingsScreen(repository: LoomRepository, nav: NavState) {
             val reach by repository.network.reach.collectAsStateWithLifecycle()
             val reason by repository.network.reason.collectAsStateWithLifecycle()
             val allowCellular by repository.network.allowCellular.collectAsStateWithLifecycle()
-            val allowRemote by repository.network.allowRemote.collectAsStateWithLifecycle()
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 Text(
                     when (reach) {
@@ -211,17 +206,6 @@ fun SettingsScreen(repository: LoomRepository, nav: NavState) {
                 },
                 checked = allowCellular,
                 onCheckedChange = { model.setAllowCellular(it) },
-            )
-            SettingSwitch(
-                title = "Use Loom through Tailscale",
-                detail = if (allowRemote) {
-                    "Away from home, Takeup reaches Loom through the tunnel. " +
-                        "On cellular it also needs the switch above."
-                } else {
-                    "Away from home, only downloaded titles are available."
-                },
-                checked = allowRemote,
-                onCheckedChange = { model.setAllowRemote(it) },
             )
 
             RowLabel("Library", color = Amber, modifier = Modifier.padding(top = 24.dp))

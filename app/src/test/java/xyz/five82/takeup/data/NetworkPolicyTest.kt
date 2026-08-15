@@ -28,21 +28,24 @@ class NetworkPolicyTest {
     }
 
     @Test
-    fun `another subnet is blocked until remote use is allowed`() {
+    fun `another subnet is blocked until the tunnel is actually up`() {
+        // The regression this replaced: a switch saying remote use was permitted
+        // opened the gate on any strange Wi-Fi, tunnel or no tunnel, and every
+        // request went to a LAN address nothing was listening at.
         assertTrue(blocked(onHomeSubnet = false))
-        assertFalse(blocked(onHomeSubnet = false, allowRemote = true))
+        assertFalse(blocked(onHomeSubnet = false, onTailnet = true))
     }
 
     @Test
-    fun `allowing remote does not also open the data plan`() {
-        // Tailscale over cellular still spends the plan, so it needs both.
-        assertTrue(blocked(onCellular = true, onHomeSubnet = false, allowRemote = true))
+    fun `the tunnel does not also open the data plan`() {
+        // Tailscale over cellular still spends the plan, so it needs the switch.
+        assertTrue(blocked(onCellular = true, onHomeSubnet = false, onTailnet = true))
         assertFalse(
             blocked(
                 onCellular = true,
                 allowCellular = true,
                 onHomeSubnet = false,
-                allowRemote = true,
+                onTailnet = true,
             ),
         )
     }
@@ -62,7 +65,7 @@ class NetworkPolicyTest {
             offlineReason(NetworkFacts(onCellular = true)),
         )
         assertEquals(
-            "You are away from your home network.",
+            "You are away from home and Tailscale isn't connected.",
             offlineReason(NetworkFacts(onHomeSubnet = false)),
         )
         // Both gates open and still nothing: now it really is the server.
@@ -109,12 +112,42 @@ class NetworkPolicyTest {
         assertTrue(isOfflineError(IOException(OFFLINE_MESSAGE)))
     }
 
+    @Test
+    fun `the tailnet range is Tailscale's own address`() {
+        // Captured from the Pixel with Tailscale connected: tun0, 100.73.96.93/32.
+        assertTrue(isTailnetAddress(bytes(100, 73, 96, 93)))
+        // The ends of 100.64.0.0/10.
+        assertTrue(isTailnetAddress(bytes(100, 64, 0, 0)))
+        assertTrue(isTailnetAddress(bytes(100, 127, 255, 255)))
+        assertFalse(isTailnetAddress(bytes(100, 63, 255, 255)))
+        assertFalse(isTailnetAddress(bytes(100, 128, 0, 0)))
+    }
+
+    @Test
+    fun `the VPNs that are not Tailscale do not match`() {
+        // Mullvad on the same Pixel, same tun0 slot: 10.159.206.81/32. Both are
+        // tunnels on a device this check cannot tell apart by name, so the range
+        // is what separates them.
+        assertFalse(isTailnetAddress(bytes(10, 159, 206, 81)))
+        // A 100.x first octet alone is not the range - 100.5.x.x is public.
+        assertFalse(isTailnetAddress(bytes(100, 5, 1, 1)))
+        assertFalse(isTailnetAddress(ByteArray(16)))
+    }
+
+    @Test
+    fun `carrier CGNAT is in range, which is why the caller checks the device`() {
+        // Carriers hand out 100.64/10 on the mobile interface, so this predicate
+        // cannot be the whole test - a bare LTE connection would read as a
+        // tunnel. NetworkPolicy only consults it for addresses on a tun device.
+        assertTrue(isTailnetAddress(bytes(100, 96, 4, 7)))
+    }
+
     private fun blocked(
         onCellular: Boolean = false,
         allowCellular: Boolean = false,
         onHomeSubnet: Boolean = true,
-        allowRemote: Boolean = false,
-    ) = networkBlocked(NetworkFacts(onCellular, allowCellular, onHomeSubnet, allowRemote))
+        onTailnet: Boolean = false,
+    ) = networkBlocked(NetworkFacts(onCellular, allowCellular, onHomeSubnet, onTailnet))
 
     private fun bytes(vararg values: Int) = ByteArray(values.size) { values[it].toByte() }
 }
