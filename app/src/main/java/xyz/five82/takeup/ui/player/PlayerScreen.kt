@@ -4,6 +4,7 @@ import android.content.pm.ActivityInfo
 import android.view.WindowManager
 import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -64,13 +65,13 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.core.view.isVisible
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
@@ -142,8 +143,8 @@ fun PlayerScreen(repository: LoomRepository, nav: NavState, itemId: Long) {
     }
 }
 
-// PlayerView.subtitleView is flagged unstable, but it is the only way to move
-// rendered cues clear of the control console.
+// PlayerView.subtitleView is flagged unstable, but it is the only way to stop
+// Media3 drawing cues that SubtitleOverlay draws instead.
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
 private fun PlayerContent(repository: LoomRepository, nav: NavState, model: PlayerViewModel) {
@@ -213,14 +214,13 @@ private fun PlayerContent(repository: LoomRepository, nav: NavState, model: Play
                 detectTapGestures { controlsVisible = !controlsVisible }
             },
     ) {
-        // Lift rendered subtitle cues clear of the console while it is up; the
-        // value tracks the console's approximate height.
-        val subtitleLiftPx = with(LocalDensity.current) { 168.dp.roundToPx() }
         AndroidView(
             factory = { context ->
                 PlayerView(context).apply {
                     useController = false
                     this.player = player
+                    // Cues are drawn by SubtitleOverlay instead; see there.
+                    subtitleView?.isVisible = false
                 }
             },
             update = { view ->
@@ -230,14 +230,19 @@ private fun PlayerContent(repository: LoomRepository, nav: NavState, model: Play
                 } else {
                     AspectRatioFrameLayout.RESIZE_MODE_FIT
                 }
-                view.subtitleView?.setPadding(
-                    0, 0, 0,
-                    if (controlsVisible && !model.ended) subtitleLiftPx else 0,
-                )
             },
             onRelease = { view -> view.player = null },
             modifier = Modifier.fillMaxSize(),
         )
+
+        // Lift cues clear of the console while it is up; the value tracks the
+        // console's approximate height, and the animation matches its own.
+        val subtitleLift by animateDpAsState(
+            if (controlsVisible && !model.ended) 168.dp else 0.dp,
+            tween(200),
+            label = "subtitleLift",
+        )
+        SubtitleOverlay(player, subtitleLift, Modifier.fillMaxSize())
 
         if (buffering && !model.ended) {
             CircularProgressIndicator(
