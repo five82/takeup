@@ -12,13 +12,34 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Animation
+import androidx.compose.material.icons.rounded.AutoFixHigh
+import androidx.compose.material.icons.rounded.Bolt
+import androidx.compose.material.icons.rounded.Cabin
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.FamilyRestroom
+import androidx.compose.material.icons.rounded.Fingerprint
+import androidx.compose.material.icons.rounded.HistoryEdu
+import androidx.compose.material.icons.rounded.MilitaryTech
+import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.NightsStay
+import androidx.compose.material.icons.rounded.RocketLaunch
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Terrain
+import androidx.compose.material.icons.rounded.TheaterComedy
+import androidx.compose.material.icons.rounded.Theaters
+import androidx.compose.material.icons.rounded.Tv
+import androidx.compose.material.icons.rounded.Videocam
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -33,6 +54,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -70,7 +92,8 @@ import xyz.five82.takeup.ui.theme.Line
 import xyz.five82.takeup.ui.theme.Muted
 import xyz.five82.takeup.ui.theme.Stage
 import xyz.five82.takeup.ui.theme.Violet
-import xyz.five82.takeup.ui.theme.genreHue
+import xyz.five82.takeup.ui.theme.genreDarken
+import xyz.five82.takeup.ui.theme.genreField
 import xyz.five82.takeup.ui.theme.rememberWovenThreads
 
 data class BrowseState(
@@ -361,7 +384,7 @@ private fun CollectionCard(collection: Collection, imageUrl: String?, onClick: (
     }
 }
 
-/** Every genre as a flat color tile, no artwork - the thread's hue carries it. */
+/** Every genre as a flat color tile in its curated hue, with a quiet icon watermark. */
 @Composable
 private fun GenresRoom(genres: List<Genre>, nav: NavState) {
     if (genres.isEmpty()) {
@@ -380,31 +403,61 @@ private fun GenresRoom(genres: List<Genre>, nav: NavState) {
         verticalArrangement = Arrangement.spacedBy(10.dp),
         modifier = Modifier.fillMaxSize(),
     ) {
-        itemsIndexed(genres, key = { _, genre -> genre.id }) { position, genre ->
-            GenreTile(
-                genre,
-                position,
-                onClick = { nav.push(Screen.GenreGrid(genre.id, genre.name, position)) },
-            )
+        items(genres, key = { it.id }) { genre ->
+            GenreTile(genre, onClick = { nav.push(Screen.GenreGrid(genre.id, genre.name)) })
         }
     }
 }
 
+// Only Browse draws genre tiles, so the id -> icon map lives here rather than
+// in the theme package; Color.kt stays the single source of truth for hue.
+// Ids not in this map (there should not be any, TMDB's movie genre set is
+// fixed) simply get no watermark.
+private val genreIcons: Map<Long, ImageVector> = mapOf(
+    28L to Icons.Rounded.Bolt, // Action
+    12L to Icons.Rounded.Terrain, // Adventure
+    16L to Icons.Rounded.Animation, // Animation
+    35L to Icons.Rounded.TheaterComedy, // Comedy
+    80L to Icons.Rounded.Fingerprint, // Crime
+    99L to Icons.Rounded.Videocam, // Documentary
+    18L to Icons.Rounded.Theaters, // Drama
+    10751L to Icons.Rounded.FamilyRestroom, // Family
+    14L to Icons.Rounded.AutoFixHigh, // Fantasy
+    36L to Icons.Rounded.HistoryEdu, // History
+    27L to Icons.Rounded.NightsStay, // Horror
+    10402L to Icons.Rounded.MusicNote, // Music
+    9648L to Icons.Rounded.Search, // Mystery
+    10749L to Icons.Rounded.Favorite, // Romance
+    878L to Icons.Rounded.RocketLaunch, // SciFi
+    53L to Icons.Rounded.Visibility, // Thriller
+    10770L to Icons.Rounded.Tv, // TVMovie
+    10752L to Icons.Rounded.MilitaryTech, // War
+    37L to Icons.Rounded.Cabin, // Western
+)
+
 @Composable
-private fun GenreTile(genre: Genre, position: Int, onClick: () -> Unit) {
-    val hue = genreHue(position)
+private fun GenreTile(genre: Genre, onClick: () -> Unit) {
+    val fieldStart = genreField(genre.id)
+    val fieldEnd = genreDarken(genre.id, valueScale = 0.55f)
     Box(
         Modifier
             .fillMaxWidth()
             .aspectRatio(2.05f / 1f)
             .clip(RoundedCornerShape(10.dp))
-            .background(
-                Brush.linearGradient(
-                    listOf(Color.hsv(hue, 0.55f, 0.32f), Color.hsv(hue, 0.65f, 0.15f)),
-                ),
-            )
+            .background(Brush.linearGradient(listOf(fieldStart, fieldEnd)))
             .clickable(onClick = onClick),
     ) {
+        genreIcons[genre.id]?.let { icon ->
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = Ink.copy(alpha = 0.30f),
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp)
+                    .size(56.dp),
+            )
+        }
         Row(
             Modifier
                 .align(Alignment.BottomStart)

@@ -56,7 +56,7 @@ import xyz.five82.takeup.ui.theme.rememberWovenThreads
 /** All movies in one genre, pushed from a Browse chip. */
 @Composable
 fun GenreGridScreen(repository: LoomRepository, nav: NavState, screen: Screen.GenreGrid) {
-    ItemGridScreen(repository, nav, screen.title, genreThread(screen.thread)) {
+    ItemGridScreen(repository, nav, screen.title, genreThread(screen.genreId)) {
         it.allItems("movies", screen.genreId)
     }
 }
