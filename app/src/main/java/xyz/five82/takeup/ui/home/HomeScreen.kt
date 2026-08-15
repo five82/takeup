@@ -56,6 +56,7 @@ import kotlinx.coroutines.launch
 import xyz.five82.takeup.api.Item
 import xyz.five82.takeup.data.DownloadState
 import xyz.five82.takeup.data.LoomRepository
+import xyz.five82.takeup.data.Reach
 import xyz.five82.takeup.data.downloadedRowItems
 import xyz.five82.takeup.data.isOfflineError
 import xyz.five82.takeup.ui.NavState
@@ -65,6 +66,7 @@ import xyz.five82.takeup.ui.components.CardAction
 import xyz.five82.takeup.ui.components.logoLaneHeight
 import xyz.five82.takeup.ui.components.ErrorState
 import xyz.five82.takeup.ui.components.LoadingState
+import xyz.five82.takeup.ui.components.OfflineNotice
 import xyz.five82.takeup.ui.components.PosterCard
 import xyz.five82.takeup.ui.components.ThreadProgress
 import xyz.five82.takeup.ui.components.navPillClearance
@@ -106,8 +108,19 @@ class HomeViewModel(private val repository: LoomRepository) : ViewModel() {
     // pick. The next scheduled slot is the only time this cache is replaced.
     private var cachedPickSlot: Long? = null
 
-    fun refresh() {
+    /**
+     * [force] is what the Try again button presses: the user is asking for the
+     * attempt itself, so a stale offline verdict must not answer for the server.
+     */
+    fun refresh(force: Boolean = false) {
         viewModelScope.launch {
+            // Ask the policy before the network. Seven parallel calls that can
+            // only time out is what made the app feel like a streaming service
+            // that had simply gone down.
+            if (!force && repository.network.reach.value == Reach.Offline) {
+                state = HomeState(loading = false, offline = true)
+                return@launch
+            }
             if (state.dailyPick == null && state.continueWatching.isEmpty() && state.recentlyAdded.isEmpty()) {
                 state = state.copy(loading = true)
             }
@@ -156,13 +169,12 @@ class HomeViewModel(private val repository: LoomRepository) : ViewModel() {
                 // The server answered, so anything queued while offline can land.
                 repository.flushPendingProgress()
             } catch (e: Exception) {
-                val hasDownloads = repository.downloads.downloads.value
-                    .any { it.state == DownloadState.Completed }
-                if (isOfflineError(e) && hasDownloads) {
+                if (isOfflineError(e)) {
                     // Drop the cached library rather than keep it: every stale
                     // poster opens a screen that cannot play. Only a connection
                     // failure counts - a Loom bug must not masquerade as being
-                    // offline - and only with something downloaded to show.
+                    // offline.
+                    repository.network.markUnreachable()
                     state = HomeState(loading = false, offline = true)
                 } else {
                     state = state.copy(
@@ -196,10 +208,13 @@ class HomeViewModel(private val repository: LoomRepository) : ViewModel() {
 @Composable
 fun HomeScreen(repository: LoomRepository, nav: NavState, active: Boolean) {
     val model = takeupHomeViewModel(repository)
+    val reach by repository.network.reach.collectAsStateWithLifecycle()
 
     // Refresh whenever home surfaces, then at 6 am and 6 pm for the next pick.
     // A finished episode also leaves Continue Watching without a manual reload.
-    LaunchedEffect(active) {
+    // Keying on reach means walking back onto the home network reconnects on
+    // its own, rather than leaving the offline screen up until something asks.
+    LaunchedEffect(active, reach) {
         if (active) {
             while (true) {
                 model.refresh()
@@ -217,7 +232,14 @@ fun HomeScreen(repository: LoomRepository, nav: NavState, active: Boolean) {
     val state = model.state
     when {
         state.loading -> LoadingState()
-        state.offline -> OfflineHome(repository, nav, onRetry = { model.refresh() })
+        state.offline -> OfflineHome(
+            repository,
+            nav,
+            onRetry = {
+                repository.network.recheck()
+                model.refresh(force = true)
+            },
+        )
         state.error != null -> ErrorState(
             state.error,
             onRetry = { model.refresh() },
@@ -235,41 +257,39 @@ fun HomeScreen(repository: LoomRepository, nav: NavState, active: Boolean) {
 @Composable
 private fun OfflineHome(repository: LoomRepository, nav: NavState, onRetry: () -> Unit) {
     val downloads by repository.downloads.downloads.collectAsStateWithLifecycle()
-    val blockedByCellular by repository.cellular.blocked.collectAsStateWithLifecycle()
+    val reason by repository.network.reason.collectAsStateWithLifecycle()
     val ready = downloadedRowItems(downloads.filter { it.state == DownloadState.Completed })
     LazyColumn(
         Modifier.fillMaxSize().houseLights(Ember),
         contentPadding = PaddingValues(bottom = navPillClearance()),
     ) {
         item(key = "offline-head") {
-            Column(
-                Modifier
-                    .statusBarsPadding()
-                    .padding(start = 20.dp, end = 20.dp, top = 16.dp),
-            ) {
-                Text("Offline", style = MaterialTheme.typography.displaySmall, color = Ink)
-                Text(
-                    if (blockedByCellular) {
-                        "Cellular data access is disabled in Takeup. These titles are " +
-                            "downloaded on this device."
+            // The same two controls the hero carries when there is a hero, so
+            // settings and searching what is downloaded stay reachable offline.
+            Box(Modifier.fillMaxWidth()) {
+                OfflineNotice(
+                    reason = reason + if (ready.isEmpty()) {
+                        " Nothing is downloaded to this device yet."
                     } else {
-                        "Loom isn't answering. These titles are downloaded on this device."
+                        " These titles are downloaded on this device."
                     },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Muted,
-                    modifier = Modifier.padding(top = 8.dp),
+                    onRetry = onRetry,
+                    modifier = Modifier
+                        .statusBarsPadding()
+                        .padding(start = 20.dp, end = 20.dp, top = 44.dp),
                 )
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.padding(top = 12.dp),
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .statusBarsPadding()
+                        .padding(top = 4.dp, end = 8.dp),
                 ) {
-                    OutlinedButton(onClick = onRetry) { Text("Retry") }
-                    OutlinedButton(onClick = { nav.push(Screen.Settings) }) {
-                        Text(if (blockedByCellular) "Settings" else "Server settings")
-                    }
+                    RoundIconButton(Icons.Filled.Search, "Search") { nav.push(Screen.Search()) }
+                    RoundIconButton(Icons.Filled.Settings, "Settings") { nav.push(Screen.Settings) }
                 }
             }
         }
+        if (ready.isEmpty()) return@LazyColumn
         item(key = "offline-downloads") {
             HomeRow("Downloaded") {
                 items(ready, key = { "dl-${it.item.id}" }) { entry ->

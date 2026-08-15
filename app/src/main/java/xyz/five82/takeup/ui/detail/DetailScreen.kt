@@ -85,10 +85,12 @@ import xyz.five82.takeup.data.DownloadEntry
 import xyz.five82.takeup.data.DownloadResult
 import xyz.five82.takeup.data.DownloadState
 import xyz.five82.takeup.data.LoomRepository
+import xyz.five82.takeup.data.Reach
 import xyz.five82.takeup.data.downloadAction
 import xyz.five82.takeup.data.downloadProgressFraction
 import xyz.five82.takeup.data.downloadStatusLabel
 import xyz.five82.takeup.data.formatBytes
+import xyz.five82.takeup.data.isOfflineError
 import xyz.five82.takeup.data.isStaleDownload
 import xyz.five82.takeup.ui.DownloadIcon
 import xyz.five82.takeup.ui.NavState
@@ -99,6 +101,7 @@ import xyz.five82.takeup.ui.components.ErrorState
 import xyz.five82.takeup.ui.components.GauzeBackground
 import xyz.five82.takeup.ui.components.logoLaneHeight
 import xyz.five82.takeup.ui.components.LoadingState
+import xyz.five82.takeup.ui.components.OfflineNotice
 import xyz.five82.takeup.ui.components.RowLabel
 import xyz.five82.takeup.ui.components.ThreadProgress
 import xyz.five82.takeup.ui.episodeLabel
@@ -121,6 +124,7 @@ import xyz.five82.takeup.ui.thumbUrl
 data class DetailState(
     val loading: Boolean = true,
     val error: String? = null,
+    val offline: Boolean = false,
     val item: Item? = null,
     val seasons: List<Item> = emptyList(),
     val episodesBySeason: Map<Long, List<Item>> = emptyMap(),
@@ -134,8 +138,12 @@ class DetailViewModel(
     var state by mutableStateOf(DetailState())
         private set
 
-    fun refresh() {
+    fun refresh(force: Boolean = false) {
         viewModelScope.launch {
+            if (!force && repository.network.reach.value == Reach.Offline) {
+                state = offlineState()
+                return@launch
+            }
             try {
                 val item = repository.api.item(itemId)
                 if (item.kind == "show") {
@@ -164,13 +172,28 @@ class DetailViewModel(
                     state = DetailState(loading = false, item = item)
                 }
             } catch (e: Exception) {
-                state = state.copy(
-                    loading = false,
-                    error = if (state.item == null) e.message ?: "Loom isn't answering" else null,
-                )
+                if (isOfflineError(e)) {
+                    repository.network.markUnreachable()
+                    state = offlineState()
+                } else {
+                    state = state.copy(
+                        loading = false,
+                        error = if (state.item == null) e.message ?: "Loom isn't answering" else null,
+                    )
+                }
             }
         }
     }
+
+    /**
+     * The download's stored snapshot is the whole item offline: seasons and
+     * episodes are a server hierarchy, and only this file is on the device.
+     */
+    private fun offlineState() = DetailState(
+        loading = false,
+        offline = true,
+        item = repository.downloads.entry(itemId)?.item,
+    )
 
     fun selectSeason(seasonId: Long) {
         state = state.copy(selectedSeason = seasonId)
@@ -220,9 +243,11 @@ class DetailViewModel(
 @Composable
 fun DetailScreen(repository: LoomRepository, nav: NavState, itemId: Long, topmost: Boolean) {
     val model = takeupViewModel("detail-$itemId") { DetailViewModel(repository, itemId) }
+    val reach by repository.network.reach.collectAsStateWithLifecycle()
+    val reason by repository.network.reason.collectAsStateWithLifecycle()
     // Refresh whenever this screen surfaces, including the trip back from the
     // player or the artwork picker.
-    LaunchedEffect(topmost) {
+    LaunchedEffect(topmost, reach) {
         if (topmost) model.refresh()
     }
 
@@ -230,12 +255,23 @@ fun DetailScreen(repository: LoomRepository, nav: NavState, itemId: Long, topmos
     val item = state.item
     when {
         item == null && state.loading -> LoadingState()
+        // Nothing downloaded and no Loom: there is no version of this item to
+        // show, so say why rather than blaming the server for a policy.
+        item == null && state.offline -> OfflineNotice(
+            reason = reason + " This title is not downloaded to this device.",
+            onRetry = {
+                repository.network.recheck()
+                model.refresh(force = true)
+            },
+            modifier = Modifier.statusBarsPadding().padding(horizontal = 20.dp),
+        )
         item == null -> ErrorState(state.error ?: "Loom isn't answering", onRetry = { model.refresh() })
         else -> {
             // Seed from the backdrop this screen hangs behind everything, not
             // the poster: the two often disagree (a warm poster over a cool
             // still) and the buttons sit on the backdrop's weather.
-            val artUrl = repository.api.backdropUrl(item, 240) ?: repository.api.posterUrl(item, 240)
+            val artUrl = offlineBackdrop(repository, item, state.offline, width = 240)
+                ?: repository.api.posterUrl(item, 240).takeIf { !state.offline }
             val threads = rememberWovenThreads(artUrl)
             // Hold the spinner a beat longer while the art's colors resolve,
             // so the first content frame lands already dressed instead of
@@ -254,7 +290,7 @@ fun DetailScreen(repository: LoomRepository, nav: NavState, itemId: Long, topmos
                 Box(Modifier.fillMaxSize()) {
                     // Gauze: the backdrop's color weather behind the whole
                     // screen, with the dyed stage catching what it misses.
-                    GauzeBackground(repository.api.backdropUrl(item, 240), seed)
+                    GauzeBackground(offlineBackdrop(repository, item, state.offline, width = 240), seed)
                     when (item.kind) {
                         "show" -> ShowDetail(repository, nav, model, item, state)
                         "episode" -> EpisodeDetail(repository, nav, model, item)
@@ -557,11 +593,17 @@ private fun DetailHead(
     item: Item,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
+    val reach by repository.network.reach.collectAsStateWithLifecycle()
+    val offline = reach == Reach.Offline
     // No fixed height: the backdrop sizes itself to 4:3 art plus the logo
     // band, so a tall logo grows the head instead of squeezing the photo.
     Box(Modifier.fillMaxWidth()) {
-        val backdrop = repository.api.backdropUrl(item, 960)
-        val logo = repository.api.logoUrl(item)
+        val backdrop = offlineBackdrop(repository, item, offline, width = 960)
+        val logo = if (offline) {
+            repository.downloads.entry(item.id)?.logoPath
+        } else {
+            repository.api.logoUrl(item)
+        }
         // Cut tailored to the logo: the lane is area-normalized once the art
         // decodes, and the line rides just above it. Animated so the first
         // load settles instead of popping.
@@ -593,8 +635,11 @@ private fun DetailHead(
                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                     val watched = item.progress?.played == true ||
                         (item.kind == "show" && item.episodeCount > 0 && item.unwatchedCount == 0)
+                    // Both of these are writes to Loom. Offline they would fail
+                    // silently, so the menu offers nothing it cannot do.
                     DropdownMenuItem(
                         text = { Text("Artwork") },
+                        enabled = !offline,
                         onClick = {
                             menuOpen = false
                             nav.push(Screen.Artwork(item.id, item.title))
@@ -602,6 +647,7 @@ private fun DetailHead(
                     )
                     DropdownMenuItem(
                         text = { Text(if (watched) "Mark unwatched" else "Mark watched") },
+                        enabled = !offline,
                         onClick = {
                             menuOpen = false
                             model.setWatched(item, !watched)
@@ -645,6 +691,22 @@ private fun DetailHead(
             }
         }
     }
+}
+
+/**
+ * Backdrop for this screen. Offline the download's own copy is the only one
+ * that resolves, so it stands in for the Loom URL rather than leaving the
+ * screen to fall back on a flat tint.
+ */
+private fun offlineBackdrop(
+    repository: LoomRepository,
+    item: Item,
+    offline: Boolean,
+    width: Int,
+): String? = if (offline) {
+    repository.downloads.entry(item.id)?.let { it.backdropPath ?: it.posterPath }
+} else {
+    repository.api.backdropUrl(item, width)
 }
 
 @Composable

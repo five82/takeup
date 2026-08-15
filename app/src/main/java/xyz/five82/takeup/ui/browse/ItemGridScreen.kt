@@ -28,17 +28,21 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
 import xyz.five82.takeup.api.Item
 import xyz.five82.takeup.api.LoomApi
 import xyz.five82.takeup.data.LoomRepository
+import xyz.five82.takeup.data.Reach
+import xyz.five82.takeup.data.isOfflineError
 import xyz.five82.takeup.ui.NavState
 import xyz.five82.takeup.ui.Screen
 import xyz.five82.takeup.ui.components.CardAction
 import xyz.five82.takeup.ui.components.EmptyState
 import xyz.five82.takeup.ui.components.ErrorState
 import xyz.five82.takeup.ui.components.LoadingState
+import xyz.five82.takeup.ui.components.OfflineNotice
 import xyz.five82.takeup.ui.components.PosterCard
 import xyz.five82.takeup.ui.components.shadowWeave
 import xyz.five82.takeup.ui.posterUrl
@@ -68,6 +72,7 @@ fun CollectionGridScreen(repository: LoomRepository, nav: NavState, screen: Scre
 data class ItemGridState(
     val loading: Boolean = true,
     val error: String? = null,
+    val offline: Boolean = false,
     val items: List<Item> = emptyList(),
 )
 
@@ -78,16 +83,30 @@ class ItemGridViewModel(
     var state by mutableStateOf(ItemGridState())
         private set
 
-    fun refresh(silent: Boolean = false) {
+    fun refresh(silent: Boolean = false, force: Boolean = false) {
         viewModelScope.launch {
+            if (!force && repository.network.reach.value == Reach.Offline) {
+                state = ItemGridState(loading = false, offline = true)
+                return@launch
+            }
             if (!silent && state.items.isEmpty()) state = state.copy(loading = true)
             try {
-                state = state.copy(loading = false, error = null, items = load(repository.api))
-            } catch (e: Exception) {
                 state = state.copy(
                     loading = false,
-                    error = if (state.items.isEmpty()) e.message ?: "Loom isn't answering" else null,
+                    error = null,
+                    offline = false,
+                    items = load(repository.api),
                 )
+            } catch (e: Exception) {
+                if (isOfflineError(e)) {
+                    repository.network.markUnreachable()
+                    state = ItemGridState(loading = false, offline = true)
+                } else {
+                    state = state.copy(
+                        loading = false,
+                        error = if (state.items.isEmpty()) e.message ?: "Loom isn't answering" else null,
+                    )
+                }
             }
         }
     }
@@ -111,7 +130,9 @@ private fun ItemGridScreen(
     load: suspend (LoomApi) -> List<Item>,
 ) {
     val model = takeupViewModel("grid-$title") { ItemGridViewModel(repository, load) }
-    LaunchedEffect(Unit) { model.refresh() }
+    val reach by repository.network.reach.collectAsStateWithLifecycle()
+    val reason by repository.network.reason.collectAsStateWithLifecycle()
+    LaunchedEffect(reach) { model.refresh(silent = model.state.items.isNotEmpty()) }
 
     val state = model.state
     // Shadow weave: the grid's lead poster casts its colors into the top of
@@ -133,6 +154,16 @@ private fun ItemGridScreen(
         }
         when {
             state.loading -> LoadingState()
+            // A genre or collection is a server slice with nothing behind it on
+            // this device, so there is no downloads view to fall back to.
+            state.offline -> OfflineNotice(
+                reason = reason + " This is a view of Loom's library.",
+                onRetry = {
+                    repository.network.recheck()
+                    model.refresh(force = true)
+                },
+                modifier = Modifier.padding(horizontal = 20.dp),
+            )
             state.error != null -> ErrorState(state.error, onRetry = { model.refresh() })
             state.items.isEmpty() -> EmptyState("Nothing here.")
             else -> LazyVerticalGrid(

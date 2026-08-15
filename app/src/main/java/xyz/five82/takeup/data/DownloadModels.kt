@@ -91,6 +91,23 @@ fun downloadedRowItems(entries: List<DownloadEntry>): List<DownloadEntry> =
         ),
     )
 
+/**
+ * Offline search. Loom matches on word starts across titles and credited people;
+ * with no server there is only what each snapshot carries, so this is a plain
+ * substring match over the title and the show it belongs to.
+ */
+fun matchDownloads(entries: List<DownloadEntry>, query: String): List<DownloadEntry> {
+    val trimmed = query.trim()
+    if (trimmed.isEmpty()) return emptyList()
+    return entries
+        .filter { it.state == DownloadState.Completed }
+        .filter {
+            it.item.title.contains(trimmed, ignoreCase = true) ||
+                it.item.seriesTitle?.contains(trimmed, ignoreCase = true) == true
+        }
+        .sortedBy { it.item.title }
+}
+
 /** What the download control on a details screen should currently offer. */
 enum class DownloadAction { Start, Cancel, Remove, Retry, Update }
 

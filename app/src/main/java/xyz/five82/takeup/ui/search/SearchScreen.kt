@@ -51,7 +51,11 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import xyz.five82.takeup.api.Item
+import xyz.five82.takeup.data.DownloadEntry
 import xyz.five82.takeup.data.LoomRepository
+import xyz.five82.takeup.data.Reach
+import xyz.five82.takeup.data.isOfflineError
+import xyz.five82.takeup.data.matchDownloads
 import xyz.five82.takeup.ui.NavState
 import xyz.five82.takeup.ui.Screen
 import xyz.five82.takeup.ui.components.EmptyState
@@ -70,6 +74,12 @@ class SearchViewModel(private val repository: LoomRepository, initialQuery: Stri
     val query = MutableStateFlow(initialQuery)
     var results by mutableStateOf<List<Item>>(emptyList())
         private set
+
+    /** Offline hits carry their entry: the poster and the file are both local. */
+    var offlineResults by mutableStateOf<List<DownloadEntry>>(emptyList())
+        private set
+    var offline by mutableStateOf(false)
+        private set
     var searched by mutableStateOf(false)
         private set
     var closestMatches by mutableStateOf(false)
@@ -82,18 +92,38 @@ class SearchViewModel(private val repository: LoomRepository, initialQuery: Stri
                 val trimmed = text.trim()
                 if (trimmed.isEmpty()) {
                     results = emptyList()
+                    offlineResults = emptyList()
                     searched = false
                     closestMatches = false
+                    offline = repository.network.reach.value == Reach.Offline
+                } else if (repository.network.reach.value == Reach.Offline) {
+                    searchDownloads(trimmed)
                 } else {
                     runCatching { repository.api.search(trimmed) }
                         .onSuccess { response ->
+                            offline = false
                             results = response.items
+                            offlineResults = emptyList()
                             searched = true
                             closestMatches = response.fuzzy && response.items.isNotEmpty()
+                        }
+                        .onFailure { error ->
+                            if (isOfflineError(error)) {
+                                repository.network.markUnreachable()
+                                searchDownloads(trimmed)
+                            }
                         }
                 }
             }
         }
+    }
+
+    private fun searchDownloads(query: String) {
+        offline = true
+        results = emptyList()
+        offlineResults = matchDownloads(repository.downloads.downloads.value, query)
+        searched = true
+        closestMatches = false
     }
 }
 
@@ -144,8 +174,22 @@ fun SearchScreen(repository: LoomRepository, nav: NavState, initialQuery: String
             )
         }
 
-        if (model.searched && model.results.isEmpty()) {
-            EmptyState("Nothing in the library matches \"${query.trim()}\".")
+        if (model.offline) {
+            Text(
+                "Offline · searching what is downloaded on this device",
+                style = MaterialTheme.typography.labelLarge,
+                color = Muted,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+            )
+        }
+        if (model.searched && model.results.isEmpty() && model.offlineResults.isEmpty()) {
+            EmptyState(
+                if (model.offline) {
+                    "Nothing downloaded matches \"${query.trim()}\"."
+                } else {
+                    "Nothing in the library matches \"${query.trim()}\"."
+                },
+            )
         }
         LazyColumn(contentPadding = PaddingValues(vertical = 8.dp)) {
             if (model.closestMatches) {
@@ -159,8 +203,15 @@ fun SearchScreen(repository: LoomRepository, nav: NavState, initialQuery: String
                 }
             }
             items(model.results, key = { it.id }) { item ->
-                SearchResultRow(repository, item) {
+                SearchResultRow(item, repository.api.posterUrl(item, 240)) {
                     nav.push(Screen.Detail(item.id))
+                }
+            }
+            // Straight to the player: offline there is no details screen to
+            // open, and the poster is a file on disk rather than a Loom URL.
+            items(model.offlineResults, key = { "dl-${it.item.id}" }) { entry ->
+                SearchResultRow(entry.item, entry.posterPath) {
+                    nav.push(Screen.Player(entry.item.id))
                 }
             }
         }
@@ -168,7 +219,7 @@ fun SearchScreen(repository: LoomRepository, nav: NavState, initialQuery: String
 }
 
 @Composable
-private fun SearchResultRow(repository: LoomRepository, item: Item, onClick: () -> Unit) {
+private fun SearchResultRow(item: Item, poster: String?, onClick: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -183,7 +234,6 @@ private fun SearchResultRow(repository: LoomRepository, item: Item, onClick: () 
                 .clip(RoundedCornerShape(6.dp))
                 .background(Surface1),
         ) {
-            val poster = repository.api.posterUrl(item, 240)
             if (poster != null) {
                 AsyncImage(
                     model = poster,

@@ -21,15 +21,19 @@ import xyz.five82.takeup.api.loomGson
 
 private val Context.dataStore by preferencesDataStore(name = "takeup")
 
-/** Persisted client settings: the server address and the cellular gate. */
+/** Persisted client settings: the server address and the two network gates. */
 class Settings(private val context: Context) {
     private val serverKey = stringPreferencesKey("server_address")
     private val allowCellularKey = booleanPreferencesKey("allow_cellular")
+    private val allowRemoteKey = booleanPreferencesKey("allow_remote")
 
     val serverAddress = context.dataStore.data.map { it[serverKey] }
 
     /** Off until asked for; a phone plan should not pay for a home library. */
     val allowCellular = context.dataStore.data.map { it[allowCellularKey] ?: false }
+
+    /** Off until asked for; away from home, only the tunnel could answer. */
+    val allowRemote = context.dataStore.data.map { it[allowRemoteKey] ?: false }
 
     suspend fun setServerAddress(value: String) {
         context.dataStore.edit { it[serverKey] = value }
@@ -37,6 +41,10 @@ class Settings(private val context: Context) {
 
     suspend fun setAllowCellular(value: Boolean) {
         context.dataStore.edit { it[allowCellularKey] = value }
+    }
+
+    suspend fun setAllowRemote(value: Boolean) {
+        context.dataStore.edit { it[allowRemoteKey] = value }
     }
 }
 
@@ -54,13 +62,13 @@ class LoomRepository(
     scope: CoroutineScope,
     val downloads: DownloadStore,
     val offlineProgress: OfflineProgressStore,
-    val cellular: CellularPolicy,
+    val network: NetworkPolicy,
 ) {
     init {
         // Media3 wants its manager driven from the main thread, the way the
         // download service drives it.
         scope.launch(Dispatchers.Main) {
-            cellular.blocked.collect { downloads.setTransfersPaused(it) }
+            network.blocked.collect { downloads.setTransfersPaused(it) }
         }
     }
 
@@ -75,7 +83,7 @@ class LoomRepository(
 
     /** Picks up downloads interrupted by a process death, if the gate is open. */
     fun resumeDownloads() {
-        if (!cellular.blocked.value) downloads.resumeQueued()
+        if (!network.blocked.value) downloads.resumeQueued()
     }
 
     @Volatile

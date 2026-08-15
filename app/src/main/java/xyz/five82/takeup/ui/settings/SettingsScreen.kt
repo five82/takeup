@@ -48,6 +48,7 @@ import xyz.five82.takeup.api.ScanStatus
 import xyz.five82.takeup.data.DownloadEntry
 import xyz.five82.takeup.data.DownloadState
 import xyz.five82.takeup.data.LoomRepository
+import xyz.five82.takeup.data.Reach
 import xyz.five82.takeup.data.downloadStatusLabel
 import xyz.five82.takeup.data.downloadedRowItems
 import xyz.five82.takeup.data.formatBytes
@@ -100,7 +101,11 @@ class SettingsViewModel(private val repository: LoomRepository) : ViewModel() {
     }
 
     fun setAllowCellular(value: Boolean) {
-        viewModelScope.launch { repository.cellular.setAllowed(value) }
+        viewModelScope.launch { repository.network.setAllowCellular(value) }
+    }
+
+    fun setAllowRemote(value: Boolean) {
+        viewModelScope.launch { repository.network.setAllowRemote(value) }
     }
 
     fun triggerScan() {
@@ -131,8 +136,11 @@ fun SettingsScreen(repository: LoomRepository, nav: NavState) {
     var confirmRemoveAll by remember { mutableStateOf(false) }
 
     // Poll scan status while the screen is open; it is the only live thing here.
-    LaunchedEffect(Unit) {
-        while (true) {
+    // Offline there is nothing to poll, and polling anyway is what made the app
+    // feel like it expected a server to always be there.
+    val online by repository.network.reach.collectAsStateWithLifecycle()
+    LaunchedEffect(online) {
+        while (online != Reach.Offline) {
             model.refreshScan()
             delay(3000)
         }
@@ -176,27 +184,50 @@ fun SettingsScreen(repository: LoomRepository, nav: NavState) {
             }
 
             RowLabel("Network", color = Ember, modifier = Modifier.padding(top = 24.dp))
-            val allowCellular by repository.cellular.allowed.collectAsStateWithLifecycle()
+            val reach by repository.network.reach.collectAsStateWithLifecycle()
+            val reason by repository.network.reason.collectAsStateWithLifecycle()
+            val allowCellular by repository.network.allowCellular.collectAsStateWithLifecycle()
+            val allowRemote by repository.network.allowRemote.collectAsStateWithLifecycle()
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.weight(1f).padding(end = 12.dp)) {
-                    Text("Allow cellular data", style = MaterialTheme.typography.titleSmall, color = Ink)
-                    Text(
-                        if (allowCellular) {
-                            "Streaming and downloads may use the data plan."
-                        } else {
-                            "Off Wi-Fi, only downloaded titles are available."
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Muted,
-                        modifier = Modifier.padding(top = 1.dp),
-                    )
-                }
-                Switch(checked = allowCellular, onCheckedChange = { model.setAllowCellular(it) })
+                Text(
+                    when (reach) {
+                        Reach.Home -> "Loom is answering on your home network."
+                        Reach.Remote -> "Loom is answering through the tunnel."
+                        Reach.Offline -> reason
+                        Reach.Unknown -> "Checking for Loom..."
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (reach == Reach.Offline) Muted else Ink,
+                    modifier = Modifier.weight(1f).padding(end = 12.dp),
+                )
+                TextButton(onClick = { repository.network.recheck() }) { Text("Check") }
             }
+            SettingSwitch(
+                title = "Allow cellular data",
+                detail = if (allowCellular) {
+                    "Streaming and downloads may use the data plan."
+                } else {
+                    "Off Wi-Fi, only downloaded titles are available."
+                },
+                checked = allowCellular,
+                onCheckedChange = { model.setAllowCellular(it) },
+            )
+            SettingSwitch(
+                title = "Use Loom through Tailscale",
+                detail = if (allowRemote) {
+                    "Away from home, Takeup reaches Loom through the tunnel. " +
+                        "On cellular it also needs the switch above."
+                } else {
+                    "Away from home, only downloaded titles are available."
+                },
+                checked = allowRemote,
+                onCheckedChange = { model.setAllowRemote(it) },
+            )
 
             RowLabel("Library", color = Amber, modifier = Modifier.padding(top = 24.dp))
             val scan = model.scan
             val statusLine = when {
+                online == Reach.Offline -> "Scanning needs Loom."
                 model.scanError != null -> "Scan status unavailable: ${model.scanError}"
                 scan == null -> "Checking scan status..."
                 scan.running -> "Scanning ${scan.library?.takeIf { it.isNotEmpty() } ?: "all libraries"}..."
@@ -207,7 +238,7 @@ fun SettingsScreen(repository: LoomRepository, nav: NavState) {
             Text(statusLine, style = MaterialTheme.typography.bodyMedium, color = Muted)
             OutlinedButton(
                 onClick = { model.triggerScan() },
-                enabled = model.scan?.running != true,
+                enabled = model.scan?.running != true && online != Reach.Offline,
             ) {
                 Text("Scan libraries now")
             }
@@ -252,6 +283,28 @@ fun SettingsScreen(repository: LoomRepository, nav: NavState) {
                 TextButton(onClick = { confirmRemoveAll = false }) { Text("Keep") }
             },
         )
+    }
+}
+
+/** A switch with the sentence that says what it currently means. */
+@Composable
+private fun SettingSwitch(
+    title: String,
+    detail: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.weight(1f).padding(end = 12.dp)) {
+            Text(title, style = MaterialTheme.typography.titleSmall, color = Ink)
+            Text(
+                detail,
+                style = MaterialTheme.typography.bodySmall,
+                color = Muted,
+                modifier = Modifier.padding(top = 1.dp),
+            )
+        }
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 

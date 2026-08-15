@@ -67,7 +67,7 @@ private fun PermissionAwareApp(repository: LoomRepository) {
     }
 
     // A grant made from Android's app settings does not return a launcher result.
-    DisposableEffect(context, lifecycleOwner, permissionRequired) {
+    DisposableEffect(context, lifecycleOwner, permissionRequired, repository) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME && permissionRequired) {
                 permissionGranted = ContextCompat.checkSelfPermission(
@@ -75,6 +75,9 @@ private fun PermissionAwareApp(repository: LoomRepository) {
                     LOCAL_NETWORK_PERMISSION,
                 ) == PackageManager.PERMISSION_GRANTED
             }
+            // The phone can change networks while the app is away, and no
+            // callback fires for a process that was not running to hear it.
+            if (event == Lifecycle.Event.ON_START) repository.network.recheck()
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }

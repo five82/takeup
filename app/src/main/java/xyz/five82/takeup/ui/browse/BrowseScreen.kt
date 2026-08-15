@@ -27,18 +27,25 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import xyz.five82.takeup.api.Collection
 import xyz.five82.takeup.api.Genre
+import xyz.five82.takeup.data.DownloadState
 import xyz.five82.takeup.data.LoomRepository
+import xyz.five82.takeup.data.Reach
+import xyz.five82.takeup.data.downloadedRowItems
+import xyz.five82.takeup.data.isOfflineError
 import xyz.five82.takeup.ui.NavState
 import xyz.five82.takeup.ui.Screen
+import xyz.five82.takeup.ui.components.DownloadedGrid
 import xyz.five82.takeup.ui.components.EmptyState
 import xyz.five82.takeup.ui.components.ErrorState
 import xyz.five82.takeup.ui.components.LoadingState
+import xyz.five82.takeup.ui.components.OfflineNotice
 import xyz.five82.takeup.ui.components.PosterCard
 import xyz.five82.takeup.ui.components.RowLabel
 import xyz.five82.takeup.ui.components.navPillClearance
@@ -54,6 +61,7 @@ import xyz.five82.takeup.ui.theme.rememberWovenThreads
 data class BrowseState(
     val loading: Boolean = true,
     val error: String? = null,
+    val offline: Boolean = false,
     val collections: List<Collection> = emptyList(),
     val genres: List<Genre> = emptyList(),
 )
@@ -62,8 +70,12 @@ class BrowseViewModel(private val repository: LoomRepository) : ViewModel() {
     var state by mutableStateOf(BrowseState())
         private set
 
-    fun refresh(silent: Boolean = false) {
+    fun refresh(silent: Boolean = false, force: Boolean = false) {
         viewModelScope.launch {
+            if (!force && repository.network.reach.value == Reach.Offline) {
+                state = BrowseState(loading = false, offline = true)
+                return@launch
+            }
             val empty = state.collections.isEmpty() && state.genres.isEmpty()
             if (!silent && empty) state = state.copy(loading = true)
             try {
@@ -77,10 +89,15 @@ class BrowseViewModel(private val repository: LoomRepository) : ViewModel() {
                     )
                 }
             } catch (e: Exception) {
-                state = state.copy(
-                    loading = false,
-                    error = if (empty) e.message ?: "Loom isn't answering" else null,
-                )
+                if (isOfflineError(e)) {
+                    repository.network.markUnreachable()
+                    state = BrowseState(loading = false, offline = true)
+                } else {
+                    state = state.copy(
+                        loading = false,
+                        error = if (empty) e.message ?: "Loom isn't answering" else null,
+                    )
+                }
             }
         }
     }
@@ -93,7 +110,8 @@ class BrowseViewModel(private val repository: LoomRepository) : ViewModel() {
 @Composable
 fun BrowseScreen(repository: LoomRepository, nav: NavState, active: Boolean) {
     val model = takeupViewModel("browse") { BrowseViewModel(repository) }
-    LaunchedEffect(active) {
+    val reach by repository.network.reach.collectAsStateWithLifecycle()
+    LaunchedEffect(active, reach) {
         if (active) {
             model.refresh(silent = model.state.collections.isNotEmpty() || model.state.genres.isNotEmpty())
         }
@@ -113,12 +131,38 @@ fun BrowseScreen(repository: LoomRepository, nav: NavState, active: Boolean) {
         )
         when {
             state.loading -> LoadingState()
+            // Collections and genres are server slices of a library this device
+            // does not hold, so offline there is nothing here to slice.
+            state.offline -> OfflineBrowse(repository, nav) {
+                repository.network.recheck()
+                model.refresh(force = true)
+            }
             state.error != null -> ErrorState(state.error, onRetry = { model.refresh() })
             state.collections.isEmpty() && state.genres.isEmpty() ->
                 EmptyState("Nothing to browse yet. Scan the library from Settings.")
             else -> BrowseContent(state, repository, nav)
         }
     }
+}
+
+@Composable
+private fun OfflineBrowse(repository: LoomRepository, nav: NavState, onRetry: () -> Unit) {
+    val downloads by repository.downloads.downloads.collectAsStateWithLifecycle()
+    val reason by repository.network.reason.collectAsStateWithLifecycle()
+    val ready = downloadedRowItems(downloads.filter { it.state == DownloadState.Completed })
+    DownloadedGrid(
+        entries = ready,
+        accent = Violet,
+        onOpen = { nav.push(Screen.Player(it)) },
+        bottomPadding = navPillClearance(),
+        header = {
+            OfflineNotice(
+                reason = reason + " Collections and genres come from Loom.",
+                onRetry = onRetry,
+                onSettings = { nav.push(Screen.Settings) },
+            )
+        },
+    )
 }
 
 @Composable

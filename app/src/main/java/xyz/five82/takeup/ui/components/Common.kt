@@ -157,6 +157,40 @@ fun ErrorState(
     }
 }
 
+/**
+ * Offline as a place, not a failure. Unlike [ErrorState] this does not fill the
+ * screen or centre itself: whatever is genuinely on the device goes underneath
+ * it, so the app still has something to show rather than only an apology.
+ */
+@Composable
+fun OfflineNotice(
+    reason: String,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+    onSettings: (() -> Unit)? = null,
+) {
+    // No horizontal padding of its own: callers place this inside grids and
+    // lists that already own the screen's margins.
+    Column(modifier.fillMaxWidth().padding(top = 16.dp)) {
+        Text("Offline", style = MaterialTheme.typography.displaySmall, color = Ink)
+        Text(
+            reason,
+            style = MaterialTheme.typography.bodyMedium,
+            color = Muted,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(top = 12.dp),
+        ) {
+            OutlinedButton(onClick = onRetry) { Text("Try again") }
+            if (onSettings != null) {
+                OutlinedButton(onClick = onSettings) { Text("Settings") }
+            }
+        }
+    }
+}
+
 /** Quiet inline emptiness, e.g. a library with nothing in it yet. */
 @Composable
 fun EmptyState(message: String, modifier: Modifier = Modifier) {

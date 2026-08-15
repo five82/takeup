@@ -27,7 +27,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import xyz.five82.takeup.R
-import xyz.five82.takeup.api.CELLULAR_BLOCKED_MESSAGE
+import xyz.five82.takeup.api.OFFLINE_MESSAGE
 import xyz.five82.takeup.api.Item
 import xyz.five82.takeup.api.loomGson
 import java.io.File
@@ -42,7 +42,7 @@ class DownloadStore(
     context: Context,
     private val scope: CoroutineScope,
     val artwork: OfflineArtwork,
-    cellular: CellularPolicy,
+    network: NetworkPolicy,
 ) {
     private val appContext = context.applicationContext
 
@@ -76,7 +76,7 @@ class DownloadStore(
     val playbackDataSourceFactory: DataSource.Factory = CacheDataSource.Factory()
         .setCache(cache)
         .setUpstreamDataSourceFactory {
-            GatedDataSource(upstreamFactory.createDataSource()) { cellular.blocked.value }
+            GatedDataSource(upstreamFactory.createDataSource()) { network.blocked.value }
         }
         .setCacheWriteDataSinkFactory(null)
         .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
@@ -289,7 +289,7 @@ private class GatedDataSource(
     private val blocked: () -> Boolean,
 ) : DataSource by delegate {
     override fun open(dataSpec: DataSpec): Long {
-        if (blocked()) throw IOException(CELLULAR_BLOCKED_MESSAGE)
+        if (blocked()) throw IOException(OFFLINE_MESSAGE)
         return delegate.open(dataSpec)
     }
 }
