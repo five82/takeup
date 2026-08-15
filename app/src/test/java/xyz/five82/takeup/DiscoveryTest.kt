@@ -2,6 +2,7 @@ package xyz.five82.takeup
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import xyz.five82.takeup.api.Collection
@@ -81,6 +82,19 @@ class DiscoveryTest {
         val preferredShow = show(100).copy(backdropImageId = 100)
 
         assertEquals(preferredMovie, dailyPick(listOf(preferredShow, preferredMovie), 100, 12))
+    }
+
+    @Test
+    fun dailyPickOmitsDocumentaries() {
+        val documentary = movie(
+            99,
+            genre = Genre(id = 3, name = "Documentary"),
+            backdropImageId = 99,
+        )
+        val regularMovie = movie(100, backdropImageId = 100)
+
+        assertEquals(regularMovie, dailyPick(listOf(documentary, regularMovie), 100, 12))
+        assertNull(dailyPick(listOf(documentary), 100, 12))
     }
 
     @Test

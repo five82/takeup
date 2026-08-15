@@ -39,7 +39,10 @@ fun dailyPick(
     val slot = dailyPickSlot(epochDay, hour)
     if (previousSlot == slot) return previousPick
 
-    val unstarted = movies.filter { it.kind == "movie" && !it.isStarted }.sortedBy { it.id }
+    val unstarted = movies.filter {
+        it.kind == "movie" && !it.isStarted &&
+            it.genres.orEmpty().none { genre -> genre.name.equals("Documentary", ignoreCase = true) }
+    }.sortedBy { it.id }
     val candidates = unstarted.filter { it.voteAverage >= HIGH_RATING && it.backdropImageId > 0 }
         .ifEmpty { unstarted.filter { it.voteAverage >= HIGH_RATING } }
         .ifEmpty { unstarted.filter { it.backdropImageId > 0 } }
