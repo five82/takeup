@@ -694,14 +694,16 @@ private fun DetailHead(
                         (item.kind == "show" && item.episodeCount > 0 && item.unwatchedCount == 0)
                     // Both of these are writes to Loom. Offline they would fail
                     // silently, so the menu offers nothing it cannot do.
-                    DropdownMenuItem(
-                        text = { Text("Artwork") },
-                        enabled = !offline,
-                        onClick = {
-                            menuOpen = false
-                            nav.push(Screen.Artwork(item.id, item.title))
-                        },
-                    )
+                    if (item.kind != "episode") {
+                        DropdownMenuItem(
+                            text = { Text("Artwork") },
+                            enabled = !offline,
+                            onClick = {
+                                menuOpen = false
+                                nav.push(Screen.Artwork(item.id, item.title))
+                            },
+                        )
+                    }
                     DropdownMenuItem(
                         text = { Text(if (watched) "Mark unwatched" else "Mark watched") },
                         enabled = !offline,
