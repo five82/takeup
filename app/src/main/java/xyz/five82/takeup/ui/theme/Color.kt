@@ -27,11 +27,13 @@ fun libraryThread(kind: String?): Color = when (kind) {
 }
 
 /**
- * Stable hue for a TMDB genre id, spun around the wheel with the golden
- * angle so neighboring ids land far apart. The chip row becomes a band of
- * thread without anyone hand-picking twenty colors.
+ * Hue for a genre's position in the sorted genre list, spun around the wheel
+ * with the golden angle so neighboring positions land far apart. Position,
+ * not the TMDB id, drives the spin: golden-angle on raw ids clumps (Music id
+ * 10402 and Mystery id 9648 land about a degree apart), while spinning by
+ * position spreads all nineteen genres evenly.
  */
-fun genreThread(genreId: Long): Color {
-    val hue = ((genreId * 137.508) % 360.0).toFloat()
-    return Color.hsv(hue, 0.48f, 0.92f)
-}
+fun genreHue(position: Int): Float = (position * 137.508f) % 360f
+
+/** Stable accent color for a genre by its position; see [genreHue]. */
+fun genreThread(position: Int): Color = Color.hsv(genreHue(position), 0.48f, 0.92f)

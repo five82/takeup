@@ -191,8 +191,9 @@ private fun BobbinBadge(count: Int, color: Color, modifier: Modifier = Modifier)
     }
 }
 
+/** Surface1 field with a tinted rule and the title, for art that never arrived. */
 @Composable
-private fun MissingArt(title: String, tint: Color) {
+fun MissingArt(title: String, tint: Color) {
     Box(
         Modifier
             .fillMaxSize()

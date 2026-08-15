@@ -1,20 +1,23 @@
 package xyz.five82.takeup.ui.browse
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -22,30 +25,40 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import coil3.compose.AsyncImage
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import xyz.five82.takeup.api.Collection
 import xyz.five82.takeup.api.Genre
+import xyz.five82.takeup.api.Item
 import xyz.five82.takeup.data.LoomRepository
 import xyz.five82.takeup.data.Reach
 import xyz.five82.takeup.data.isOfflineError
 import xyz.five82.takeup.ui.NavState
 import xyz.five82.takeup.ui.Screen
+import xyz.five82.takeup.ui.backdropUrl
 import xyz.five82.takeup.ui.components.EmptyState
 import xyz.five82.takeup.ui.components.ErrorState
 import xyz.five82.takeup.ui.components.LoadingState
+import xyz.five82.takeup.ui.components.MissingArt
 import xyz.five82.takeup.ui.components.OfflineBanner
 import xyz.five82.takeup.ui.components.OfflineNotice
 import xyz.five82.takeup.ui.components.PosterCard
-import xyz.five82.takeup.ui.components.RowLabel
 import xyz.five82.takeup.ui.components.navPillClearance
 import xyz.five82.takeup.ui.components.shadowWeave
 import xyz.five82.takeup.ui.posterFor
@@ -53,9 +66,11 @@ import xyz.five82.takeup.ui.posterUrl
 import xyz.five82.takeup.ui.progressFraction
 import xyz.five82.takeup.ui.takeupViewModel
 import xyz.five82.takeup.ui.theme.Ink
+import xyz.five82.takeup.ui.theme.Line
 import xyz.five82.takeup.ui.theme.Muted
+import xyz.five82.takeup.ui.theme.Stage
 import xyz.five82.takeup.ui.theme.Violet
-import xyz.five82.takeup.ui.theme.genreThread
+import xyz.five82.takeup.ui.theme.genreHue
 import xyz.five82.takeup.ui.theme.rememberWovenThreads
 
 data class BrowseState(
@@ -104,8 +119,9 @@ class BrowseViewModel(private val repository: LoomRepository) : ViewModel() {
 }
 
 /**
- * The two ways to slice the movie library, side by side: every collection as
- * a cover card, every genre as a chip. Both open a filtered grid.
+ * Two rooms for the two ways to slice the movie library: a segmented switch
+ * flips between every collection as a backdrop card and every genre as a
+ * flat color tile. Both open a filtered grid.
  */
 @Composable
 fun BrowseScreen(repository: LoomRepository, nav: NavState, active: Boolean) {
@@ -197,10 +213,68 @@ private fun OfflineBrowse(repository: LoomRepository, nav: NavState, onRetry: ()
     }
 }
 
+private enum class Room { Collections, Genres }
+
 @Composable
 private fun BrowseContent(state: BrowseState, repository: LoomRepository, nav: NavState) {
+    var room by rememberSaveable { mutableStateOf(Room.Collections) }
+    Column(Modifier.fillMaxSize()) {
+        RoomSwitch(room, onSelect = { room = it })
+        when (room) {
+            Room.Collections -> CollectionsRoom(state.collections, repository, nav)
+            Room.Genres -> GenresRoom(state.genres, nav)
+        }
+    }
+}
+
+@Composable
+private fun RoomSwitch(selected: Room, onSelect: (Room) -> Unit) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.padding(start = 20.dp, bottom = 12.dp),
+    ) {
+        RoomPill("Collections", active = selected == Room.Collections, onClick = { onSelect(Room.Collections) })
+        RoomPill("Genres", active = selected == Room.Genres, onClick = { onSelect(Room.Genres) })
+    }
+}
+
+@Composable
+private fun RoomPill(label: String, active: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(50))
+            .then(
+                if (active) {
+                    Modifier.background(Violet)
+                } else {
+                    Modifier.border(1.dp, Line, RoundedCornerShape(50))
+                },
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 7.dp),
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelLarge,
+            color = if (active) Stage else Muted,
+        )
+    }
+}
+
+/**
+ * Every collection as a 16:9 cover: one member's backdrop stands in for the
+ * whole set, deduped so collections that share an opening chapter (Spielberg
+ * and Indiana Jones both start with Raiders) don't show the same frame twice.
+ */
+@Composable
+private fun CollectionsRoom(collections: List<Collection>, repository: LoomRepository, nav: NavState) {
+    if (collections.isEmpty()) {
+        EmptyState("No collections yet.")
+        return
+    }
+    val faces = remember(collections) { collectionFaces(collections) }
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = 106.dp),
+        columns = GridCells.Fixed(2),
         contentPadding = PaddingValues(
             start = 20.dp,
             end = 20.dp,
@@ -211,65 +285,146 @@ private fun BrowseContent(state: BrowseState, repository: LoomRepository, nav: N
         verticalArrangement = Arrangement.spacedBy(10.dp),
         modifier = Modifier.fillMaxSize(),
     ) {
-        if (state.collections.isNotEmpty()) {
-            item(key = "collections-label", span = { GridItemSpan(maxLineSpan) }) {
-                RowLabel("Collections", color = Violet, modifier = Modifier.padding(top = 4.dp))
-            }
-            items(state.collections, key = { "col-${it.slug}" }) { collection ->
-                // The first member's poster fronts the collection; Loom
-                // guarantees at least two owned members.
-                PosterCard(
-                    title = collection.title,
-                    imageUrl = collection.items.firstOrNull()?.let { repository.api.posterUrl(it) },
-                    badgeCount = collection.items.size,
-                    badgeColor = Violet,
-                    fallbackTint = Violet,
-                    onClick = { nav.push(Screen.CollectionGrid(collection.slug, collection.title)) },
-                )
-            }
-        }
-        if (state.genres.isNotEmpty()) {
-            item(key = "genres-label", span = { GridItemSpan(maxLineSpan) }) {
-                RowLabel("Genres", modifier = Modifier.padding(top = 18.dp))
-            }
-            item(key = "genres", span = { GridItemSpan(maxLineSpan) }) {
-                GenreCloud(state.genres) { genre ->
-                    nav.push(Screen.GenreGrid(genre.id, genre.name))
-                }
-            }
+        items(collections, key = { it.slug }) { collection ->
+            CollectionCard(
+                collection = collection,
+                imageUrl = faces[collection.slug]?.let { repository.api.backdropUrl(it, 480) },
+                onClick = { nav.push(Screen.CollectionGrid(collection.slug, collection.title)) },
+            )
         }
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun GenreCloud(genres: List<Genre>, onSelect: (Genre) -> Unit) {
-    FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        for (genre in genres) {
-            GenreChip(genre, onClick = { onSelect(genre) })
-        }
+/**
+ * Picks each collection's cover in server order: the first member whose
+ * backdrop is not already claimed by an earlier collection. If every member's
+ * backdrop is claimed (or none has one), falls back to the first member with
+ * any backdrop; if no member has a backdrop at all, the collection has no face.
+ */
+fun collectionFaces(collections: List<Collection>): Map<String, Item?> {
+    val claimed = mutableSetOf<Long>()
+    val faces = mutableMapOf<String, Item?>()
+    for (collection in collections) {
+        val hasBackdrop = { item: Item -> item.backdropImageId > 0 }
+        val face = collection.items.firstOrNull { hasBackdrop(it) && it.backdropImageId !in claimed }
+            ?: collection.items.firstOrNull { hasBackdrop(it) }
+        if (face != null) claimed += face.backdropImageId
+        faces[collection.slug] = face
     }
+    return faces
 }
 
 @Composable
-private fun GenreChip(genre: Genre, onClick: () -> Unit) {
-    // Each chip keeps a hint of its thread, so the cloud reads as a band of
-    // colored thread rather than a gray fence.
-    val color = genreThread(genre.id)
+private fun CollectionCard(collection: Collection, imageUrl: String?, onClick: () -> Unit) {
     Box(
         Modifier
-            .clip(RoundedCornerShape(50))
-            .border(1.dp, color.copy(alpha = 0.45f), RoundedCornerShape(50))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 9.dp),
+            .fillMaxWidth()
+            .aspectRatio(16f / 9f)
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick),
     ) {
-        Text(
-            "${genre.name} · ${genre.itemCount}",
-            style = MaterialTheme.typography.labelLarge,
-            color = Muted,
+        if (imageUrl != null) {
+            AsyncImage(
+                model = imageUrl,
+                contentDescription = collection.title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            MissingArt(collection.title, Violet)
+        }
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(0.35f to Color.Transparent, 1f to Stage.copy(alpha = 0.92f)),
+                ),
         )
+        Column(
+            Modifier
+                .align(Alignment.BottomStart)
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+        ) {
+            Text(
+                collection.title,
+                style = MaterialTheme.typography.labelLarge,
+                color = Ink,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                "${collection.items.size} films",
+                style = MaterialTheme.typography.labelSmall,
+                color = Muted,
+            )
+        }
+    }
+}
+
+/** Every genre as a flat color tile, no artwork - the thread's hue carries it. */
+@Composable
+private fun GenresRoom(genres: List<Genre>, nav: NavState) {
+    if (genres.isEmpty()) {
+        EmptyState("No genres yet.")
+        return
+    }
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(2),
+        contentPadding = PaddingValues(
+            start = 20.dp,
+            end = 20.dp,
+            top = 8.dp,
+            bottom = navPillClearance(),
+        ),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        itemsIndexed(genres, key = { _, genre -> genre.id }) { position, genre ->
+            GenreTile(
+                genre,
+                position,
+                onClick = { nav.push(Screen.GenreGrid(genre.id, genre.name, position)) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun GenreTile(genre: Genre, position: Int, onClick: () -> Unit) {
+    val hue = genreHue(position)
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .aspectRatio(2.05f / 1f)
+            .clip(RoundedCornerShape(10.dp))
+            .background(
+                Brush.linearGradient(
+                    listOf(Color.hsv(hue, 0.55f, 0.32f), Color.hsv(hue, 0.65f, 0.15f)),
+                ),
+            )
+            .clickable(onClick = onClick),
+    ) {
+        Row(
+            Modifier
+                .align(Alignment.BottomStart)
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            Text(
+                genre.name,
+                style = MaterialTheme.typography.labelLarge,
+                color = Ink,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                genre.itemCount.toString(),
+                style = MaterialTheme.typography.labelSmall,
+                color = Ink.copy(alpha = 0.7f),
+            )
+        }
     }
 }

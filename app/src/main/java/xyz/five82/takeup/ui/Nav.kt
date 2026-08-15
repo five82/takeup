@@ -12,7 +12,7 @@ sealed interface Screen {
     data class Search(val initialQuery: String = "") : Screen
     data object Settings : Screen
     data class Artwork(val itemId: Long, val title: String) : Screen
-    data class GenreGrid(val genreId: Long, val title: String) : Screen
+    data class GenreGrid(val genreId: Long, val title: String, val thread: Int) : Screen
     data class CollectionGrid(val slug: String, val title: String) : Screen
 }
 
