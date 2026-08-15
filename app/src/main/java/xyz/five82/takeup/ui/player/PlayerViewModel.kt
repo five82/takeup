@@ -9,14 +9,20 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
+import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.exoplayer.DecoderReuseEvaluation
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import xyz.five82.takeup.TakeupApplication
 import xyz.five82.takeup.api.Item
@@ -62,6 +68,21 @@ class PlayerViewModel(
     var nextEpisode by mutableStateOf<Item?>(null)
         private set
 
+    private val dialogueBoostEffect = DialogueBoost()
+
+    val dialogueBoost: StateFlow<Boolean> = repository.dialogueBoost
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun setDialogueBoost(enabled: Boolean) {
+        viewModelScope.launch { repository.setDialogueBoost(enabled) }
+    }
+
+    /** Re-reads the current toggle and audio session/format and reapplies the effect. */
+    private fun applyDialogueBoost() {
+        val channelCount = player.audioFormat?.channelCount ?: 2
+        dialogueBoostEffect.setEnabled(dialogueBoost.value, player.audioSessionId, channelCount)
+    }
+
     init {
         player.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
@@ -76,7 +97,26 @@ class PlayerViewModel(
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 if (!isPlaying && !ended) reportNow()
             }
+
+            override fun onAudioSessionIdChanged(audioSessionId: Int) {
+                applyDialogueBoost()
+            }
         })
+        // Player.Listener has no hook for the audio format itself changing
+        // (e.g. a track switch changing channel count), so that one comes
+        // from the analytics listener instead.
+        player.addAnalyticsListener(object : AnalyticsListener {
+            override fun onAudioInputFormatChanged(
+                eventTime: AnalyticsListener.EventTime,
+                format: Format,
+                decoderReuseEvaluation: DecoderReuseEvaluation?,
+            ) {
+                applyDialogueBoost()
+            }
+        })
+        viewModelScope.launch {
+            dialogueBoost.collect { applyDialogueBoost() }
+        }
         load()
         viewModelScope.launch {
             while (true) {
@@ -195,6 +235,7 @@ class PlayerViewModel(
                 report(player.currentPosition, duration)
             }
         }
+        dialogueBoostEffect.release()
         player.release()
     }
 }

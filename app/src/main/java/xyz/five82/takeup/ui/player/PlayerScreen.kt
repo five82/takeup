@@ -33,6 +33,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.Crop
 import androidx.compose.material.icons.filled.FitScreen
 import androidx.compose.material.icons.filled.PlayArrow
@@ -75,6 +76,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.view.isVisible
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
@@ -421,6 +423,7 @@ private fun PlayerControls(
     val player = model.player
     val chapters = model.item?.media?.chapters.orEmpty()
     val accent = MaterialTheme.colorScheme.primary
+    val dialogueBoost by model.dialogueBoost.collectAsStateWithLifecycle()
     val shape = RoundedCornerShape(26.dp)
     Column(
         modifier
@@ -512,6 +515,12 @@ private fun PlayerControls(
                 Modifier.weight(1f),
                 horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
             ) {
+                if (trackCount(tracks, androidx.media3.common.C.TRACK_TYPE_AUDIO) > 0) {
+                    DialogueBoostPill(active = dialogueBoost, accent = accent) {
+                        onInteraction()
+                        model.setDialogueBoost(!dialogueBoost)
+                    }
+                }
                 if (trackCount(tracks, androidx.media3.common.C.TRACK_TYPE_AUDIO) > 1) {
                     ConsolePill("Audio") {
                         onInteraction()
@@ -541,6 +550,25 @@ private fun ConsolePill(label: String, onClick: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         Text(label, style = MaterialTheme.typography.labelLarge, color = Ink)
+    }
+}
+
+@Composable
+private fun DialogueBoostPill(active: Boolean, accent: Color, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .size(44.dp)
+            .clip(CircleShape)
+            .background(if (active) accent.copy(alpha = 0.28f) else Ink.copy(alpha = 0.08f))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            Icons.Filled.Bedtime,
+            contentDescription = "Dialogue boost",
+            tint = if (active) accent else Ink,
+            modifier = Modifier.size(22.dp),
+        )
     }
 }
 

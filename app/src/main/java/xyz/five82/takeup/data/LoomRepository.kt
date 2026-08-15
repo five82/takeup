@@ -8,6 +8,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.google.gson.JsonParser
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -27,11 +28,15 @@ class Settings(private val context: Context) {
     private val serverKey = stringPreferencesKey("server_address")
     private val allowCellularKey = booleanPreferencesKey("allow_cellular")
     private val libraryKindsKey = stringPreferencesKey("library_kinds")
+    private val dialogueBoostKey = booleanPreferencesKey("dialogue_boost")
 
     val serverAddress = context.dataStore.data.map { it[serverKey] }
 
     /** Off until asked for; a phone plan should not pay for a home library. */
     val allowCellular = context.dataStore.data.map { it[allowCellularKey] ?: false }
+
+    /** Off by default; night-mode dynamic range compression for dialogue. */
+    val dialogueBoost = context.dataStore.data.map { it[dialogueBoostKey] ?: false }
 
     /**
      * Library kind per library id, learned whenever Loom answers. An item knows
@@ -47,6 +52,10 @@ class Settings(private val context: Context) {
 
     suspend fun setAllowCellular(value: Boolean) {
         context.dataStore.edit { it[allowCellularKey] = value }
+    }
+
+    suspend fun setDialogueBoost(value: Boolean) {
+        context.dataStore.edit { it[dialogueBoostKey] = value }
     }
 
     suspend fun setLibraryKinds(value: Map<Long, String>) {
@@ -120,6 +129,10 @@ class LoomRepository(
     }.stateIn(scope, SharingStarted.Eagerly, OfflineCatalog())
 
     suspend fun setServerAddress(value: String) = settings.setServerAddress(value)
+
+    val dialogueBoost: Flow<Boolean> = settings.dialogueBoost
+
+    suspend fun setDialogueBoost(value: Boolean) = settings.setDialogueBoost(value)
 
     /** Picks up downloads interrupted by a process death, if the gate is open. */
     fun resumeDownloads() {
