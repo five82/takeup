@@ -16,11 +16,29 @@ private const val QUICK_WATCH_MAX_MS = 90 * 60 * 1000L
 private const val HIGH_RATING = 7.5
 
 /**
- * One unstarted movie for the home hero. Consecutive 12-hour slots walk a
- * stable shuffled list, so the pick always changes at 6 am and 6 pm when at
- * least two candidates are available.
+ * The slot used by the home hero. It changes at 6 am and 6 pm.
  */
-fun dailyPick(movies: List<Item>, epochDay: Long, hour: Int): Item? {
+fun dailyPickSlot(epochDay: Long, hour: Int): Long =
+    if (hour < 6) (epochDay - 1) * 2 + 1 else epochDay * 2 + if (hour >= 18) 1 else 0
+
+/**
+ * One unstarted movie for the home hero. Consecutive 12-hour slots walk a
+ * stable shuffled list, so the pick changes at 6 am and 6 pm when at least
+ * two candidates are available.
+ *
+ * A caller can pass the pick already shown for [previousSlot]. This keeps a
+ * library scan from changing the title in the middle of a scheduled slot.
+ */
+fun dailyPick(
+    movies: List<Item>,
+    epochDay: Long,
+    hour: Int,
+    previousSlot: Long? = null,
+    previousPick: Item? = null,
+): Item? {
+    val slot = dailyPickSlot(epochDay, hour)
+    if (previousSlot == slot) return previousPick
+
     val unstarted = movies.filter { it.kind == "movie" && !it.isStarted }.sortedBy { it.id }
     val candidates = unstarted.filter { it.voteAverage >= HIGH_RATING && it.backdropImageId > 0 }
         .ifEmpty { unstarted.filter { it.voteAverage >= HIGH_RATING } }
@@ -29,7 +47,6 @@ fun dailyPick(movies: List<Item>, epochDay: Long, hour: Int): Item? {
         .shuffled(Random(0))
     if (candidates.isEmpty()) return null
 
-    val slot = if (hour < 6) (epochDay - 1) * 2 + 1 else epochDay * 2 + if (hour >= 18) 1 else 0
     val index = Math.floorMod(slot, candidates.size.toLong()).toInt()
     return candidates[index]
 }

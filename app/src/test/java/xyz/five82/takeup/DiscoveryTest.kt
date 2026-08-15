@@ -10,6 +10,7 @@ import xyz.five82.takeup.api.Item
 import xyz.five82.takeup.api.Progress
 import xyz.five82.takeup.ui.home.dailyPick
 import xyz.five82.takeup.ui.home.dailyPickLabel
+import xyz.five82.takeup.ui.home.dailyPickSlot
 import xyz.five82.takeup.ui.home.discoveryRows
 
 class DiscoveryTest {
@@ -80,6 +81,24 @@ class DiscoveryTest {
         val preferredShow = show(100).copy(backdropImageId = 100)
 
         assertEquals(preferredMovie, dailyPick(listOf(preferredShow, preferredMovie), 100, 12))
+    }
+
+    @Test
+    fun dailyPickDoesNotChangeWhenLibraryChangesWithinSlot() {
+        val candidates = (1L..4L).map { movie(it, backdropImageId = it) }
+        val today = dailyPick(candidates, 100, 12)
+        val added = candidates + movie(99, backdropImageId = 99)
+
+        assertEquals(
+            today,
+            dailyPick(
+                added,
+                100,
+                12,
+                previousSlot = dailyPickSlot(100, 12),
+                previousPick = today,
+            ),
+        )
     }
 
     @Test

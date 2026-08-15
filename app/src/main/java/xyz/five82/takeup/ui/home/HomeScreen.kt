@@ -102,6 +102,10 @@ class HomeViewModel(private val repository: LoomRepository) : ViewModel() {
     var state by mutableStateOf(HomeState())
         private set
 
+    // A scan refreshes the library, but must not redraw the current slot's
+    // pick. The next scheduled slot is the only time this cache is replaced.
+    private var cachedPickSlot: Long? = null
+
     fun refresh() {
         viewModelScope.launch {
             if (state.dailyPick == null && state.continueWatching.isEmpty() && state.recentlyAdded.isEmpty()) {
@@ -120,12 +124,25 @@ class HomeViewModel(private val repository: LoomRepository) : ViewModel() {
                     val showItems = shows.await()
                     val now = LocalDateTime.now()
                     val epochDay = now.toLocalDate().toEpochDay()
+                    val slot = dailyPickSlot(epochDay, now.hour)
+                    val currentPick = state.dailyPick?.let { previous ->
+                        // Keep the current slot's item up to date when a scan
+                        // returns it, while retaining it if the scan omits it.
+                        movieItems.firstOrNull { it.id == previous.id } ?: previous
+                    }
+                    val pick = dailyPick(
+                        movies = movieItems,
+                        epochDay = epochDay,
+                        hour = now.hour,
+                        previousSlot = cachedPickSlot,
+                        previousPick = currentPick,
+                    )
                     state = HomeState(
                         loading = false,
                         continueWatching = continueWatching.await(),
                         nextUp = nextUp.await(),
                         recentlyAdded = recentlyAdded.await(),
-                        dailyPick = dailyPick(movieItems, epochDay, now.hour),
+                        dailyPick = pick,
                         discovery = discoveryRows(
                             movies = movieItems,
                             shows = showItems,
@@ -134,6 +151,7 @@ class HomeViewModel(private val repository: LoomRepository) : ViewModel() {
                             epochDay = epochDay,
                         ),
                     )
+                    cachedPickSlot = slot
                 }
                 // The server answered, so anything queued while offline can land.
                 repository.flushPendingProgress()
