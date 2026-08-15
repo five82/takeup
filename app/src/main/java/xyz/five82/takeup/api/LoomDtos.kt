@@ -55,6 +55,12 @@ data class SearchResponse(
     val fuzzy: Boolean = false,
 )
 
+data class FeaturedPick(
+    val item: Item = Item(),
+    val startsAt: String = "",
+    val endsAt: String = "",
+)
+
 data class Genre(
     val id: Long = 0,
     val name: String = "",

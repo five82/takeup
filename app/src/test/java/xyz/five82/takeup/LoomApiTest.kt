@@ -5,6 +5,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import xyz.five82.takeup.api.Credit
+import xyz.five82.takeup.api.FeaturedPick
 import xyz.five82.takeup.api.Item
 import xyz.five82.takeup.api.LoomApi
 import xyz.five82.takeup.api.SearchResponse
@@ -54,6 +55,19 @@ class LoomApiTest {
             api.absoluteUrl("/api/v1/media/3?tag=x"),
         )
         assertEquals("http://other/a", api.absoluteUrl("http://other/a"))
+    }
+
+    @Test
+    fun featuredPickMapsNestedItemAndPeriod() {
+        val pick = loomGson.fromJson(
+            """{"item":{"id":42,"title":"A Movie","kind":"movie"},"starts_at":"2025-08-12T06:00:00Z","ends_at":"2025-08-12T18:00:00Z"}""",
+            FeaturedPick::class.java,
+        )
+
+        assertEquals(42L, pick.item.id)
+        assertEquals("A Movie", pick.item.title)
+        assertEquals("2025-08-12T06:00:00Z", pick.startsAt)
+        assertEquals("2025-08-12T18:00:00Z", pick.endsAt)
     }
 
     @Test

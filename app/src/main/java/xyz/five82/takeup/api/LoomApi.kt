@@ -138,6 +138,13 @@ class LoomApi(
     suspend fun recentlyPlayed(limit: Int = 20): List<Item> =
         itemsList(get("/api/v1/recently-played", "limit" to limit.toString()), Item::class.java)
 
+    /** The server-selected movie for the current 6am-to-6pm or 6pm-to-6am slot. */
+    suspend fun featuredPick(): FeaturedPick? = try {
+        gson.fromJson(get("/api/v1/featured-pick"), FeaturedPick::class.java)
+    } catch (e: LoomException) {
+        if (e.code == 404) null else throw e
+    }
+
     // -- playback ------------------------------------------------------------
 
     suspend fun playback(id: Long): PlaybackInfo =

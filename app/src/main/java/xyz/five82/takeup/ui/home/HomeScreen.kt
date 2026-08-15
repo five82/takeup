@@ -100,7 +100,7 @@ data class HomeState(
     val continueWatching: List<Item> = emptyList(),
     val nextUp: List<Item> = emptyList(),
     val recentlyAdded: List<Item> = emptyList(),
-    val dailyPick: Item? = null,
+    val featuredPick: Item? = null,
     val discovery: List<DiscoveryRow> = emptyList(),
 )
 
@@ -108,24 +108,20 @@ class HomeViewModel(private val repository: LoomRepository) : ViewModel() {
     var state by mutableStateOf(HomeState())
         private set
 
-    // A scan refreshes the library, but must not redraw the current slot's
-    // pick. The next scheduled slot is the only time this cache is replaced.
-    private var cachedPickSlot: Long? = null
-
     /**
      * [force] is what the Try again button presses: the user is asking for the
      * attempt itself, so a stale offline verdict must not answer for the server.
      */
     fun refresh(force: Boolean = false) {
         viewModelScope.launch {
-            // Ask the policy before the network. Seven parallel calls that can
+            // Ask the policy before the network. Eight parallel calls that can
             // only time out is what made the app feel like a streaming service
             // that had simply gone down.
             if (!force && repository.network.reach.value == Reach.Offline) {
                 state = HomeState(loading = false, offline = true)
                 return@launch
             }
-            if (state.dailyPick == null && state.continueWatching.isEmpty() && state.recentlyAdded.isEmpty()) {
+            if (state.featuredPick == null && state.continueWatching.isEmpty() && state.recentlyAdded.isEmpty()) {
                 state = state.copy(loading = true)
             }
             try {
@@ -137,29 +133,17 @@ class HomeViewModel(private val repository: LoomRepository) : ViewModel() {
                     val shows = async { repository.api.allItems("tv") }
                     val collections = async { repository.api.collections() }
                     val recentlyPlayed = async { repository.api.recentlyPlayed() }
+                    val featured = async { repository.api.featuredPick()?.item }
                     val movieItems = movies.await()
                     val showItems = shows.await()
                     val now = LocalDateTime.now()
                     val epochDay = now.toLocalDate().toEpochDay()
-                    val slot = dailyPickSlot(epochDay, now.hour)
-                    val currentPick = state.dailyPick?.let { previous ->
-                        // Keep the current slot's item up to date when a scan
-                        // returns it, while retaining it if the scan omits it.
-                        movieItems.firstOrNull { it.id == previous.id } ?: previous
-                    }
-                    val pick = dailyPick(
-                        movies = movieItems,
-                        epochDay = epochDay,
-                        hour = now.hour,
-                        previousSlot = cachedPickSlot,
-                        previousPick = currentPick,
-                    )
                     state = HomeState(
                         loading = false,
                         continueWatching = continueWatching.await(),
                         nextUp = nextUp.await(),
                         recentlyAdded = recentlyAdded.await(),
-                        dailyPick = pick,
+                        featuredPick = featured.await(),
                         discovery = discoveryRows(
                             movies = movieItems,
                             shows = showItems,
@@ -168,7 +152,6 @@ class HomeViewModel(private val repository: LoomRepository) : ViewModel() {
                             epochDay = epochDay,
                         ),
                     )
-                    cachedPickSlot = slot
                 }
                 // The server answered, so anything queued while offline can land.
                 repository.flushPendingProgress()
@@ -185,7 +168,7 @@ class HomeViewModel(private val repository: LoomRepository) : ViewModel() {
                         loading = false,
                         offline = false,
                         error = if (
-                            state.dailyPick == null &&
+                            state.featuredPick == null &&
                             state.continueWatching.isEmpty() &&
                             state.recentlyAdded.isEmpty()
                         ) {
@@ -383,18 +366,17 @@ private fun HomeContent(
     state: HomeState,
 ) {
     val api = repository.api
-    // Only the scheduled pick gets the hero. Falling back to the newest movie
-    // put whatever landed last under a "Tonight's Pick" label - documentaries
-    // and half-watched titles included - and changed it off schedule.
-    val hero = state.dailyPick
-    val heroLabel = dailyPickLabel(LocalTime.now().hour)
+    // Loom chooses the movie; the label remains client-side so it follows the
+    // device's local clock rather than the server's timezone.
+    val hero = state.featuredPick
+    val heroLabel = featuredPickLabel(LocalTime.now().hour)
     val continueWatching = state.continueWatching.filterNot { it.id == hero?.id }
     val nextUp = state.nextUp.filterNot { it.id == hero?.id }
     val recentlyAdded = state.recentlyAdded.filterNot { it.id == hero?.id }
     val discovery = state.discovery.mapNotNull { row ->
         row.copy(items = row.items.filterNot { it.id == hero?.id }).takeIf { it.items.isNotEmpty() }
     }
-    // The daily pick colors the whole room: its seed dyes the stage, and its
+    // The featured pick colors the whole room: its seed dyes the stage, and its
     // swatches sit as still fields of light down the screen. Ember house
     // lights hold the room until the art resolves (and with no hero at all).
     val heroThreads = hero?.let { rememberWovenThreads(api.posterUrl(it, 240)) }.orEmpty()
