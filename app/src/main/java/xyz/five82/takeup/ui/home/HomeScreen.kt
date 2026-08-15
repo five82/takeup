@@ -383,7 +383,10 @@ private fun HomeContent(
     state: HomeState,
 ) {
     val api = repository.api
-    val hero = state.dailyPick ?: state.recentlyAdded.firstOrNull { it.kind == "movie" }
+    // Only the scheduled pick gets the hero. Falling back to the newest movie
+    // put whatever landed last under a "Tonight's Pick" label - documentaries
+    // and half-watched titles included - and changed it off schedule.
+    val hero = state.dailyPick
     val heroLabel = dailyPickLabel(LocalTime.now().hour)
     val continueWatching = state.continueWatching.filterNot { it.id == hero?.id }
     val nextUp = state.nextUp.filterNot { it.id == hero?.id }

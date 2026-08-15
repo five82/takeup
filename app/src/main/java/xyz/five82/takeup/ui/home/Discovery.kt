@@ -37,7 +37,10 @@ fun dailyPick(
     previousPick: Item? = null,
 ): Item? {
     val slot = dailyPickSlot(epochDay, hour)
-    if (previousSlot == slot) return previousPick
+    // No previous pick is not an answer. An offline blip clears the hero while
+    // the slot stands, and honoring that emptiness would leave the slot with no
+    // pick until the next one - so recompute instead.
+    if (previousSlot == slot && previousPick != null) return previousPick
 
     val unstarted = movies.filter {
         it.kind == "movie" && !it.isStarted &&

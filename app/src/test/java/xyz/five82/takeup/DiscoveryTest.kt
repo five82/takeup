@@ -116,6 +116,25 @@ class DiscoveryTest {
     }
 
     @Test
+    fun dailyPickRecoversTheSlotAfterTheHeroIsCleared() {
+        val candidates = (1L..4L).map { movie(it, backdropImageId = it) }
+        val today = dailyPick(candidates, 100, 12)
+
+        // Going offline drops the pick while the slot stands; coming back must
+        // restore the same title rather than leave the slot empty.
+        assertEquals(
+            today,
+            dailyPick(
+                candidates,
+                100,
+                12,
+                previousSlot = dailyPickSlot(100, 12),
+                previousPick = null,
+            ),
+        )
+    }
+
+    @Test
     fun dailyPickChangesAtSixAmAndSixPm() {
         val candidates = (1L..4L).map { movie(it, backdropImageId = it) }
         val today = dailyPick(candidates, 100, 6)
