@@ -40,3 +40,7 @@ fun LoomRepository.logoFor(item: Item, offline: Boolean, widthPx: Int = 480): St
 
 fun LoomRepository.thumbFor(item: Item, offline: Boolean, widthPx: Int = 480): String? =
     if (offline) downloads.artwork.thumbPath(item.id) else api.thumbUrl(item, widthPx)
+
+/** The detail hero uses an episode's screencap rather than its inherited backdrop. */
+fun LoomRepository.detailArtFor(item: Item, offline: Boolean, widthPx: Int = 1440): String? =
+    if (item.kind == "episode") thumbFor(item, offline, widthPx) else backdropFor(item, offline, widthPx)

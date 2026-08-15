@@ -95,7 +95,7 @@ import xyz.five82.takeup.data.isStaleDownload
 import xyz.five82.takeup.ui.DownloadIcon
 import xyz.five82.takeup.ui.NavState
 import xyz.five82.takeup.ui.Screen
-import xyz.five82.takeup.ui.backdropFor
+import xyz.five82.takeup.ui.detailArtFor
 import xyz.five82.takeup.ui.components.BiasCutBackdrop
 import xyz.five82.takeup.ui.components.ErrorState
 import xyz.five82.takeup.ui.components.GauzeBackground
@@ -292,7 +292,7 @@ fun DetailScreen(repository: LoomRepository, nav: NavState, itemId: Long, topmos
             // Seed from the backdrop this screen hangs behind everything, not
             // the poster: the two often disagree (a warm poster over a cool
             // still) and the buttons sit on the backdrop's weather.
-            val artUrl = repository.backdropFor(item, state.offline, widthPx = 240)
+            val artUrl = repository.detailArtFor(item, state.offline, widthPx = 240)
                 ?: repository.posterFor(item, state.offline, widthPx = 240)
             val threads = rememberWovenThreads(artUrl)
             // Hold the spinner a beat longer while the art's colors resolve,
@@ -312,7 +312,7 @@ fun DetailScreen(repository: LoomRepository, nav: NavState, itemId: Long, topmos
                 Box(Modifier.fillMaxSize()) {
                     // Gauze: the backdrop's color weather behind the whole
                     // screen, with the dyed stage catching what it misses.
-                    GauzeBackground(repository.backdropFor(item, state.offline, widthPx = 240), seed)
+                    GauzeBackground(repository.detailArtFor(item, state.offline, widthPx = 240), seed)
                     when (item.kind) {
                         "show" -> ShowDetail(repository, nav, model, item, state)
                         "episode" -> EpisodeDetail(repository, nav, model, item, state.offline)
@@ -367,7 +367,7 @@ private fun MovieDetail(
 // -- episode ------------------------------------------------------------------
 
 /**
- * An episode's own page: the head carries the show's inherited backdrop and
+ * An episode's own page: the head carries the episode screencap and show's
  * logo, so the episode names itself in the body, with the overview finally
  * given room the season list's two-line clamp never had.
  */
@@ -645,7 +645,7 @@ private fun EpisodeRow(
 
 // -- shared pieces ------------------------------------------------------------
 
-/** Backdrop ending on the bias cut, logo art below it, back and overflow above. */
+/** Hero art ending on the bias cut, logo art below it, back and overflow above. */
 @Composable
 private fun DetailHead(
     repository: LoomRepository,
@@ -659,7 +659,7 @@ private fun DetailHead(
     // No fixed height: the backdrop sizes itself to 4:3 art plus the logo
     // band, so a tall logo grows the head instead of squeezing the photo.
     Box(Modifier.fillMaxWidth()) {
-        val backdrop = repository.backdropFor(item, offline, widthPx = 960)
+        val backdrop = repository.detailArtFor(item, offline, widthPx = 960)
         val logo = repository.logoFor(item, offline)
         // Cut tailored to the logo: the lane is area-normalized once the art
         // decodes, and the line rides just above it. Animated so the first
