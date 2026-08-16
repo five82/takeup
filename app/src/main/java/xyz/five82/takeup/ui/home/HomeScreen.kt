@@ -64,15 +64,13 @@ import xyz.five82.takeup.ui.components.BiasCutBackdrop
 import xyz.five82.takeup.ui.components.CardAction
 import xyz.five82.takeup.ui.components.logoLaneHeight
 import xyz.five82.takeup.ui.components.ErrorState
+import xyz.five82.takeup.ui.components.GauzeBackground
 import xyz.five82.takeup.ui.components.LoadingState
 import xyz.five82.takeup.ui.components.OfflineBanner
 import xyz.five82.takeup.ui.components.OfflineNotice
 import xyz.five82.takeup.ui.components.PosterCard
 import xyz.five82.takeup.ui.components.ThreadProgress
 import xyz.five82.takeup.ui.components.navPillClearance
-import xyz.five82.takeup.ui.components.dyeBath
-import xyz.five82.takeup.ui.components.houseLights
-import xyz.five82.takeup.ui.components.threeThreads
 import xyz.five82.takeup.ui.components.ThumbCard
 import xyz.five82.takeup.ui.backdropFor
 import xyz.five82.takeup.ui.backdropUrl
@@ -91,7 +89,6 @@ import xyz.five82.takeup.ui.theme.Ink
 import xyz.five82.takeup.ui.theme.Muted
 import xyz.five82.takeup.ui.theme.Stage
 import xyz.five82.takeup.ui.theme.Violet
-import xyz.five82.takeup.ui.theme.rememberWovenThreads
 
 data class HomeState(
     val loading: Boolean = true,
@@ -240,8 +237,7 @@ fun HomeScreen(repository: LoomRepository, nav: NavState, active: Boolean) {
 /**
  * Home with no Loom: the same room over what is genuinely on this device. The
  * stale library stays absent - cached posters would open screens that cannot
- * play - but a download is a real title, so it gets the hero, the rows and the
- * dye bath that home gives anything else.
+ * play - but a download is a real title, so it gets the hero and the rows.
  */
 @Composable
 private fun OfflineHome(repository: LoomRepository, nav: NavState, onRetry: () -> Unit) {
@@ -251,91 +247,93 @@ private fun OfflineHome(repository: LoomRepository, nav: NavState, onRetry: () -
     val downloaded = catalog.recent()
     // Lead with what is half-watched, else with what landed most recently.
     val hero = continueWatching.firstOrNull() ?: downloaded.firstOrNull()
-    val heroThreads = rememberWovenThreads(
-        hero?.let { repository.posterFor(it, offline = true, widthPx = 240) },
-    ).orEmpty()
-    val room = if (heroThreads.isNotEmpty()) {
-        Modifier.dyeBath(heroThreads.first()).threeThreads(heroThreads)
-    } else {
-        Modifier.houseLights(Ember)
-    }
-    LazyColumn(
-        Modifier.fillMaxSize().then(room),
-        contentPadding = PaddingValues(bottom = navPillClearance()),
-    ) {
-        item(key = "offline-head") {
-            // The same two controls the hero carries when there is a hero, so
-            // settings and searching what is downloaded stay reachable offline.
-            Box(Modifier.fillMaxWidth()) {
-                if (hero != null) {
-                    Hero(
-                        item = hero,
-                        backdrop = repository.backdropFor(hero, offline = true, widthPx = 960),
-                        logo = repository.logoFor(hero, offline = true),
-                        label = if (hero == continueWatching.firstOrNull()) {
-                            "Continue watching"
-                        } else {
-                            "Downloaded"
-                        },
-                        onOpen = { nav.push(Screen.Detail(hero.id)) },
-                    )
-                } else {
-                    OfflineNotice(
-                        reason = "$reason Nothing is downloaded to this device yet.",
-                        onRetry = onRetry,
-                        modifier = Modifier
-                            .statusBarsPadding()
-                            .padding(start = 20.dp, end = 20.dp, top = 44.dp),
-                    )
-                }
-                Row(
-                    Modifier
-                        .align(Alignment.TopEnd)
-                        .statusBarsPadding()
-                        .padding(top = 4.dp, end = 8.dp),
-                ) {
-                    RoundIconButton(Icons.Filled.Search, "Search") { nav.push(Screen.Search()) }
-                    RoundIconButton(Icons.Filled.Settings, "Settings") { nav.push(Screen.Settings) }
-                }
-            }
-        }
-        if (hero == null) return@LazyColumn
-        item(key = "offline-banner") {
-            OfflineBanner(reason, onRetry, Modifier.padding(start = 20.dp, end = 12.dp, top = 12.dp))
-        }
-        if (continueWatching.isNotEmpty()) {
-            item(key = "offline-cw") {
-                HomeRow("Continue Watching") {
-                    items(continueWatching, key = { "ocw-${it.id}" }) { item ->
-                        ThumbCard(
-                            title = item.title,
-                            imageUrl = repository.thumbFor(item, offline = true),
-                            width = 200,
-                            line = offlineLine(item, catalog),
-                            lineStyle = MaterialTheme.typography.bodyMedium,
-                            progress = progressFraction(item),
-                            progressColor = Ember,
-                            onClick = { nav.push(Screen.Detail(item.id)) },
+    // Use the visible backdrop for gauze, with the poster as the offline
+    // fallback when a download has no backdrop copy.
+    val heroArt = hero?.let { repository.backdropFor(it, offline = true, widthPx = 240) }
+    Box(Modifier.fillMaxSize()) {
+        GauzeBackground(
+            imageUrl = heroArt,
+            seed = null,
+            scrimAlphaScale = 0.9f,
+        )
+        LazyColumn(
+            Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = navPillClearance()),
+        ) {
+            item(key = "offline-head") {
+                // The same two controls the hero carries when there is a hero, so
+                // settings and searching what is downloaded stay reachable offline.
+                Box(Modifier.fillMaxWidth()) {
+                    if (hero != null) {
+                        Hero(
+                            item = hero,
+                            backdrop = repository.backdropFor(hero, offline = true, widthPx = 960),
+                            logo = repository.logoFor(hero, offline = true),
+                            label = if (hero == continueWatching.firstOrNull()) {
+                                "Continue watching"
+                            } else {
+                                "Downloaded"
+                            },
+                            onOpen = { nav.push(Screen.Detail(hero.id)) },
                         )
+                    } else {
+                        OfflineNotice(
+                            reason = "$reason Nothing is downloaded to this device yet.",
+                            onRetry = onRetry,
+                            modifier = Modifier
+                                .statusBarsPadding()
+                                .padding(start = 20.dp, end = 20.dp, top = 44.dp),
+                        )
+                    }
+                    Row(
+                        Modifier
+                            .align(Alignment.TopEnd)
+                            .statusBarsPadding()
+                            .padding(top = 4.dp, end = 8.dp),
+                    ) {
+                        RoundIconButton(Icons.Filled.Search, "Search") { nav.push(Screen.Search()) }
+                        RoundIconButton(Icons.Filled.Settings, "Settings") { nav.push(Screen.Settings) }
                     }
                 }
             }
-        }
-        item(key = "offline-downloads") {
-            HomeRow("Downloaded") {
-                items(downloaded, key = { "dl-${it.id}" }) { item ->
-                    PosterCard(
-                        title = item.title,
-                        imageUrl = repository.posterFor(item, offline = true),
-                        width = 128,
-                        badgeCount = if (item.kind == "show") {
-                            catalog.episodes(item.id).count { it.progress?.played != true }
-                        } else {
-                            0
-                        },
-                        progress = progressFraction(item),
-                        onClick = { nav.push(Screen.Detail(item.id)) },
-                    )
+            if (hero == null) return@LazyColumn
+            item(key = "offline-banner") {
+                OfflineBanner(reason, onRetry, Modifier.padding(start = 20.dp, end = 12.dp, top = 12.dp))
+            }
+            if (continueWatching.isNotEmpty()) {
+                item(key = "offline-cw") {
+                    HomeRow("Continue Watching") {
+                        items(continueWatching, key = { "ocw-${it.id}" }) { item ->
+                            ThumbCard(
+                                title = item.title,
+                                imageUrl = repository.thumbFor(item, offline = true),
+                                width = 200,
+                                line = offlineLine(item, catalog),
+                                lineStyle = MaterialTheme.typography.bodyMedium,
+                                progress = progressFraction(item),
+                                progressColor = Ember,
+                                onClick = { nav.push(Screen.Detail(item.id)) },
+                            )
+                        }
+                    }
+                }
+            }
+            item(key = "offline-downloads") {
+                HomeRow("Downloaded") {
+                    items(downloaded, key = { "dl-${it.id}" }) { item ->
+                        PosterCard(
+                            title = item.title,
+                            imageUrl = repository.posterFor(item, offline = true),
+                            width = 128,
+                            badgeCount = if (item.kind == "show") {
+                                catalog.episodes(item.id).count { it.progress?.played != true }
+                            } else {
+                                0
+                            },
+                            progress = progressFraction(item),
+                            onClick = { nav.push(Screen.Detail(item.id)) },
+                        )
+                    }
                 }
             }
         }
@@ -376,116 +374,120 @@ private fun HomeContent(
     val discovery = state.discovery.mapNotNull { row ->
         row.copy(items = row.items.filterNot { it.id == hero?.id }).takeIf { it.items.isNotEmpty() }
     }
-    // The featured pick colors the whole room: its seed dyes the stage, and its
-    // swatches sit as still fields of light down the screen. Ember house
-    // lights hold the room until the art resolves (and with no hero at all).
-    val heroThreads = hero?.let { rememberWovenThreads(api.posterUrl(it, 240)) }.orEmpty()
-    val room = if (heroThreads.isNotEmpty()) {
-        Modifier.dyeBath(heroThreads.first()).threeThreads(heroThreads)
-    } else {
-        Modifier.houseLights(Ember)
-    }
-    LazyColumn(
-        Modifier.fillMaxSize().then(room),
-        contentPadding = PaddingValues(bottom = navPillClearance()),
-    ) {
-        item(key = "hero") {
-            Box {
-                if (hero != null) {
-                    Hero(
-                        item = hero,
-                        backdrop = api.backdropUrl(hero, 960) ?: api.thumbUrl(hero, 960),
-                        logo = api.logoUrl(hero),
-                        label = heroLabel,
-                        onOpen = { nav.push(Screen.Detail(hero.id)) },
-                    )
-                } else {
-                    Box(Modifier.fillMaxWidth().height(220.dp))
-                }
-                Row(
-                    Modifier
-                        .align(Alignment.TopEnd)
-                        .statusBarsPadding()
-                        .padding(top = 4.dp, end = 8.dp),
-                ) {
-                    RoundIconButton(Icons.Filled.Search, "Search") { nav.push(Screen.Search()) }
-                    RoundIconButton(Icons.Filled.Settings, "Settings") { nav.push(Screen.Settings) }
-                }
-            }
-        }
-
-        if (continueWatching.isNotEmpty()) {
-            item(key = "cw") {
-                HomeRow("Continue Watching") {
-                    items(continueWatching, key = { "cw-${it.id}" }) { item ->
-                        ThumbCard(
-                            title = item.title,
-                            imageUrl = api.thumbUrl(item),
-                            width = 200,
-                            line = continueLine(item),
-                            lineStyle = MaterialTheme.typography.bodyMedium,
-                            progress = progressFraction(item),
-                            progressColor = Ember,
-                            actions = listOf(
-                                CardAction("Play") { nav.push(Screen.Player(item.id)) },
-                                CardAction("Mark watched") { model.setWatched(item, true) },
-                                CardAction("Remove from Continue Watching") { model.setWatched(item, false) },
-                            ),
-                            onClick = { nav.push(Screen.Player(item.id)) },
+    // Use the visible backdrop for gauze; a poster is only a last-resort
+    // fallback because it is portrait art rather than the hero's landscape.
+    val heroBackdrop = hero?.let { api.backdropUrl(it, 240) }
+    val heroArt = heroBackdrop ?: hero?.let { api.posterUrl(it, 240) }
+    Box(Modifier.fillMaxSize()) {
+        GauzeBackground(
+            imageUrl = heroArt,
+            seed = null,
+            // Keep Home a little more colorful than Detail. A portrait poster
+            // is visually denser, so retain Detail's default scrim for it.
+            scrimAlphaScale = if (heroBackdrop == null) 1f else 0.9f,
+        )
+        LazyColumn(
+            Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = navPillClearance()),
+        ) {
+            item(key = "hero") {
+                Box {
+                    if (hero != null) {
+                        Hero(
+                            item = hero,
+                            backdrop = api.backdropUrl(hero, 960) ?: api.thumbUrl(hero, 960),
+                            logo = api.logoUrl(hero),
+                            label = heroLabel,
+                            onOpen = { nav.push(Screen.Detail(hero.id)) },
                         )
+                    } else {
+                        Box(Modifier.fillMaxWidth().height(220.dp))
+                    }
+                    Row(
+                        Modifier
+                            .align(Alignment.TopEnd)
+                            .statusBarsPadding()
+                            .padding(top = 4.dp, end = 8.dp),
+                    ) {
+                        RoundIconButton(Icons.Filled.Search, "Search") { nav.push(Screen.Search()) }
+                        RoundIconButton(Icons.Filled.Settings, "Settings") { nav.push(Screen.Settings) }
                     }
                 }
             }
-        }
 
-        if (nextUp.isNotEmpty()) {
-            item(key = "next") {
-                HomeRow("Next Up") {
-                    items(nextUp, key = { "nu-${it.id}" }) { item ->
-                        ThumbCard(
-                            title = item.title,
-                            imageUrl = api.thumbUrl(item),
-                            width = 200,
-                            line = "${episodeLabel(item)} · ${item.title}",
-                            lineStyle = MaterialTheme.typography.bodyMedium,
-                            actions = listOf(
-                                CardAction("Play") { nav.push(Screen.Player(item.id)) },
-                                CardAction("Mark watched") { model.setWatched(item, true) },
-                            ),
-                            onClick = { nav.push(Screen.Player(item.id)) },
-                        )
+            if (continueWatching.isNotEmpty()) {
+                item(key = "cw") {
+                    HomeRow("Continue Watching") {
+                        items(continueWatching, key = { "cw-${it.id}" }) { item ->
+                            ThumbCard(
+                                title = item.title,
+                                imageUrl = api.thumbUrl(item),
+                                width = 200,
+                                line = continueLine(item),
+                                lineStyle = MaterialTheme.typography.bodyMedium,
+                                progress = progressFraction(item),
+                                progressColor = Ember,
+                                actions = listOf(
+                                    CardAction("Play") { nav.push(Screen.Player(item.id)) },
+                                    CardAction("Mark watched") { model.setWatched(item, true) },
+                                    CardAction("Remove from Continue Watching") { model.setWatched(item, false) },
+                                ),
+                                onClick = { nav.push(Screen.Player(item.id)) },
+                            )
+                        }
                     }
                 }
             }
-        }
 
-        if (recentlyAdded.isNotEmpty()) {
-            item(key = "recent") {
-                HomeRow("Recently Added") {
-                    items(recentlyAdded, key = { "ra-${it.id}" }) { item ->
-                        PosterCard(
-                            title = item.title,
-                            imageUrl = api.posterUrl(item),
-                            width = 128,
-                            onClick = { nav.push(Screen.Detail(item.id)) },
-                        )
+            if (nextUp.isNotEmpty()) {
+                item(key = "next") {
+                    HomeRow("Next Up") {
+                        items(nextUp, key = { "nu-${it.id}" }) { item ->
+                            ThumbCard(
+                                title = item.title,
+                                imageUrl = api.thumbUrl(item),
+                                width = 200,
+                                line = "${episodeLabel(item)} · ${item.title}",
+                                lineStyle = MaterialTheme.typography.bodyMedium,
+                                actions = listOf(
+                                    CardAction("Play") { nav.push(Screen.Player(item.id)) },
+                                    CardAction("Mark watched") { model.setWatched(item, true) },
+                                ),
+                                onClick = { nav.push(Screen.Player(item.id)) },
+                            )
+                        }
                     }
                 }
             }
-        }
 
-        // The rotating shelves: a different slice of the library every day.
-        for (discoveryRow in discovery) {
-            item(key = "d-${discoveryRow.key}") {
-                HomeRow(discoveryRow.title, labelColor = Violet) {
-                    items(discoveryRow.items, key = { "${discoveryRow.key}-${it.id}" }) { item ->
-                        PosterCard(
-                            title = item.title,
-                            imageUrl = api.posterUrl(item),
-                            width = 128,
-                            progress = progressFraction(item),
-                            onClick = { nav.push(Screen.Detail(item.id)) },
-                        )
+            if (recentlyAdded.isNotEmpty()) {
+                item(key = "recent") {
+                    HomeRow("Recently Added") {
+                        items(recentlyAdded, key = { "ra-${it.id}" }) { item ->
+                            PosterCard(
+                                title = item.title,
+                                imageUrl = api.posterUrl(item),
+                                width = 128,
+                                onClick = { nav.push(Screen.Detail(item.id)) },
+                            )
+                        }
+                    }
+                }
+            }
+
+            // The rotating shelves: a different slice of the library every day.
+            for (discoveryRow in discovery) {
+                item(key = "d-${discoveryRow.key}") {
+                    HomeRow(discoveryRow.title, labelColor = Violet) {
+                        items(discoveryRow.items, key = { "${discoveryRow.key}-${it.id}" }) { item ->
+                            PosterCard(
+                                title = item.title,
+                                imageUrl = api.posterUrl(item),
+                                width = 128,
+                                progress = progressFraction(item),
+                                onClick = { nav.push(Screen.Detail(item.id)) },
+                            )
+                        }
                     }
                 }
             }

@@ -179,10 +179,17 @@ fun Modifier.shadowWeave(swatches: List<Color>, fallback: Color): Modifier {
  * Gauze: the title's backdrop blurred past recognition - no faces, no
  * composition, just the film's color weather - darkened toward the ceiling
  * and hung behind the whole screen. The image is the small resize bucket
- * (a blur has no detail to lose), so this costs one tiny decode.
+ * (a blur has no detail to lose), so this costs one tiny decode. [scrimAlphaScale]
+ * is 1 by default to preserve the Detail treatment; Home uses a slightly
+ * lighter scrim so it keeps more of the backdrop's color.
  */
 @Composable
-fun GauzeBackground(imageUrl: String?, seed: Color?, modifier: Modifier = Modifier) {
+fun GauzeBackground(
+    imageUrl: String?,
+    seed: Color?,
+    modifier: Modifier = Modifier,
+    scrimAlphaScale: Float = 1f,
+) {
     // The dye bath catches whatever the gauze doesn't cover: missing
     // backdrops, and the moment before the image decodes.
     Box(modifier.fillMaxSize().dyeBath(seed)) {
@@ -201,9 +208,9 @@ fun GauzeBackground(imageUrl: String?, seed: Color?, modifier: Modifier = Modifi
                     .fillMaxSize()
                     .drawWithCache {
                         val scrim = Brush.verticalGradient(
-                            0f to Stage.copy(alpha = 0.55f),
-                            0.55f to Stage.copy(alpha = 0.68f),
-                            1f to Stage.copy(alpha = 0.88f),
+                            0f to Stage.copy(alpha = 0.55f * scrimAlphaScale),
+                            0.55f to Stage.copy(alpha = 0.68f * scrimAlphaScale),
+                            1f to Stage.copy(alpha = 0.88f * scrimAlphaScale),
                         )
                         onDrawBehind { drawRect(scrim) }
                     },
