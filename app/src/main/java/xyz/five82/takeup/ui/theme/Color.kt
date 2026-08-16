@@ -20,6 +20,9 @@ val Ember = Color(0xFFFF4D55)
 val Teal = Color(0xFF3FD1C4)
 val Amber = Color(0xFFFFB84D)
 val Violet = Color(0xFFA78BFA)
+// Fifth thread, mirrored from iOS where Browse split into Collections
+// (violet) and Genres (cobalt); unused here until Browse splits the same way.
+val Cobalt = Color(0xFF5FA0FF)
 
 /** Thread color for a Loom library kind; ember is also the brand fallback. */
 fun libraryThread(kind: String?): Color = when (kind) {
