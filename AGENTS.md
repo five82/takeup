@@ -18,6 +18,20 @@ Single-developer hobby project - prefer simple, maintainable solutions over clev
 
 Loom and Takeup are developed and deployed together for one user. Do not preserve compatibility with older versions of either application; make coordinated changes in both repositories instead of adding compatibility shims.
 
+## Visual Design Philosophy
+
+Takeup should feel closer to Apple TV than to the typical black media-center interface: cinematic, artwork-led, colorful, and dimensional. Dark-only does not mean black-first.
+
+- Do not default large surfaces to black or near-black merely because this is a media app. `Stage` is a deep indigo foundation, not the intended final appearance of every screen. Reserve true black primarily for video, necessary scrims, and other places where it has a concrete purpose.
+- Let the current media artwork bring color and depth into a screen. Prefer blurred backdrop color, soft gradients, gauze, and localized light over empty dark fields.
+- Prefer the visible landscape backdrop as the source for ambient color. Posters often overrepresent skin tones, reds, cream, and gold; do not let one poster swatch repaint a broad background.
+- Preserve the spatial mixture of colors in artwork when possible. A blurred backdrop generally produces richer, more natural atmosphere than a single extracted dominant color.
+- Avoid flat full-screen fills from one dynamic swatch. They frequently collapse varied artwork into muddy red-brown. Likewise, do not "fix" a poor dynamic treatment by stripping out the color and making the screen black; correct the source, blend, or treatment while retaining depth.
+- Blend artwork with chromatic `Stage` scrims to maintain text contrast and cool muddy imagery without erasing its character. Tune scrims only as dark as readability requires.
+- Do not ban warm hues globally. Genuinely warm artwork should remain warm; avoid ugly repetition through better artwork sources and spatial treatments rather than arbitrary hue filters.
+- Reuse the established visual language (`BiasCutBackdrop`, `GauzeBackground`, woven accents, and thread lighting) instead of introducing an unrelated generic Material look.
+- Judge visual changes on the emulator using real library artwork and the whole composed screen, not isolated components or assumptions. Check that backgrounds support cards, labels, logos, and navigation while still carrying visible color.
+
 ## Critical Expectations
 
 - Apply YAGNI ("You Aren't Gonna Need It") and KISS ("Keep It Simple, Stupid"). Build only what the current task requires; do not add abstractions, generality, or future-proofing for needs that do not yet exist. When two approaches work, take the simpler one.
