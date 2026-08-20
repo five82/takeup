@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import xyz.five82.takeup.api.LoomApi
@@ -120,6 +121,13 @@ class SettingsViewModel(private val repository: LoomRepository) : ViewModel() {
         try {
             scan = repository.api.scanStatus()
             scanError = null
+        } catch (e: CancellationException) {
+            // Unlike every other call in this app, this one is awaited in the
+            // polling effect's own coroutine rather than launched into
+            // viewModelScope, so it really is cancelled from under us whenever
+            // that effect restarts. Reading that as a failed request put the
+            // app's own teardown on screen as "Scan status unavailable".
+            throw e
         } catch (e: Exception) {
             scanError = e.message
         }
@@ -135,7 +143,12 @@ fun SettingsScreen(repository: LoomRepository, nav: NavState) {
     // Offline there is nothing to poll, and polling anyway is what made the app
     // feel like it expected a server to always be there.
     val online by repository.network.reach.collectAsStateWithLifecycle()
-    LaunchedEffect(online) {
+    // Keyed on the verdict rather than on reach itself: only crossing the
+    // offline line starts or stops the poll, so the first probe answering -
+    // or home settling into remote - no longer restarts the effect and
+    // cancels the request already in flight. The loop still reads `online`
+    // live, so it stops the moment the app goes offline.
+    LaunchedEffect(online != Reach.Offline) {
         while (online != Reach.Offline) {
             model.refreshScan()
             delay(3000)
