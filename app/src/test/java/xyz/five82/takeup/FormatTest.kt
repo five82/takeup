@@ -2,6 +2,8 @@ package xyz.five82.takeup
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import java.time.ZoneId
+import java.time.ZonedDateTime
 import org.junit.Test
 import xyz.five82.takeup.api.Chapter
 import xyz.five82.takeup.api.Item
@@ -12,6 +14,7 @@ import xyz.five82.takeup.ui.audioLayout
 import xyz.five82.takeup.ui.episodeLabel
 import xyz.five82.takeup.ui.formatClock
 import xyz.five82.takeup.ui.formatRuntime
+import xyz.five82.takeup.ui.formatTimestamp
 import xyz.five82.takeup.ui.nextEpisodeAfter
 import xyz.five82.takeup.ui.progressFraction
 import xyz.five82.takeup.ui.remainingLabel
@@ -32,6 +35,24 @@ class FormatTest {
         assertEquals("7:32", formatClock(452_000))
         assertEquals("0:00", formatClock(0))
         assertEquals("0:00", formatClock(-500))
+    }
+
+    @Test
+    fun timestampsReadAsLocalDateAndTime() {
+        val zone = ZoneId.of("America/New_York")
+        val now = ZonedDateTime.of(2026, 8, 20, 14, 30, 0, 0, zone)
+        // 2026-08-20T17:04:05Z is 1:04 PM the same day in New York.
+        assertEquals("Today at 1:04 PM", formatTimestamp("2026-08-20T17:04:05.123456789Z", zone, now))
+        assertEquals("Yesterday at 11:32 PM", formatTimestamp("2026-08-20T03:32:00Z", zone, now))
+        assertEquals("Aug 18 at 9:05 AM", formatTimestamp("2026-08-18T13:05:00Z", zone, now))
+        assertEquals("Dec 30, 2025 at 9:05 AM", formatTimestamp("2025-12-30T14:05:00Z", zone, now))
+    }
+
+    @Test
+    fun unparsableTimestampsFallBackToTheRawText() {
+        val zone = ZoneId.of("America/New_York")
+        val now = ZonedDateTime.of(2026, 8, 20, 14, 30, 0, 0, zone)
+        assertEquals("soon", formatTimestamp("soon", zone, now))
     }
 
     @Test

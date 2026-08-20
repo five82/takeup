@@ -57,6 +57,7 @@ import xyz.five82.takeup.ui.DownloadIcon
 import xyz.five82.takeup.ui.NavState
 import xyz.five82.takeup.ui.components.RowLabel
 import xyz.five82.takeup.ui.components.threeThreads
+import xyz.five82.takeup.ui.formatTimestamp
 import xyz.five82.takeup.ui.takeupViewModel
 import xyz.five82.takeup.ui.theme.Amber
 import xyz.five82.takeup.ui.theme.Ember
@@ -229,7 +230,8 @@ fun SettingsScreen(repository: LoomRepository, nav: NavState) {
                 scan == null -> "Checking scan status..."
                 scan.running -> "Scanning ${scan.library?.takeIf { it.isNotEmpty() } ?: "all libraries"}..."
                 scan.lastError?.isNotEmpty() == true -> "Last scan failed: ${scan.lastError}"
-                scan.lastEndedAt?.isNotEmpty() == true -> "Last scan finished ${scan.lastEndedAt}"
+                scan.lastEndedAt?.isNotEmpty() == true ->
+                    "Last scan finished ${formatTimestamp(scan.lastEndedAt)}"
                 else -> "No scan has run yet"
             }
             Text(statusLine, style = MaterialTheme.typography.bodyMedium, color = Muted)

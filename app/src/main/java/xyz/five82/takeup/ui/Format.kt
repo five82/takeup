@@ -1,5 +1,11 @@
 package xyz.five82.takeup.ui
 
+import java.time.Instant
+import java.time.ZoneId
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeParseException
+import java.time.temporal.ChronoUnit
 import xyz.five82.takeup.api.Item
 import xyz.five82.takeup.api.MediaFile
 
@@ -126,3 +132,29 @@ fun nextEpisodeAfter(episodes: List<Item>, currentId: Long): Item? {
     return ordered.getOrNull(index + 1)
 }
 
+
+/**
+ * "Today at 1:04 PM", "Yesterday at 11:32 PM", "Aug 18 at 9:05 AM", or
+ * "Dec 30, 2025 at 9:05 AM" for a Loom RFC 3339 UTC timestamp, shown in the
+ * device's local time. Returns the raw string if it cannot be parsed.
+ */
+fun formatTimestamp(
+    iso: String,
+    zone: ZoneId = ZoneId.systemDefault(),
+    now: ZonedDateTime = ZonedDateTime.now(zone),
+): String {
+    val moment = try {
+        Instant.parse(iso).atZone(zone)
+    } catch (e: DateTimeParseException) {
+        return iso
+    }
+    val time = moment.format(DateTimeFormatter.ofPattern("h:mm a"))
+    val days = ChronoUnit.DAYS.between(moment.toLocalDate(), now.toLocalDate())
+    val day = when {
+        days == 0L -> "Today"
+        days == 1L -> "Yesterday"
+        moment.year == now.year -> moment.format(DateTimeFormatter.ofPattern("MMM d"))
+        else -> moment.format(DateTimeFormatter.ofPattern("MMM d, yyyy"))
+    }
+    return "$day at $time"
+}
