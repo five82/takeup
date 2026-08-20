@@ -103,6 +103,7 @@ data class Stream(
     val title: String? = null,
     val width: Int = 0,
     val height: Int = 0,
+    val resolution: String = "",
     val channels: Int = 0,
     val channelLayout: String? = null,
     val dynamicRange: String? = null,

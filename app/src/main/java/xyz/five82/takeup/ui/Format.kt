@@ -55,11 +55,11 @@ fun techBadges(media: MediaFile?): List<String> {
     val badges = mutableListOf<String>()
     val video = media.streams?.firstOrNull { it.kind == "video" }
     if (video != null) {
-        badges += when {
-            video.width >= 3200 -> "4K"
-            video.width >= 1800 -> "1080p"
-            video.width >= 1200 -> "720p"
-            video.width > 0 -> "SD"
+        badges += when (video.resolution) {
+            "4k" -> "4K"
+            "1080p" -> "1080p"
+            "720p" -> "720p"
+            "sd" -> "SD"
             else -> ""
         }
         when (video.dynamicRange) {

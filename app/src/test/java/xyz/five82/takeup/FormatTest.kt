@@ -58,13 +58,33 @@ class FormatTest {
             filename = "movie.mkv",
             container = "matroska,webm",
             streams = listOf(
-                Stream(kind = "video", codec = "hevc", width = 3840, height = 2160, dynamicRange = "dolby_vision"),
+                Stream(
+                    kind = "video",
+                    codec = "hevc",
+                    width = 3840,
+                    height = 2160,
+                    resolution = "4k",
+                    dynamicRange = "dolby_vision",
+                ),
                 Stream(kind = "audio", codec = "truehd", channels = 8, channelLayout = "7.1", isDefault = true),
                 Stream(kind = "audio", codec = "ac3", channels = 2),
             ),
         )
         assertEquals(listOf("4K", "Dolby Vision", "HEVC", "TrueHD 7.1"), techBadges(media))
         assertEquals(emptyList<String>(), techBadges(null))
+    }
+
+    @Test
+    fun techBadgesUseServerResolutionLabel() {
+        val pillarboxed = MediaFile(
+            streams = listOf(Stream(kind = "video", width = 2880, height = 2160, resolution = "4k")),
+        )
+        assertEquals(listOf("4K"), techBadges(pillarboxed))
+
+        val unlabeled = MediaFile(
+            streams = listOf(Stream(kind = "video", width = 3840, height = 2160)),
+        )
+        assertEquals(emptyList<String>(), techBadges(unlabeled))
     }
 
     @Test

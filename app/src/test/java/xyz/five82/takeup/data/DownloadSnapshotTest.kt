@@ -26,6 +26,7 @@ class DownloadSnapshotTest {
         assertEquals(8_123_456_789L, item.media?.size)
         assertEquals(2_580_000L, item.media?.durationMs)
         assertEquals(2, item.media?.streams?.size)
+        assertEquals("4k", item.media?.streams?.get(0)?.resolution)
         assertEquals("HDR10", item.media?.streams?.get(0)?.dynamicRange)
         assertEquals("5.1", item.media?.streams?.get(1)?.channelLayout)
         assertEquals(600_000L, item.progress?.resumePositionMs)
@@ -77,6 +78,7 @@ class DownloadSnapshotTest {
                     "profile": "Main 10",
                     "width": 3840,
                     "height": 2160,
+                    "resolution": "4k",
                     "dynamic_range": "HDR10",
                     "is_default": true
                   },

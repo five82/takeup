@@ -103,7 +103,7 @@ class LoomApiTest {
                 "tag": "t", "duration_ms": 1320000, "container": "mkv",
                 "streams": [
                   {"index": 0, "kind": "video", "codec": "hevc", "width": 1920,
-                   "height": 1080, "dynamic_range": "sdr", "is_default": true}
+                   "height": 800, "resolution": "1080p", "dynamic_range": "sdr", "is_default": true}
                 ],
                 "chapters": [{"index": 0, "start_ms": 0, "title": "Open"}]
               },
@@ -122,6 +122,7 @@ class LoomApiTest {
         assertEquals("m1", item.mediaTag)
         assertEquals(1_320_000L, item.media!!.durationMs)
         assertEquals("sdr", item.media.streams!!.single().dynamicRange)
+        assertEquals("1080p", item.media.streams.single().resolution)
         assertTrue(item.media.streams.single().isDefault)
         assertEquals(0L, item.media.chapters!!.single().startMs)
         assertEquals(60_000L, item.progress!!.resumePositionMs)
