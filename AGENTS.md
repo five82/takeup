@@ -81,8 +81,11 @@ ANDROID_SERIAL=emulator-5554 ./gradlew installDebug
 Leave the emulator running between tasks. Only kill it when the user asks:
 
 ```bash
-adb -s emulator-5554 emu kill
+./stop-emulator.sh
 ```
+
+That stops every running emulator and leaves USB-connected devices alone, so
+it is safe with the Pixel plugged in.
 
 Always target a device explicitly with `ANDROID_SERIAL` or `adb -s`; the Pixel is often connected over USB at the same time, so a bare `adb` command or `./gradlew installDebug` can land on the wrong one.
 
