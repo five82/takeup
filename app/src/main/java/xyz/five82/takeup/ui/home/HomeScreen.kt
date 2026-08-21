@@ -312,7 +312,13 @@ private fun OfflineHome(repository: LoomRepository, nav: NavState, onRetry: () -
                                 lineStyle = MaterialTheme.typography.bodyMedium,
                                 progress = progressFraction(item),
                                 progressColor = Ember,
-                                onClick = { nav.push(Screen.Detail(item.id)) },
+                                // The watched-state actions are writes to Loom, which offline
+                                // would only fail, so the menu holds navigation alone.
+                                actions = listOf(
+                                    CardAction("Play") { nav.push(Screen.Player(item.id)) },
+                                    CardAction("Go to details") { nav.push(Screen.Detail(item.id)) },
+                                ),
+                                onClick = { nav.push(Screen.Player(item.id)) },
                             )
                         }
                     }
@@ -418,6 +424,7 @@ private fun HomeContent(
                                 progressColor = Ember,
                                 actions = listOf(
                                     CardAction("Play") { nav.push(Screen.Player(item.id)) },
+                                    CardAction("Go to details") { nav.push(Screen.Detail(item.id)) },
                                     CardAction("Mark watched") { model.setWatched(item, true) },
                                     CardAction("Remove from Continue Watching") { model.setWatched(item, false) },
                                 ),
@@ -441,6 +448,7 @@ private fun HomeContent(
                                 lineStyle = MaterialTheme.typography.bodyMedium,
                                 actions = listOf(
                                     CardAction("Play") { nav.push(Screen.Player(item.id)) },
+                                    CardAction("Go to details") { nav.push(Screen.Detail(item.id)) },
                                     CardAction("Mark watched") { model.setWatched(item, true) },
                                 ),
                                 onClick = { nav.push(Screen.Player(item.id)) },
