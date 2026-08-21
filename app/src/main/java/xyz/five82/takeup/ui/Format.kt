@@ -45,6 +45,24 @@ fun remainingLabel(item: Item): String? {
     return formatRuntime(progress.durationMs - progress.positionMs) + " left"
 }
 
+/**
+ * "S2E3 · Title": which episode this is, under the show named on the card
+ * above it. The show is not repeated here - unlike a movie or a show, an
+ * episode wears its own still rather than art with a title baked in, so the
+ * card carries the show as its heading instead.
+ */
+fun episodeLine(item: Item): String = "${episodeLabel(item)} · ${item.title}"
+
+/** [episodeLine] with what is left to watch, or a movie's own runtime. */
+fun continueLine(item: Item): String {
+    val remaining = remainingLabel(item)
+    return if (item.kind == "episode") {
+        listOfNotNull(episodeLine(item), remaining).joinToString(" · ")
+    } else {
+        remaining ?: formatRuntime(item.media?.durationMs ?: 0)
+    }
+}
+
 /** Watched fraction for progress threads, or null when there is nothing to draw. */
 fun progressFraction(item: Item): Float? {
     val progress = item.progress ?: return null

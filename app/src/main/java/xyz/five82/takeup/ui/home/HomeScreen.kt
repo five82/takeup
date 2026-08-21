@@ -55,7 +55,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import xyz.five82.takeup.api.Item
 import xyz.five82.takeup.data.LoomRepository
-import xyz.five82.takeup.data.OfflineCatalog
 import xyz.five82.takeup.data.Reach
 import xyz.five82.takeup.data.isOfflineError
 import xyz.five82.takeup.ui.NavState
@@ -74,8 +73,8 @@ import xyz.five82.takeup.ui.components.navPillClearance
 import xyz.five82.takeup.ui.components.ThumbCard
 import xyz.five82.takeup.ui.backdropFor
 import xyz.five82.takeup.ui.backdropUrl
-import xyz.five82.takeup.ui.episodeLabel
-import xyz.five82.takeup.ui.formatRuntime
+import xyz.five82.takeup.ui.continueLine
+import xyz.five82.takeup.ui.episodeLine
 import xyz.five82.takeup.ui.logoFor
 import xyz.five82.takeup.ui.logoUrl
 import xyz.five82.takeup.ui.posterFor
@@ -308,7 +307,8 @@ private fun OfflineHome(repository: LoomRepository, nav: NavState, onRetry: () -
                                 title = item.title,
                                 imageUrl = repository.thumbFor(item, offline = true),
                                 width = 200,
-                                line = offlineLine(item, catalog),
+                                heading = catalog.showFor(item.id)?.title,
+                                line = continueLine(item),
                                 lineStyle = MaterialTheme.typography.bodyMedium,
                                 progress = progressFraction(item),
                                 progressColor = Ember,
@@ -338,18 +338,6 @@ private fun OfflineHome(repository: LoomRepository, nav: NavState, onRetry: () -
             }
         }
     }
-}
-
-/** Like [continueLine], but naming the show as well: offline nothing else does. */
-private fun offlineLine(item: Item, catalog: OfflineCatalog): String {
-    if (item.kind != "episode") {
-        return remainingLabel(item) ?: formatRuntime(item.media?.durationMs ?: 0)
-    }
-    return listOfNotNull(
-        catalog.showFor(item.id)?.title,
-        "${episodeLabel(item)} · ${item.title}",
-        remainingLabel(item),
-    ).joinToString(" · ")
 }
 
 @Composable
@@ -423,6 +411,7 @@ private fun HomeContent(
                                 title = item.title,
                                 imageUrl = api.thumbUrl(item),
                                 width = 200,
+                                heading = item.seriesTitle,
                                 line = continueLine(item),
                                 lineStyle = MaterialTheme.typography.bodyMedium,
                                 progress = progressFraction(item),
@@ -447,7 +436,8 @@ private fun HomeContent(
                                 title = item.title,
                                 imageUrl = api.thumbUrl(item),
                                 width = 200,
-                                line = "${episodeLabel(item)} · ${item.title}",
+                                heading = item.seriesTitle,
+                                line = episodeLine(item),
                                 lineStyle = MaterialTheme.typography.bodyMedium,
                                 actions = listOf(
                                     CardAction("Play") { nav.push(Screen.Player(item.id)) },
@@ -492,15 +482,6 @@ private fun HomeContent(
                 }
             }
         }
-    }
-}
-
-private fun continueLine(item: Item): String {
-    val remaining = remainingLabel(item)
-    return if (item.kind == "episode") {
-        listOfNotNull("${episodeLabel(item)} · ${item.title}", remaining).joinToString(" · ")
-    } else {
-        remaining ?: formatRuntime(item.media?.durationMs ?: 0)
     }
 }
 

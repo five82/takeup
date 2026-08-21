@@ -11,7 +11,9 @@ import xyz.five82.takeup.api.MediaFile
 import xyz.five82.takeup.api.Progress
 import xyz.five82.takeup.api.Stream
 import xyz.five82.takeup.ui.audioLayout
+import xyz.five82.takeup.ui.continueLine
 import xyz.five82.takeup.ui.episodeLabel
+import xyz.five82.takeup.ui.episodeLine
 import xyz.five82.takeup.ui.formatClock
 import xyz.five82.takeup.ui.formatRuntime
 import xyz.five82.takeup.ui.formatTimestamp
@@ -61,6 +63,34 @@ class FormatTest {
         assertEquals(
             "S4E1-2",
             episodeLabel(Item(seasonNumber = 4, episodeNumber = 1, episodeEndNumber = 2)),
+        )
+    }
+
+    @Test
+    fun homeCardLinesPlaceAnEpisodeUnderItsShow() {
+        // The show itself is the card's heading, so it is deliberately absent
+        // from both lines rather than repeated in them.
+        val episode = Item(
+            kind = "episode",
+            title = "The Constant",
+            seasonNumber = 4,
+            episodeNumber = 5,
+            seriesTitle = "Lost",
+        )
+        assertEquals("S4E5 · The Constant", episodeLine(episode))
+        assertEquals(
+            "S4E5 · The Constant · 30 m left",
+            continueLine(episode.copy(progress = Progress(positionMs = 1_800_000, durationMs = 3_600_000))),
+        )
+    }
+
+    @Test
+    fun continueLineFallsBackToRuntimeForAnUnstartedMovie() {
+        val movie = Item(kind = "movie", title = "Heat", media = MediaFile(durationMs = 10_260_000))
+        assertEquals("2 h 51 m", continueLine(movie))
+        assertEquals(
+            "1 h 0 m left",
+            continueLine(movie.copy(progress = Progress(positionMs = 6_660_000, durationMs = 10_260_000))),
         )
     }
 

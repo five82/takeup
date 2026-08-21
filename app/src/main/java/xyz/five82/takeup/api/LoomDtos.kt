@@ -42,8 +42,8 @@ data class Item(
     val progress: Progress? = null,
     val episodeCount: Int = 0,
     val unwatchedCount: Int = 0,
-    // Present only on search results: context for episodes listed outside
-    // their show hierarchy.
+    // Context for episodes listed outside their show hierarchy. Search fills in
+    // both; Continue Watching and Next Up carry the series title only.
     val seriesTitle: String? = null,
     val seasonTitle: String? = null,
 ) {

@@ -103,8 +103,11 @@ fun PosterCard(
 }
 
 /**
- * 16:9 thumb card for Continue Watching and Next Up. Loom's thumb art has
- * the title baked in, so the lines beneath carry context, not identity.
+ * 16:9 thumb card for Continue Watching and Next Up. A movie or show wears a
+ * thumb with its title baked in, but an episode wears its own still, so the
+ * show it belongs to has to be named in [heading]; [line] places the episode
+ * within that show. Both are held to one line so a long title cannot push a
+ * card's text past its neighbours'.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -113,6 +116,7 @@ fun ThumbCard(
     imageUrl: String?,
     modifier: Modifier = Modifier,
     width: Int = 172,
+    heading: String? = null,
     line: String? = null,
     lineStyle: TextStyle = MaterialTheme.typography.labelSmall,
     progress: Float? = null,
@@ -157,14 +161,24 @@ fun ThumbCard(
                     )
                 }
             }
+            if (heading != null) {
+                Text(
+                    heading,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = Ink,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 6.dp, start = 2.dp),
+                )
+            }
             if (line != null) {
                 Text(
                     line,
                     style = lineStyle,
                     color = Muted,
-                    maxLines = 2,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 6.dp, start = 2.dp),
+                    modifier = Modifier.padding(top = if (heading == null) 6.dp else 1.dp, start = 2.dp),
                 )
             }
         }
