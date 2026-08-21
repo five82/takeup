@@ -247,7 +247,7 @@ private fun PlayerContent(repository: LoomRepository, nav: NavState, model: Play
             tween(200),
             label = "subtitleLift",
         )
-        SubtitleOverlay(player, subtitleLift, Modifier.fillMaxSize())
+        SubtitleOverlay(player, subtitleLift, cropped, Modifier.fillMaxSize())
 
         if (buffering && !model.ended) {
             CircularProgressIndicator(
