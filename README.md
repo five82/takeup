@@ -123,4 +123,4 @@ Takeup is written in Kotlin with Jetpack Compose and Material 3. Playback and do
 
 ## License
 
-Takeup is licensed under the [GNU General Public License v3.0](LICENSE). The bundled Google Sans Flex font is distributed under the SIL Open Font License; see [`licenses/google-sans-flex-OFL.txt`](licenses/google-sans-flex-OFL.txt).
+Takeup is licensed under the [GNU General Public License v3.0](LICENSE). The bundled Google Sans Flex and Lato fonts are distributed under the SIL Open Font License; see [`licenses/google-sans-flex-OFL.txt`](licenses/google-sans-flex-OFL.txt) and [`licenses/lato-OFL.txt`](licenses/lato-OFL.txt).

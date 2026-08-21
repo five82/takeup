@@ -35,7 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
 import androidx.media3.common.text.Cue
 import androidx.media3.common.text.CueGroup
-import xyz.five82.takeup.ui.theme.TakeupSans
+import xyz.five82.takeup.ui.theme.TakeupSubtitle
 
 // Cues drawn in Compose rather than through Media3's SubtitleView, which cannot
 // round a corner or pad a background box. We only ever play SRT: text cues, no
@@ -84,7 +84,7 @@ fun SubtitleOverlay(player: Player, lift: Dp, modifier: Modifier = Modifier) {
             Text(
                 text = text.toAnnotatedString(),
                 color = Color.White,
-                fontFamily = TakeupSans,
+                fontFamily = TakeupSubtitle,
                 fontWeight = FontWeight.Medium,
                 fontSize = fontSize,
                 lineHeight = fontSize * 1.3f,

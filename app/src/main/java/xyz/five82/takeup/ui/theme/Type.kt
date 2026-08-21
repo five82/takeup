@@ -4,6 +4,7 @@ import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.em
@@ -38,6 +39,19 @@ val TakeupSans = FontFamily(
         weight = FontWeight.Bold,
         variationSettings = FontVariation.Settings(FontVariation.weight(700)),
     ),
+)
+
+// Subtitles are the one place that steps outside Google Sans Flex. Lato's
+// plainer, humanist letterforms read better in motion over a moving picture,
+// and it is what the iPad app draws cues in - the same voice on both. Static
+// faces rather than one variable file, so italic and bold runs in a cue get
+// the real cuts instead of a synthesized slant.
+
+val TakeupSubtitle = FontFamily(
+    Font(R.font.lato_medium, weight = FontWeight.Medium),
+    Font(R.font.lato_medium_italic, weight = FontWeight.Medium, style = FontStyle.Italic),
+    Font(R.font.lato_bold, weight = FontWeight.Bold),
+    Font(R.font.lato_bold_italic, weight = FontWeight.Bold, style = FontStyle.Italic),
 )
 
 val TakeupDisplay = FontFamily(
