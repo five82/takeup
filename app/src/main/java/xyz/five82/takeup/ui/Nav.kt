@@ -11,6 +11,7 @@ sealed interface Screen {
     data class Player(val itemId: Long) : Screen
     data class Search(val initialQuery: String = "") : Screen
     data object Settings : Screen
+    data object Downloads : Screen
     data class Artwork(val itemId: Long, val title: String) : Screen
     data class GenreGrid(val genreId: Long, val title: String) : Screen
     data class CollectionGrid(val slug: String, val title: String) : Screen

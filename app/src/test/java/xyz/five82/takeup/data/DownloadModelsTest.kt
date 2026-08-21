@@ -137,6 +137,22 @@ class DownloadModelsTest {
     }
 
     @Test
+    fun `summarizes active downloads and completed bytes`() {
+        val entries = listOf(
+            entry(state = DownloadState.Queued),
+            entry(state = DownloadState.Failed),
+            entry(state = DownloadState.Removing),
+            entry(title = "Done", total = 1_500_000_000),
+            entry(title = "Unknown size", total = -1, downloaded = 500_000_000),
+        )
+
+        assertEquals(
+            DownloadSummary(activeCount = 3, completedCount = 2, completedBytes = 2_000_000_000),
+            downloadSummary(entries),
+        )
+    }
+
+    @Test
     fun `offers the action that matches the download's state`() {
         assertEquals(DownloadAction.Start, downloadAction(null, "abc"))
         assertEquals(

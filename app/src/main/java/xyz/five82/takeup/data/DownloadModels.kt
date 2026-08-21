@@ -78,6 +78,21 @@ fun downloadProgressFraction(entry: DownloadEntry): Float {
     return (entry.bytesDownloaded.toFloat() / entry.totalBytes).coerceIn(0f, 1f)
 }
 
+data class DownloadSummary(
+    val activeCount: Int,
+    val completedCount: Int,
+    val completedBytes: Long,
+)
+
+/** Counts the work in flight separately from bytes that really occupy the device. */
+fun downloadSummary(entries: List<DownloadEntry>): DownloadSummary = DownloadSummary(
+    activeCount = entries.count { it.state != DownloadState.Completed },
+    completedCount = entries.count { it.state == DownloadState.Completed },
+    completedBytes = entries
+        .filter { it.state == DownloadState.Completed }
+        .sumOf { it.totalBytes.takeIf { size -> size > 0 } ?: it.bytesDownloaded },
+)
+
 fun formatBytes(bytes: Long): String {
     if (bytes <= 0L) return "0 MB"
     val gb = bytes / 1_000_000_000.0

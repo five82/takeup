@@ -57,6 +57,7 @@ import xyz.five82.takeup.api.Item
 import xyz.five82.takeup.data.LoomRepository
 import xyz.five82.takeup.data.Reach
 import xyz.five82.takeup.data.isOfflineError
+import xyz.five82.takeup.ui.DownloadIcon
 import xyz.five82.takeup.ui.NavState
 import xyz.five82.takeup.ui.Screen
 import xyz.five82.takeup.ui.components.BiasCutBackdrop
@@ -291,6 +292,7 @@ private fun OfflineHome(repository: LoomRepository, nav: NavState, onRetry: () -
                             .padding(top = 4.dp, end = 8.dp),
                     ) {
                         RoundIconButton(Icons.Filled.Search, "Search") { nav.push(Screen.Search()) }
+                        RoundIconButton(DownloadIcon, "Downloads") { nav.push(Screen.Downloads) }
                         RoundIconButton(Icons.Filled.Settings, "Settings") { nav.push(Screen.Settings) }
                     }
                 }
@@ -404,6 +406,7 @@ private fun HomeContent(
                             .padding(top = 4.dp, end = 8.dp),
                     ) {
                         RoundIconButton(Icons.Filled.Search, "Search") { nav.push(Screen.Search()) }
+                        RoundIconButton(DownloadIcon, "Downloads") { nav.push(Screen.Downloads) }
                         RoundIconButton(Icons.Filled.Settings, "Settings") { nav.push(Screen.Settings) }
                     }
                 }

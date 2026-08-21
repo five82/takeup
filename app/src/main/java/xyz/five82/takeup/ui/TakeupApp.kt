@@ -46,6 +46,7 @@ import xyz.five82.takeup.ui.browse.CollectionGridScreen
 import xyz.five82.takeup.ui.browse.GenreGridScreen
 import xyz.five82.takeup.ui.components.Selvedge
 import xyz.five82.takeup.ui.detail.DetailScreen
+import xyz.five82.takeup.ui.downloads.DownloadsScreen
 import xyz.five82.takeup.ui.home.HomeScreen
 import xyz.five82.takeup.ui.library.LibraryScreen
 import xyz.five82.takeup.ui.onboarding.OnboardingScreen
@@ -106,6 +107,7 @@ private fun MainScaffold(repository: LoomRepository) {
                             is Screen.Player -> PlayerScreen(repository, nav, screen.itemId)
                             is Screen.Search -> SearchScreen(repository, nav, screen.initialQuery)
                             is Screen.Settings -> SettingsScreen(repository, nav)
+                            is Screen.Downloads -> DownloadsScreen(repository, nav)
                             is Screen.Artwork -> ArtworkScreen(repository, nav, screen.itemId, screen.title)
                             is Screen.GenreGrid -> GenreGridScreen(repository, nav, screen)
                             is Screen.CollectionGrid -> CollectionGridScreen(repository, nav, screen)
