@@ -15,19 +15,20 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.request.transformations
 import xyz.five82.takeup.ui.theme.Stage
 import xyz.five82.takeup.ui.theme.fieldTone
 
@@ -194,14 +195,19 @@ fun GauzeBackground(
     // backdrops, and the moment before the image decodes.
     Box(modifier.fillMaxSize().dyeBath(seed)) {
         if (imageUrl != null) {
+            // The blur and saturation boost are baked into the small bitmap
+            // by GauzeTransformation rather than applied as live layer
+            // effects - a full-screen RenderEffect blur re-runs on the GPU
+            // every redrawn frame for output that never changes.
+            val blurPx = with(LocalDensity.current) { 64.dp.toPx() }
             AsyncImage(
-                model = imageUrl,
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(imageUrl)
+                    .transformations(GauzeTransformation(blurPx))
+                    .build(),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                // Blur washes saturation out; the boost keeps the weather
-                // colorful so the scrim can do the darkening alone.
-                colorFilter = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(1.4f) }),
-                modifier = Modifier.fillMaxSize().blur(64.dp),
+                modifier = Modifier.fillMaxSize(),
             )
             Box(
                 Modifier
