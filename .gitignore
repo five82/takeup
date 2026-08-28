@@ -30,6 +30,10 @@ keystore.properties
 *.jks
 *.keystore
 
+# Play Console service account key and fastlane run artifacts
+play-service-account.json
+fastlane/
+
 # Google Services (e.g. APIs or Firebase)
 google-services.json
 

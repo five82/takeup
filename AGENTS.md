@@ -8,6 +8,7 @@ This file provides guidance when working with code in this repository.
 - Run `./check-ci.sh` before handing work back.
 - Test on the emulator, not the Pixel. Start the emulator yourself if it is not running.
 - Debug builds install as `xyz.five82.takeup.debug`. Launch that, not `xyz.five82.takeup`.
+- `./deploy-release.sh` publishes to real Play Console testers. Run it only when asked.
 - Video playback does not work on the emulator. Anything that needs a playing video - the player screen included - must be verified on the Pixel.
 
 ## Project
@@ -56,6 +57,36 @@ Run device tests separately when an emulator or device is available:
 ```bash
 ./gradlew connectedCheck
 ```
+
+## Release
+
+`./deploy-release.sh [versionName]` bumps `versionCode`, builds a signed app
+bundle, uploads it to the Play Console internal testing track, then commits and
+tags the bump. It does not push; do that yourself once the upload looks right.
+
+Run it only when the user asks. It publishes to real testers.
+
+```bash
+./deploy-release.sh          # keep versionName, bump versionCode only
+./deploy-release.sh 0.8.1    # also set versionName, tagged v0.8.1
+```
+
+It needs `brew install fastlane`, plus two secrets that stay out of this public
+repo and are gitignored:
+
+- `keystore.properties` - upload signing credentials.
+- `play-service-account.json` - a Google Cloud service account key, granted
+  "Release apps to testing tracks" on this app under Play Console -> Users and
+  permissions. Override the path with `PLAY_SERVICE_ACCOUNT_JSON`.
+
+Play Console no longer has an "API access" page, and the developer account no
+longer needs a linked Cloud project. Create the service account and its JSON key
+in Google Cloud Console (enable the Google Play Android Developer API first),
+then invite its `...iam.gserviceaccount.com` address as a user in Play Console.
+
+The repo is mirrored publicly on GitHub, so neither secret may ever be checked
+in, base64-encoded into a workflow, or pasted into a CI provider. Releases are
+cut locally on purpose.
 
 ## Emulator
 
