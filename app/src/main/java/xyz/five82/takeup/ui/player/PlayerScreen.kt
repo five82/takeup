@@ -117,20 +117,19 @@ fun PlayerScreen(repository: LoomRepository, nav: NavState, itemId: Long) {
     val application = LocalContext.current.applicationContext as TakeupApplication
     val model = takeupViewModel("player-$itemId") { PlayerViewModel(application, repository, itemId) }
 
-    // The player owns the device while it is on screen: landscape, immersive,
-    // and awake. All of it is handed back on dispose.
+    // The player owns the device while it is on screen: landscape and
+    // immersive. Both are handed back on dispose. Keeping the screen awake
+    // belongs to playback rather than to the screen; see PlayerContent.
     val activity = LocalActivity.current
     DisposableEffect(Unit) {
         val window = activity?.window
         activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-        window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val controller = window?.let { WindowCompat.getInsetsController(it, it.decorView) }
         controller?.systemBarsBehavior =
             WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         controller?.hide(WindowInsetsCompat.Type.systemBars())
         onDispose {
             activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-            window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             controller?.show(WindowInsetsCompat.Type.systemBars())
         }
     }
@@ -154,6 +153,7 @@ fun PlayerScreen(repository: LoomRepository, nav: NavState, itemId: Long) {
 @Composable
 private fun PlayerContent(repository: LoomRepository, nav: NavState, model: PlayerViewModel) {
     val player = model.player
+    val activity = LocalActivity.current
     var controlsVisible by remember { mutableStateOf(true) }
     var playing by remember { mutableStateOf(player.isPlaying) }
     var buffering by remember { mutableStateOf(true) }
@@ -200,6 +200,18 @@ private fun PlayerContent(repository: LoomRepository, nav: NavState, model: Play
             duration = player.duration.takeIf { it > 0 } ?: model.item?.media?.durationMs ?: 0
             delay(250)
         }
+    }
+
+    // Hold the screen awake only while frames are moving, the way other video
+    // players do: a paused video times out like any other screen. Buffering
+    // counts as playing, because the display sleeps as soon as the flag drops
+    // if the last touch is already older than the screen timeout - a rebuffer
+    // an hour into a film would otherwise blank the screen at once.
+    val awake = playing || buffering
+    DisposableEffect(activity, awake) {
+        val window = activity?.window
+        if (awake) window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        onDispose { window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
     }
 
     // Controls fade while playing; any interaction brings them back, and
