@@ -19,6 +19,8 @@ Single-developer hobby project - prefer simple, maintainable solutions over clev
 
 Loom and Takeup are developed and deployed together for one user. Do not preserve compatibility with older versions of either application; make coordinated changes in both repositories instead of adding compatibility shims.
 
+Configuration and state live on Loom by design, and the Loom address is discovered over mDNS. What Takeup persists locally is cache and convenience, all of it rediscovered or re-fetched on next launch. Uninstalling and reinstalling is therefore harmless: do not warn about losing settings, the server address, or playback progress, and do not treat a reinstall as a cost worth weighing.
+
 ## Visual Design Philosophy
 
 Takeup should feel closer to Apple TV than to the typical black media-center interface: cinematic, artwork-led, colorful, and dimensional. Dark-only does not mean black-first.
