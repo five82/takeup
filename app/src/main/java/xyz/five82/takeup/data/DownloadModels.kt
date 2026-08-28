@@ -100,13 +100,11 @@ fun formatBytes(bytes: Long): String {
     return String.format(Locale.US, "%.0f MB", bytes / 1_000_000.0)
 }
 
-/** Active downloads first so in-progress work stays visible, then newest additions. */
+/** Active downloads first so in-progress work stays visible, then A-Z as Loom orders. */
 fun downloadedRowItems(entries: List<DownloadEntry>): List<DownloadEntry> =
     entries.sortedWith(
-        compareBy(
-            { it.state == DownloadState.Completed },
-            { it.item.title },
-        ),
+        compareBy<DownloadEntry> { it.state == DownloadState.Completed }
+            .then(compareBy(alphabetical, DownloadEntry::item)),
     )
 
 /** What the download control on a details screen should currently offer. */

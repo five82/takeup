@@ -4,6 +4,16 @@ import xyz.five82.takeup.api.Item
 import xyz.five82.takeup.api.Progress
 
 /**
+ * Loom's A-Z order, reproduced for the lists this app sorts itself: one leading
+ * English article skipped, compared without case, ties broken by the title. A
+ * downloaded library that ordered titles any other way would reshuffle itself
+ * the moment the device came back online.
+ */
+internal val alphabetical: Comparator<Item> =
+    compareBy(String.CASE_INSENSITIVE_ORDER, Item::sortKey)
+        .thenBy(String.CASE_INSENSITIVE_ORDER, Item::title)
+
+/**
  * The downloads as a library. Movies and short films stand for themselves,
  * episodes gather under the seasons and shows captured alongside them, and every
  * screen with no Loom reads this instead of the API - the same items, the same
@@ -55,13 +65,13 @@ class OfflineCatalog(
 
     /** What a library tab holds offline, in the same A-Z order Loom serves. */
     fun library(kind: String): List<Item> = when (kind) {
-        "tv" -> (shows + looseEpisodes).sortedBy { it.title }
+        "tv" -> (shows + looseEpisodes).sortedWith(alphabetical)
         // An item does not carry its library's kind, so the cached id-to-kind map
         // fills that in. Anything downloaded before the map knew its library lands
         // under Movies rather than vanishing from every tab.
         else -> ready
             .filter { it.kind == "movie" && (libraryKinds[it.libraryId] ?: "movies") == kind }
-            .sortedBy { it.title }
+            .sortedWith(alphabetical)
     }
 
     fun item(id: Long): Item? = itemsById[id] ?: ancestorsById[id]
@@ -110,7 +120,7 @@ class OfflineCatalog(
         .distinctBy { it.id }
 
     /** Everything on the device in one A-Z grid, for a tab with no libraries to split. */
-    fun all(): List<Item> = recent().sortedBy { it.title }
+    fun all(): List<Item> = recent().sortedWith(alphabetical)
 
     /**
      * Offline search. Loom matches on word starts across titles and credited
@@ -126,7 +136,7 @@ class OfflineCatalog(
                 item.title.contains(trimmed, ignoreCase = true) ||
                     showFor(item.id)?.title?.contains(trimmed, ignoreCase = true) == true
             }
-            .sortedBy { it.title }
+            .sortedWith(alphabetical)
     }
 
     private fun seasonsOf(showId: Long): List<Item> = episodesByShow[showId]

@@ -159,6 +159,24 @@ class OfflineCatalogTest {
     }
 
     @Test
+    fun `offline listings file a leading article under the next word, as Loom does`() {
+        val catalog = catalog(
+            entries = listOf(
+                movie(1, "Gangs of New York"),
+                movie(2, "The Departed", sortTitle = "Departed"),
+                movie(3, "A Bronx Tale", sortTitle = "Bronx Tale"),
+                movie(4, "Cape Fear"),
+            ),
+        )
+
+        assertEquals(listOf(3L, 4L, 2L, 1L), catalog.library("movies").map { it.id })
+        assertEquals(listOf(3L, 4L, 2L, 1L), catalog.all().map { it.id })
+        // Search hits sort the same way, so dropping offline mid-search does not
+        // reshuffle the results. Every title here contains an "a".
+        assertEquals(listOf(3L, 4L, 2L, 1L), catalog.search("a").map { it.id })
+    }
+
+    @Test
     fun `the player chains through a show's downloaded episodes`() {
         val catalog = catalog(
             entries = listOf(
@@ -185,8 +203,16 @@ class OfflineCatalogTest {
         state: DownloadState = DownloadState.Completed,
         progress: Progress? = null,
         startTimeMs: Long = 0,
+        sortTitle: String? = null,
     ) = entry(
-        Item(id = id, kind = "movie", title = title, libraryId = libraryId, progress = progress),
+        Item(
+            id = id,
+            kind = "movie",
+            title = title,
+            sortTitle = sortTitle,
+            libraryId = libraryId,
+            progress = progress,
+        ),
         state,
         startTimeMs,
     )

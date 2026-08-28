@@ -11,6 +11,9 @@ data class Item(
     val parentId: Long? = null,
     val kind: String = "",
     val title: String = "",
+    // The title with one leading English article dropped, sent only where that
+    // changes the title. See [Item.sortKey].
+    val sortTitle: String? = null,
     val year: Int = 0,
     val seasonNumber: Int = 0,
     val episodeNumber: Int = 0,
@@ -48,6 +51,13 @@ data class Item(
     val seasonTitle: String? = null,
 ) {
     val isPlayable: Boolean get() = kind == "movie" || kind == "episode"
+
+    /**
+     * What Loom's own A-Z listings sort by, so The Departed files under D.
+     * Only lists this app orders itself need it; anything drawn in the order
+     * the server sent it is already sorted this way.
+     */
+    val sortKey: String get() = sortTitle ?: title
 }
 
 data class SearchResponse(
