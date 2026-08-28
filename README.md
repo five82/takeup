@@ -18,7 +18,7 @@ This repository is shared as is. Takeup is a personal tool. It is open source in
 the spirit of sharing, but it is not actively maintained as a general-purpose
 product.
 
-- Personal-first: behavior may change as the workflow evolves.
+- Personal-first: behavior may change as the application evolves.
 - Best-effort only: questions and issues may receive a slow response or none.
 - The project began as and remains an experiment. Expect rough edges.
 
