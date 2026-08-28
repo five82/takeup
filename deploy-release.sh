@@ -100,9 +100,11 @@ if ! [[ "$new_version_name" =~ ^[0-9A-Za-z.+_-]+$ ]]; then
     exit 1
 fi
 
-tag="v${new_version_name}"
+# A no-arg run reuses the version name, so the version code is what makes a
+# tag unique. It is semver build metadata, which is exactly what this is.
+tag="v${new_version_name}+${new_version_code}"
 if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
-    print_error "Tag $tag already exists. Pass a new version name."
+    print_error "Tag $tag already exists."
     exit 1
 fi
 
@@ -143,9 +145,17 @@ print_success "Uploaded ${new_version_name} (${new_version_code})"
 print_step "Recording the release"
 version_bumped=""
 git add "$BUILD_FILE"
-git commit -m "Bump the version to ${new_version_name} for internal testing"
+git commit -m "Bump the version to ${new_version_name} (${new_version_code}) for internal testing"
 git tag "$tag"
 print_success "Committed and tagged $tag"
 
+branch=$(git rev-parse --abbrev-ref HEAD)
+read -r -p "Push $branch and $tag to origin? [y/N] " push_reply
+if [[ "$push_reply" =~ ^[Yy]$ ]]; then
+    git push origin "$branch" "$tag"
+    print_success "Pushed $branch and $tag"
+else
+    print_success "Not pushed. When ready: git push origin $branch $tag"
+fi
+
 echo -e "\n${GREEN}Released ${new_version_name} (${new_version_code}) to internal testing${NC}"
-echo "Push when ready: git push origin main --tags"

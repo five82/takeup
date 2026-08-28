@@ -61,15 +61,18 @@ Run device tests separately when an emulator or device is available:
 ## Release
 
 `./deploy-release.sh [versionName]` bumps `versionCode`, builds a signed app
-bundle, uploads it to the Play Console internal testing track, then commits and
-tags the bump. It does not push; do that yourself once the upload looks right.
+bundle, uploads it to the Play Console internal testing track, commits and tags
+the bump, then offers to push.
 
 Run it only when the user asks. It publishes to real testers.
 
 ```bash
 ./deploy-release.sh          # keep versionName, bump versionCode only
-./deploy-release.sh 0.8.1    # also set versionName, tagged v0.8.1
+./deploy-release.sh 0.8.1    # also set versionName
 ```
+
+Tags are `v<versionName>+<versionCode>`, so every Play release maps to exactly
+one tag even across repeated no-arg builds of the same version name.
 
 It needs `brew install fastlane`, plus two secrets that stay out of this public
 repo and are gitignored:
