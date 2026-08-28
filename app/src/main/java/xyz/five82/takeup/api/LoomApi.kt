@@ -125,25 +125,8 @@ class LoomApi(
             SearchResponse::class.java,
         )
 
-    suspend fun continueWatching(limit: Int = 20): List<Item> =
-        itemsList(get("/api/v1/continue-watching", "limit" to limit.toString()), Item::class.java)
-
-    suspend fun nextUp(limit: Int = 20): List<Item> =
-        itemsList(get("/api/v1/next-up", "limit" to limit.toString()), Item::class.java)
-
-    suspend fun recentlyAdded(limit: Int = 20): List<Item> =
-        itemsList(get("/api/v1/recently-added", "limit" to limit.toString()), Item::class.java)
-
-    /** Finished movies and fully watched shows, most recently finished first. */
-    suspend fun recentlyPlayed(limit: Int = 20): List<Item> =
-        itemsList(get("/api/v1/recently-played", "limit" to limit.toString()), Item::class.java)
-
-    /** The server-selected movie for the current 6am-to-6pm or 6pm-to-6am slot. */
-    suspend fun featuredPick(): FeaturedPick? = try {
-        gson.fromJson(get("/api/v1/featured-pick"), FeaturedPick::class.java)
-    } catch (e: LoomException) {
-        if (e.code == 404) null else throw e
-    }
+    /** The home screen: hero, playback rows, and the day's discovery shelves. */
+    suspend fun home(): Home = gson.fromJson(get("/api/v1/home"), Home::class.java)
 
     // -- playback ------------------------------------------------------------
 

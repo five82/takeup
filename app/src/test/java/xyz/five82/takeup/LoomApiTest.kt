@@ -5,7 +5,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import xyz.five82.takeup.api.Credit
-import xyz.five82.takeup.api.FeaturedPick
+import xyz.five82.takeup.api.Home
 import xyz.five82.takeup.api.Item
 import xyz.five82.takeup.api.LoomApi
 import xyz.five82.takeup.api.SearchResponse
@@ -58,16 +58,21 @@ class LoomApiTest {
     }
 
     @Test
-    fun featuredPickMapsNestedItemAndPeriod() {
-        val pick = loomGson.fromJson(
-            """{"item":{"id":42,"title":"A Movie","kind":"movie"},"starts_at":"2025-08-12T06:00:00Z","ends_at":"2025-08-12T18:00:00Z"}""",
-            FeaturedPick::class.java,
+    fun homeMapsHeroRowsAndShelves() {
+        val home = loomGson.fromJson(
+            """{"featured":{"id":42,"title":"A Movie","kind":"movie"},"continue_watching":[],"next_up":[{"id":7,"kind":"episode","title":"Pilot"}],"recently_added":[],"shelves":[{"key":"col-star-wars","title":"Star Wars","items":[{"id":1,"kind":"movie","title":"Star Wars"}]}],"expires_at":"2025-08-12T18:00:00Z"}""",
+            Home::class.java,
         )
 
-        assertEquals(42L, pick.item.id)
-        assertEquals("A Movie", pick.item.title)
-        assertEquals("2025-08-12T06:00:00Z", pick.startsAt)
-        assertEquals("2025-08-12T18:00:00Z", pick.endsAt)
+        assertEquals(42L, home.featured?.id)
+        assertEquals(listOf(7L), home.nextUp.map { it.id })
+        assertEquals("col-star-wars", home.shelves.single().key)
+        assertEquals("Star Wars", home.shelves.single().items.single().title)
+        assertEquals("2025-08-12T18:00:00Z", home.expiresAt)
+
+        val empty = loomGson.fromJson("""{"featured":null,"continue_watching":[],"next_up":[],"recently_added":[],"shelves":[]}""", Home::class.java)
+        assertNull(empty.featured)
+        assertTrue(empty.shelves.isEmpty())
     }
 
     @Test

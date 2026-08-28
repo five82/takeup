@@ -65,10 +65,22 @@ data class SearchResponse(
     val fuzzy: Boolean = false,
 )
 
-data class FeaturedPick(
-    val item: Item = Item(),
-    val startsAt: String = "",
-    val endsAt: String = "",
+/** The whole home screen in one response; Loom builds the rows and shelves. */
+data class Home(
+    val featured: Item? = null,
+    val continueWatching: List<Item> = emptyList(),
+    val nextUp: List<Item> = emptyList(),
+    val recentlyAdded: List<Item> = emptyList(),
+    val shelves: List<Shelf> = emptyList(),
+    /** UTC instant at which Loom's rows go stale and home should reload. */
+    val expiresAt: String = "",
+)
+
+/** One rotating discovery shelf. The key is stable for a given shelf kind. */
+data class Shelf(
+    val key: String = "",
+    val title: String = "",
+    val items: List<Item> = emptyList(),
 )
 
 data class Genre(

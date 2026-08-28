@@ -47,13 +47,12 @@ import androidx.compose.animation.core.animateDpAsState
 import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
 import java.time.Duration
-import java.time.LocalDateTime
+import java.time.Instant
 import java.time.LocalTime
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import xyz.five82.takeup.api.Item
+import xyz.five82.takeup.api.Shelf
 import xyz.five82.takeup.data.LoomRepository
 import xyz.five82.takeup.data.Reach
 import xyz.five82.takeup.data.isOfflineError
@@ -90,6 +89,9 @@ import xyz.five82.takeup.ui.theme.Muted
 import xyz.five82.takeup.ui.theme.Stage
 import xyz.five82.takeup.ui.theme.Violet
 
+fun featuredPickLabel(hour: Int): String =
+    if (hour in 6 until 18) "Today's Pick" else "Tonight's Pick"
+
 data class HomeState(
     val loading: Boolean = true,
     val error: String? = null,
@@ -98,7 +100,8 @@ data class HomeState(
     val nextUp: List<Item> = emptyList(),
     val recentlyAdded: List<Item> = emptyList(),
     val featuredPick: Item? = null,
-    val discovery: List<DiscoveryRow> = emptyList(),
+    val shelves: List<Shelf> = emptyList(),
+    val expiresAt: String = "",
 )
 
 class HomeViewModel(private val repository: LoomRepository) : ViewModel() {
@@ -111,9 +114,9 @@ class HomeViewModel(private val repository: LoomRepository) : ViewModel() {
      */
     fun refresh(force: Boolean = false) {
         viewModelScope.launch {
-            // Ask the policy before the network. Eight parallel calls that can
-            // only time out is what made the app feel like a streaming service
-            // that had simply gone down.
+            // Ask the policy before the network. A call that can only time out
+            // is what made the app feel like a streaming service that had
+            // simply gone down.
             if (!force && repository.network.reach.value == Reach.Offline) {
                 state = HomeState(loading = false, offline = true)
                 return@launch
@@ -122,34 +125,16 @@ class HomeViewModel(private val repository: LoomRepository) : ViewModel() {
                 state = state.copy(loading = true)
             }
             try {
-                coroutineScope {
-                    val continueWatching = async { repository.api.continueWatching() }
-                    val nextUp = async { repository.api.nextUp() }
-                    val recentlyAdded = async { repository.api.recentlyAdded() }
-                    val movies = async { repository.api.allItems("movies") }
-                    val shows = async { repository.api.allItems("tv") }
-                    val collections = async { repository.api.collections() }
-                    val recentlyPlayed = async { repository.api.recentlyPlayed() }
-                    val featured = async { repository.api.featuredPick()?.item }
-                    val movieItems = movies.await()
-                    val showItems = shows.await()
-                    val now = LocalDateTime.now()
-                    val epochDay = now.toLocalDate().toEpochDay()
-                    state = HomeState(
-                        loading = false,
-                        continueWatching = continueWatching.await(),
-                        nextUp = nextUp.await(),
-                        recentlyAdded = recentlyAdded.await(),
-                        featuredPick = featured.await(),
-                        discovery = discoveryRows(
-                            movies = movieItems,
-                            shows = showItems,
-                            collections = collections.await(),
-                            recentlyPlayed = recentlyPlayed.await(),
-                            epochDay = epochDay,
-                        ),
-                    )
-                }
+                val home = repository.api.home()
+                state = HomeState(
+                    loading = false,
+                    continueWatching = home.continueWatching,
+                    nextUp = home.nextUp,
+                    recentlyAdded = home.recentlyAdded,
+                    featuredPick = home.featured,
+                    shelves = home.shelves,
+                    expiresAt = home.expiresAt,
+                )
                 // The server answered, so anything queued while offline can land.
                 repository.flushPendingProgress()
             } catch (e: Exception) {
@@ -194,22 +179,22 @@ fun HomeScreen(repository: LoomRepository, nav: NavState, active: Boolean) {
     val model = takeupHomeViewModel(repository)
     val reach by repository.network.reach.collectAsStateWithLifecycle()
 
-    // Refresh whenever home surfaces, then at 6 am and 6 pm for the next pick.
-    // A finished episode also leaves Continue Watching without a manual reload.
-    // Keying on reach means walking back onto the home network reconnects on
-    // its own, rather than leaving the offline screen up until something asks.
+    // Refresh whenever home surfaces. A finished episode also leaves Continue
+    // Watching without a manual reload. Keying on reach means walking back
+    // onto the home network reconnects on its own, rather than leaving the
+    // offline screen up until something asks.
     LaunchedEffect(active, reach) {
-        if (active) {
-            while (true) {
-                model.refresh()
-                val now = LocalDateTime.now()
-                val nextChange = when {
-                    now.hour < 6 -> now.toLocalDate().atTime(6, 0)
-                    now.hour < 18 -> now.toLocalDate().atTime(18, 0)
-                    else -> now.toLocalDate().plusDays(1).atTime(6, 0)
-                }
-                delay(Duration.between(now, nextChange).toMillis().coerceAtLeast(1_000))
-            }
+        if (active) model.refresh()
+    }
+    // Loom says when its rows go stale - the next pick change or shelf
+    // rotation - so home reloads then rather than guessing at the server's
+    // schedule from this clock. The floor keeps a skewed clock from spinning.
+    val expiresAt = model.state.expiresAt
+    LaunchedEffect(active, expiresAt) {
+        val expiry = runCatching { Instant.parse(expiresAt) }.getOrNull()
+        if (active && expiry != null) {
+            delay(Duration.between(Instant.now(), expiry).toMillis().coerceAtLeast(60_000))
+            model.refresh()
         }
     }
 
@@ -360,16 +345,14 @@ private fun HomeContent(
     state: HomeState,
 ) {
     val api = repository.api
-    // Loom chooses the movie; the label remains client-side so it follows the
-    // device's local clock rather than the server's timezone.
+    // Loom chooses the movie and keeps it out of every row; the label remains
+    // client-side so it follows the device's local clock rather than the
+    // server's timezone.
     val hero = state.featuredPick
     val heroLabel = featuredPickLabel(LocalTime.now().hour)
-    val continueWatching = state.continueWatching.filterNot { it.id == hero?.id }
-    val nextUp = state.nextUp.filterNot { it.id == hero?.id }
-    val recentlyAdded = state.recentlyAdded.filterNot { it.id == hero?.id }
-    val discovery = state.discovery.mapNotNull { row ->
-        row.copy(items = row.items.filterNot { it.id == hero?.id }).takeIf { it.items.isNotEmpty() }
-    }
+    val continueWatching = state.continueWatching
+    val nextUp = state.nextUp
+    val recentlyAdded = state.recentlyAdded
     // Use the visible backdrop for gauze; a poster is only a last-resort
     // fallback because it is portrait art rather than the hero's landscape.
     val heroBackdrop = hero?.let { api.backdropUrl(it, 240) }
@@ -477,10 +460,10 @@ private fun HomeContent(
             }
 
             // The rotating shelves: a different slice of the library every day.
-            for (discoveryRow in discovery) {
-                item(key = "d-${discoveryRow.key}") {
-                    HomeRow(discoveryRow.title, labelColor = Violet) {
-                        items(discoveryRow.items, key = { "${discoveryRow.key}-${it.id}" }) { item ->
+            for (shelf in state.shelves) {
+                item(key = "d-${shelf.key}") {
+                    HomeRow(shelf.title, labelColor = Violet) {
+                        items(shelf.items, key = { "${shelf.key}-${it.id}" }) { item ->
                             PosterCard(
                                 title = item.title,
                                 imageUrl = api.posterUrl(item),
