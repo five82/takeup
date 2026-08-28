@@ -40,6 +40,7 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import xyz.five82.takeup.BuildConfig
 import xyz.five82.takeup.api.LoomApi
 import xyz.five82.takeup.api.ScanStatus
 import xyz.five82.takeup.data.LoomRepository
@@ -240,6 +241,13 @@ fun SettingsScreen(repository: LoomRepository, nav: NavState) {
             }
 
             RowLabel("About", modifier = Modifier.padding(top = 24.dp))
+            // The version code is the part that identifies a Play build, so it
+            // is worth showing next to the friendlier version name.
+            Text(
+                "Version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Ink,
+            )
             Text(
                 "Takeup is the take-up reel on a loom: the beam that winds finished cloth as it is woven.",
                 style = MaterialTheme.typography.bodyMedium,

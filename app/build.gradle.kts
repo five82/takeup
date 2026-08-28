@@ -48,6 +48,8 @@ android {
 
     buildFeatures {
         compose = true
+        // Settings shows the version, so the generated constants have to exist.
+        buildConfig = true
     }
 
     compileOptions {
