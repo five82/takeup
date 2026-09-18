@@ -57,6 +57,9 @@ import xyz.five82.takeup.data.LoomRepository
 import xyz.five82.takeup.data.Reach
 import xyz.five82.takeup.data.isOfflineError
 import xyz.five82.takeup.ui.DownloadIcon
+import xyz.five82.takeup.ui.FoldLayout
+import xyz.five82.takeup.ui.LocalFoldLayout
+import xyz.five82.takeup.ui.foldContentInsets
 import xyz.five82.takeup.ui.NavState
 import xyz.five82.takeup.ui.Screen
 import xyz.five82.takeup.ui.components.BiasCutBackdrop
@@ -226,6 +229,7 @@ fun HomeScreen(repository: LoomRepository, nav: NavState, active: Boolean) {
  */
 @Composable
 private fun OfflineHome(repository: LoomRepository, nav: NavState, onRetry: () -> Unit) {
+    val layout = LocalFoldLayout.current
     val catalog by repository.offlineCatalog.collectAsStateWithLifecycle()
     val reason by repository.network.reason.collectAsStateWithLifecycle()
     val continueWatching = catalog.continueWatching()
@@ -252,7 +256,9 @@ private fun OfflineHome(repository: LoomRepository, nav: NavState, onRetry: () -
                     if (hero != null) {
                         Hero(
                             item = hero,
-                            backdrop = repository.backdropFor(hero, offline = true, widthPx = 960),
+                            backdrop = repository.backdropFor(
+                                hero, offline = true, widthPx = if (layout == FoldLayout.Phone) 960 else 1440,
+                            ),
                             logo = repository.logoFor(hero, offline = true),
                             label = if (hero == continueWatching.firstOrNull()) {
                                 "Continue watching"
@@ -266,25 +272,22 @@ private fun OfflineHome(repository: LoomRepository, nav: NavState, onRetry: () -
                             reason = "$reason Nothing is downloaded to this device yet.",
                             onRetry = onRetry,
                             modifier = Modifier
+                                .foldContentInsets()
                                 .statusBarsPadding()
                                 .padding(start = 20.dp, end = 20.dp, top = 44.dp),
                         )
                     }
-                    Row(
-                        Modifier
-                            .align(Alignment.TopEnd)
-                            .statusBarsPadding()
-                            .padding(top = 4.dp, end = 8.dp),
-                    ) {
-                        RoundIconButton(Icons.Filled.Search, "Search") { nav.push(Screen.Search()) }
-                        RoundIconButton(DownloadIcon, "Downloads") { nav.push(Screen.Downloads) }
-                        RoundIconButton(Icons.Filled.Settings, "Settings") { nav.push(Screen.Settings) }
+                    if (!layout.hasSidebar) {
+                        HomeUtilities(nav, Modifier.align(Alignment.TopEnd))
                     }
                 }
             }
             if (hero == null) return@LazyColumn
             item(key = "offline-banner") {
-                OfflineBanner(reason, onRetry, Modifier.padding(start = 20.dp, end = 12.dp, top = 12.dp))
+                OfflineBanner(
+                    reason, onRetry,
+                    Modifier.foldContentInsets().padding(start = 20.dp, end = 12.dp, top = 12.dp),
+                )
             }
             if (continueWatching.isNotEmpty()) {
                 item(key = "offline-cw") {
@@ -293,7 +296,7 @@ private fun OfflineHome(repository: LoomRepository, nav: NavState, onRetry: () -
                             ThumbCard(
                                 title = item.title,
                                 imageUrl = repository.thumbFor(item, offline = true),
-                                width = 200,
+                                width = layout.thumbWidth,
                                 heading = catalog.showFor(item.id)?.title,
                                 line = continueLine(item),
                                 lineStyle = MaterialTheme.typography.bodyMedium,
@@ -344,11 +347,13 @@ private fun HomeContent(
     model: HomeViewModel,
     state: HomeState,
 ) {
+    val layout = LocalFoldLayout.current
     val api = repository.api
     // Loom chooses the movie and keeps it out of every row; the label remains
     // client-side so it follows the device's local clock rather than the
     // server's timezone.
     val hero = state.featuredPick
+    val heroWidth = if (layout == FoldLayout.Phone) 960 else 1440
     val heroLabel = featuredPickLabel(LocalTime.now().hour)
     val continueWatching = state.continueWatching
     val nextUp = state.nextUp
@@ -374,7 +379,7 @@ private fun HomeContent(
                     if (hero != null) {
                         Hero(
                             item = hero,
-                            backdrop = api.backdropUrl(hero, 960) ?: api.thumbUrl(hero, 960),
+                            backdrop = api.backdropUrl(hero, heroWidth) ?: api.thumbUrl(hero, heroWidth),
                             logo = api.logoUrl(hero),
                             label = heroLabel,
                             onOpen = { nav.push(Screen.Detail(hero.id)) },
@@ -382,15 +387,8 @@ private fun HomeContent(
                     } else {
                         Box(Modifier.fillMaxWidth().height(220.dp))
                     }
-                    Row(
-                        Modifier
-                            .align(Alignment.TopEnd)
-                            .statusBarsPadding()
-                            .padding(top = 4.dp, end = 8.dp),
-                    ) {
-                        RoundIconButton(Icons.Filled.Search, "Search") { nav.push(Screen.Search()) }
-                        RoundIconButton(DownloadIcon, "Downloads") { nav.push(Screen.Downloads) }
-                        RoundIconButton(Icons.Filled.Settings, "Settings") { nav.push(Screen.Settings) }
+                    if (!layout.hasSidebar) {
+                        HomeUtilities(nav, Modifier.align(Alignment.TopEnd))
                     }
                 }
             }
@@ -402,7 +400,7 @@ private fun HomeContent(
                             ThumbCard(
                                 title = item.title,
                                 imageUrl = api.thumbUrl(item),
-                                width = 200,
+                                width = layout.thumbWidth,
                                 heading = item.seriesTitle,
                                 line = continueLine(item),
                                 lineStyle = MaterialTheme.typography.bodyMedium,
@@ -428,7 +426,7 @@ private fun HomeContent(
                             ThumbCard(
                                 title = item.title,
                                 imageUrl = api.thumbUrl(item),
-                                width = 200,
+                                width = layout.thumbWidth,
                                 heading = item.seriesTitle,
                                 line = episodeLine(item),
                                 lineStyle = MaterialTheme.typography.bodyMedium,
@@ -485,7 +483,8 @@ private fun HomeRow(
     labelColor: Color = Muted,
     content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit,
 ) {
-    Column(Modifier.padding(top = 22.dp)) {
+    val layout = LocalFoldLayout.current
+    Column(Modifier.foldContentInsets().padding(top = if (layout.inlineHeroIdentity) 8.dp else 22.dp)) {
         Text(
             label.uppercase(),
             style = MaterialTheme.typography.titleMedium.copy(
@@ -510,6 +509,11 @@ private fun Hero(
     label: String,
     onOpen: () -> Unit,
 ) {
+    val layout = LocalFoldLayout.current
+    if (layout != FoldLayout.Phone) {
+        FoldHomeHero(item, backdrop, logo, label, layout, onOpen)
+        return
+    }
     // No fixed height: the backdrop sizes itself to 4:3 art plus the logo
     // and resume band, so a tall logo grows the hero instead of squeezing
     // the photo.
@@ -581,6 +585,15 @@ private fun Hero(
             }
             Spacer(Modifier.height(18.dp))
         }
+    }
+}
+
+@Composable
+private fun HomeUtilities(nav: NavState, modifier: Modifier) {
+    Row(modifier.foldContentInsets().statusBarsPadding().padding(top = 4.dp, end = 8.dp)) {
+        RoundIconButton(Icons.Filled.Search, "Search") { nav.push(Screen.Search()) }
+        RoundIconButton(DownloadIcon, "Downloads") { nav.push(Screen.Downloads) }
+        RoundIconButton(Icons.Filled.Settings, "Settings") { nav.push(Screen.Settings) }
     }
 }
 

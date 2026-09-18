@@ -46,6 +46,7 @@ import kotlinx.coroutines.launch
 import xyz.five82.takeup.api.ImageOption
 import xyz.five82.takeup.data.LoomRepository
 import xyz.five82.takeup.ui.NavState
+import xyz.five82.takeup.ui.components.foldPillClearance
 import xyz.five82.takeup.ui.components.EmptyState
 import xyz.five82.takeup.ui.components.LoadingState
 import xyz.five82.takeup.ui.takeupViewModel
@@ -183,7 +184,7 @@ fun ArtworkScreen(repository: LoomRepository, nav: NavState, itemId: Long, title
                 EmptyState("TMDB has no ${model.kind} options for this title.")
             else -> LazyVerticalGrid(
                 columns = GridCells.Adaptive(minSize = if (model.kind == "poster") 104.dp else 156.dp),
-                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp),
+                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = foldPillClearance(24.dp)),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.fillMaxSize().weight(1f),

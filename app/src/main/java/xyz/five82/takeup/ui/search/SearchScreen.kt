@@ -36,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.input.ImeAction
@@ -55,6 +56,7 @@ import xyz.five82.takeup.data.LoomRepository
 import xyz.five82.takeup.data.Reach
 import xyz.five82.takeup.data.isOfflineError
 import xyz.five82.takeup.ui.NavState
+import xyz.five82.takeup.ui.components.foldPillClearance
 import xyz.five82.takeup.ui.Screen
 import xyz.five82.takeup.ui.components.EmptyState
 import xyz.five82.takeup.ui.components.houseLights
@@ -133,13 +135,15 @@ class SearchViewModel(private val repository: LoomRepository, initialQuery: Stri
  * matches. Results are always shown in server order.
  */
 @Composable
-fun SearchScreen(repository: LoomRepository, nav: NavState, initialQuery: String) {
+fun SearchScreen(repository: LoomRepository, nav: NavState, initialQuery: String, active: Boolean = true) {
     val model = takeupViewModel { SearchViewModel(repository, initialQuery) }
     val query by model.query.collectAsStateWithLifecycle()
     val catalog by repository.offlineCatalog.collectAsStateWithLifecycle()
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) {
-        if (initialQuery.isEmpty()) focusRequester.requestFocus()
+        // Folding or changing text size may recreate a search underneath detail.
+        // A covered search must not summon the keyboard over the visible page.
+        if (active && initialQuery.isEmpty()) focusRequester.requestFocus()
     }
 
     Column(
@@ -170,6 +174,7 @@ fun SearchScreen(repository: LoomRepository, nav: NavState, initialQuery: String
                 },
                 modifier = Modifier
                     .fillMaxWidth()
+                    .focusProperties { canFocus = active }
                     .focusRequester(focusRequester),
             )
         }
@@ -191,7 +196,7 @@ fun SearchScreen(repository: LoomRepository, nav: NavState, initialQuery: String
                 },
             )
         }
-        LazyColumn(contentPadding = PaddingValues(vertical = 8.dp)) {
+        LazyColumn(contentPadding = PaddingValues(top = 8.dp, bottom = foldPillClearance(8.dp))) {
             if (model.closestMatches) {
                 item {
                     Text(

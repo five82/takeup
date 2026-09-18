@@ -37,6 +37,7 @@ import xyz.five82.takeup.data.LoomRepository
 import xyz.five82.takeup.data.Reach
 import xyz.five82.takeup.data.isOfflineError
 import xyz.five82.takeup.ui.NavState
+import xyz.five82.takeup.ui.components.foldPillClearance
 import xyz.five82.takeup.ui.Screen
 import xyz.five82.takeup.ui.components.CardAction
 import xyz.five82.takeup.ui.components.EmptyState
@@ -168,7 +169,9 @@ private fun ItemGridScreen(
             state.items.isEmpty() -> EmptyState("Nothing here.")
             else -> LazyVerticalGrid(
                 columns = GridCells.Adaptive(minSize = 106.dp),
-                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 16.dp),
+                contentPadding = PaddingValues(
+                    start = 20.dp, end = 20.dp, top = 8.dp, bottom = foldPillClearance(16.dp),
+                ),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.fillMaxSize().navigationBarsPadding(),

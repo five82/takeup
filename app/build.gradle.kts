@@ -90,6 +90,13 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
+    // AGP aligns instrumentation with the tested APK's transitive versions.
+    debugImplementation(libs.androidx.concurrent.futures)
 
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    // Compose's transitive Espresso 3.5 uses an InputManager API removed in API 37.
+    androidTestImplementation(libs.androidx.test.espresso)
     testImplementation(libs.junit)
 }

@@ -51,13 +51,11 @@ fun logoLaneHeight(aspect: Float?): Dp {
  * photo, and that background's scrim is what keeps logos legible, so the cut
  * needs no ground or wash of its own.
  *
- * The art is always the full width at 4:3, and the component sizes its own
- * height to art plus [solidLeft] minus the overlap - so a tall logo grows
- * the box downward instead of squeezing the photo into a flatter frame.
- * Since 4:3 is a narrower shape than the 16:9 art, Crop fits the photo's
- * full height and trims the sides only - never the top or bottom - and the
- * cut hides just the [CutOverlap] sliver. Callers wrap this in a Box that
- * takes its height rather than imposing one.
+ * Art defaults to the phone's 4:3 allocation. Fold Home supplies 16:9 via
+ * [artAspectRatio] to avoid additional side cropping. Height is art plus
+ * [solidLeft] minus the overlap; callers do not impose a fixed hero height.
+ * The diagonal removes [CutOverlap] at the left and an additional
+ * width * tan(4 degrees) at the right, regardless of the photo allocation.
  *
  * [solidLeft] is the height of open ground at the left edge, where titles
  * and logos sit. The cut climbs away from there, so the clearance over
@@ -69,9 +67,10 @@ fun BiasCutBackdrop(
     solidLeft: Dp,
     modifier: Modifier = Modifier,
     contentDescription: String? = null,
+    artAspectRatio: Float = 4f / 3f,
 ) {
     BoxWithConstraints(modifier) {
-        val artHeight = maxWidth * 3 / 4
+        val artHeight = if (artAspectRatio == 4f / 3f) maxWidth * 3 / 4 else maxWidth / artAspectRatio
         Box(Modifier.fillMaxWidth().height(artHeight + solidLeft - CutOverlap)) {
             if (imageUrl != null) {
                 AsyncImage(

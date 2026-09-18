@@ -50,6 +50,7 @@ import xyz.five82.takeup.data.downloadSummary
 import xyz.five82.takeup.data.formatBytes
 import xyz.five82.takeup.ui.DownloadIcon
 import xyz.five82.takeup.ui.NavState
+import xyz.five82.takeup.ui.components.foldPillClearance
 import xyz.five82.takeup.ui.components.EmptyState
 import xyz.five82.takeup.ui.components.RowLabel
 import xyz.five82.takeup.ui.components.ThreadProgress
@@ -98,7 +99,7 @@ fun DownloadsScreen(repository: LoomRepository, nav: NavState) {
             .threeThreads(listOf(Violet, Teal, Ember))
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
-            .padding(bottom = 32.dp),
+            .padding(bottom = foldPillClearance(32.dp)),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,

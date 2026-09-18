@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
@@ -65,6 +66,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -93,12 +95,17 @@ import xyz.five82.takeup.data.formatBytes
 import xyz.five82.takeup.data.isOfflineError
 import xyz.five82.takeup.data.isStaleDownload
 import xyz.five82.takeup.ui.DownloadIcon
+import xyz.five82.takeup.ui.FoldLayout
+import xyz.five82.takeup.ui.LocalFoldLayout
+import xyz.five82.takeup.ui.foldContentInsets
 import xyz.five82.takeup.ui.NavState
 import xyz.five82.takeup.ui.Screen
 import xyz.five82.takeup.ui.detailArtFor
 import xyz.five82.takeup.ui.components.BiasCutBackdrop
 import xyz.five82.takeup.ui.components.ErrorState
 import xyz.five82.takeup.ui.components.GauzeBackground
+import xyz.five82.takeup.ui.components.FoldHero
+import xyz.five82.takeup.ui.components.foldPillClearance
 import xyz.five82.takeup.ui.components.logoLaneHeight
 import xyz.five82.takeup.ui.components.LoadingState
 import xyz.five82.takeup.ui.components.OfflineNotice
@@ -285,9 +292,12 @@ fun DetailScreen(repository: LoomRepository, nav: NavState, itemId: Long, topmos
                 repository.network.recheck()
                 model.refresh(force = true)
             },
-            modifier = Modifier.statusBarsPadding().padding(horizontal = 20.dp),
+            modifier = Modifier.foldContentInsets().statusBarsPadding().padding(horizontal = 20.dp),
         )
-        item == null -> ErrorState(state.error ?: "Loom isn't answering", onRetry = { model.refresh() })
+        item == null -> ErrorState(
+            state.error ?: "Loom isn't answering", onRetry = { model.refresh() },
+            modifier = Modifier.foldContentInsets(),
+        )
         else -> {
             // Seed from the backdrop this screen hangs behind everything, not
             // the poster: the two often disagree (a warm poster over a cool
@@ -324,6 +334,11 @@ fun DetailScreen(repository: LoomRepository, nav: NavState, itemId: Long, topmos
     }
 }
 
+@Composable
+private fun detailListModifier(): Modifier = Modifier.fillMaxSize().then(
+    if (LocalFoldLayout.current.hasSidebar) Modifier.navigationBarsPadding() else Modifier,
+)
+
 // -- movie / short ------------------------------------------------------------
 
 @Composable
@@ -334,11 +349,11 @@ private fun MovieDetail(
     item: Item,
     offline: Boolean,
 ) {
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 32.dp)) {
+    LazyColumn(detailListModifier(), contentPadding = PaddingValues(bottom = foldPillClearance(32.dp))) {
         item { DetailHead(repository, nav, model, item) }
         item {
-            Column(Modifier.padding(horizontal = 20.dp)) {
-                MetaLine(item, offline)
+            Column(Modifier.foldContentInsets().padding(horizontal = 20.dp)) {
+                if (LocalFoldLayout.current == FoldLayout.Phone) MetaLine(item, offline)
                 if (!item.tagline.isNullOrEmpty()) {
                     Text(
                         item.tagline,
@@ -379,10 +394,10 @@ private fun EpisodeDetail(
     item: Item,
     offline: Boolean,
 ) {
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 32.dp)) {
+    LazyColumn(detailListModifier(), contentPadding = PaddingValues(bottom = foldPillClearance(32.dp))) {
         item { DetailHead(repository, nav, model, item) }
         item {
-            Column(Modifier.padding(horizontal = 20.dp)) {
+            Column(Modifier.foldContentInsets().padding(horizontal = 20.dp)) {
                 Text(
                     episodeLabel(item),
                     style = MaterialTheme.typography.labelMedium,
@@ -395,7 +410,7 @@ private fun EpisodeDetail(
                     color = Ink,
                     modifier = Modifier.padding(top = 2.dp),
                 )
-                MetaLine(item, offline)
+                if (LocalFoldLayout.current == FoldLayout.Phone) MetaLine(item, offline)
                 PlayControls(repository, nav, model, item)
                 BadgeStrip(item)
                 if (!item.overview.isNullOrEmpty()) {
@@ -423,11 +438,11 @@ private fun ShowDetail(
     item: Item,
     state: DetailState,
 ) {
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 32.dp)) {
+    LazyColumn(detailListModifier(), contentPadding = PaddingValues(bottom = foldPillClearance(32.dp))) {
         item { DetailHead(repository, nav, model, item) }
         item {
-            Column(Modifier.padding(horizontal = 20.dp)) {
-                MetaLine(item, state.offline)
+            Column(Modifier.foldContentInsets().padding(horizontal = 20.dp)) {
+                if (LocalFoldLayout.current == FoldLayout.Phone) MetaLine(item, state.offline)
                 val next = model.nextToWatch()
                 if (next != null) {
                     val started = next.progress != null && !next.progress.played
@@ -499,7 +514,7 @@ private fun SeasonChips(state: DetailState, onSelect: (Long) -> Unit) {
     LazyRow(
         contentPadding = PaddingValues(horizontal = 20.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.padding(top = 20.dp, bottom = 4.dp),
+        modifier = Modifier.foldContentInsets().padding(top = 20.dp, bottom = 4.dp),
     ) {
         items(state.seasons, key = { it.id }) { season ->
             val selected = state.selectedSeason == season.id
@@ -550,7 +565,7 @@ private fun EpisodeRow(
     offline: Boolean,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
-    Box {
+    Box(Modifier.foldContentInsets()) {
         Row(
             Modifier
                 .fillMaxWidth()
@@ -656,28 +671,18 @@ private fun DetailHead(
     var menuOpen by remember { mutableStateOf(false) }
     val reach by repository.network.reach.collectAsStateWithLifecycle()
     val offline = reach == Reach.Offline
-    // No fixed height: the backdrop sizes itself to 4:3 art plus the logo
-    // band, so a tall logo grows the head instead of squeezing the photo.
+    val layout = LocalFoldLayout.current
     Box(Modifier.fillMaxWidth()) {
-        val backdrop = repository.detailArtFor(item, offline, widthPx = 960)
-        val logo = repository.logoFor(item, offline)
-        // Cut tailored to the logo: the lane is area-normalized once the art
-        // decodes, and the line rides just above it. Animated so the first
-        // load settles instead of popping.
-        var logoAspect by remember(item.id) { mutableStateOf<Float?>(null) }
-        val lane by animateDpAsState(logoLaneHeight(logoAspect), label = "logoLane")
-        val solid by animateDpAsState(
-            if (logo != null) logoLaneHeight(logoAspect) + 22.dp else 116.dp,
-            label = "biasSolid",
-        )
-        BiasCutBackdrop(
-            imageUrl = backdrop,
-            solidLeft = solid,
-            modifier = Modifier.fillMaxWidth(),
+        DetailArtwork(
+            item = item,
+            backdrop = repository.detailArtFor(item, offline, widthPx = if (layout == FoldLayout.Phone) 960 else 1440),
+            logo = repository.logoFor(item, offline),
+            offline = offline,
         )
         Row(
             Modifier
                 .fillMaxWidth()
+                .foldContentInsets()
                 .statusBarsPadding()
                 .padding(top = 4.dp, start = 8.dp, end = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -715,6 +720,32 @@ private fun DetailHead(
                 }
             }
         }
+    }
+}
+
+/** Movie, short, show and episode heroes all use the same Fold composition. */
+@Composable
+internal fun DetailArtwork(item: Item, backdrop: String?, logo: String?, offline: Boolean) {
+    val layout = LocalFoldLayout.current
+    if (layout != FoldLayout.Phone) {
+        FoldHero(item.title, backdrop, logo, layout) { inline ->
+            MetaLine(item, offline, topPadding = if (inline) 0.dp else 10.dp)
+        }
+        return
+    }
+    // Keep the phone's existing 4:3 photo and area-normalized logo lane.
+    Box(Modifier.fillMaxWidth()) {
+        var logoAspect by remember(item.id) { mutableStateOf<Float?>(null) }
+        val lane by animateDpAsState(logoLaneHeight(logoAspect), label = "logoLane")
+        val solid by animateDpAsState(
+            if (logo != null) logoLaneHeight(logoAspect) + 22.dp else 116.dp,
+            label = "biasSolid",
+        )
+        BiasCutBackdrop(
+            imageUrl = backdrop,
+            solidLeft = solid,
+            modifier = Modifier.fillMaxWidth(),
+        )
         // Logo lane under the low start of the cut; the line climbs away to
         // the right, so clearance only grows across the lane.
         Box(
@@ -765,7 +796,7 @@ private fun HeadIconButton(onClick: () -> Unit, content: @Composable () -> Unit)
 }
 
 @Composable
-private fun MetaLine(item: Item, offline: Boolean) {
+private fun MetaLine(item: Item, offline: Boolean, topPadding: Dp = 14.dp) {
     val parts = mutableListOf<String>()
     if (item.year > 0) parts += item.year.toString()
     item.media?.durationMs?.takeIf { it > 0 }?.let { parts += formatRuntime(it) }
@@ -785,7 +816,7 @@ private fun MetaLine(item: Item, offline: Boolean) {
         parts.joinToString(" · "),
         style = MaterialTheme.typography.bodySmall,
         color = Ink,
-        modifier = Modifier.padding(top = 14.dp),
+        modifier = Modifier.padding(top = topPadding),
     )
 }
 
@@ -1073,7 +1104,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.creditsSection(
         var expanded by rememberSaveable { mutableStateOf(false) }
         Column(
             verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(top = 24.dp, start = 20.dp, end = 20.dp),
+            modifier = Modifier.foldContentInsets().padding(top = 24.dp, start = 20.dp, end = 20.dp),
         ) {
             RowLabel("Cast", modifier = Modifier.padding(bottom = 4.dp))
             if (director != null) {
