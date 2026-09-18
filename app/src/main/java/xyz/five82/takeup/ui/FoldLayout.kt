@@ -41,8 +41,8 @@ fun foldLayout(hasHinge: Boolean, widthDp: Float, heightDp: Float): FoldLayout =
 internal fun foldSidebarOnRight(layout: FoldLayout, cutoutLeft: Int, cutoutRight: Int): Boolean =
     layout == FoldLayout.CoverLandscape && cutoutLeft > cutoutRight
 
-internal fun showFoldNavPill(layout: FoldLayout, screen: Screen?, keyboardVisible: Boolean): Boolean =
-    layout == FoldLayout.CoverPortrait && screen !is Screen.Player && !keyboardVisible
+internal fun showNavPill(layout: FoldLayout, screen: Screen?): Boolean =
+    !layout.hasSidebar && screen == null
 
 // Browsing screens share the Fold layout; playback always uses the full window.
 val LocalFoldLayout = staticCompositionLocalOf { FoldLayout.Phone }

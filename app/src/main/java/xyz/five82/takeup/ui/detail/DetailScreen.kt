@@ -105,7 +105,6 @@ import xyz.five82.takeup.ui.components.BiasCutBackdrop
 import xyz.five82.takeup.ui.components.ErrorState
 import xyz.five82.takeup.ui.components.GauzeBackground
 import xyz.five82.takeup.ui.components.FoldHero
-import xyz.five82.takeup.ui.components.foldPillClearance
 import xyz.five82.takeup.ui.components.logoLaneHeight
 import xyz.five82.takeup.ui.components.LoadingState
 import xyz.five82.takeup.ui.components.OfflineNotice
@@ -336,7 +335,7 @@ fun DetailScreen(repository: LoomRepository, nav: NavState, itemId: Long, topmos
 
 @Composable
 private fun detailListModifier(): Modifier = Modifier.fillMaxSize().then(
-    if (LocalFoldLayout.current.hasSidebar) Modifier.navigationBarsPadding() else Modifier,
+    if (LocalFoldLayout.current != FoldLayout.Phone) Modifier.navigationBarsPadding() else Modifier,
 )
 
 // -- movie / short ------------------------------------------------------------
@@ -349,7 +348,7 @@ private fun MovieDetail(
     item: Item,
     offline: Boolean,
 ) {
-    LazyColumn(detailListModifier(), contentPadding = PaddingValues(bottom = foldPillClearance(32.dp))) {
+    LazyColumn(detailListModifier(), contentPadding = PaddingValues(bottom = 32.dp)) {
         item { DetailHead(repository, nav, model, item) }
         item {
             Column(Modifier.foldContentInsets().padding(horizontal = 20.dp)) {
@@ -394,7 +393,7 @@ private fun EpisodeDetail(
     item: Item,
     offline: Boolean,
 ) {
-    LazyColumn(detailListModifier(), contentPadding = PaddingValues(bottom = foldPillClearance(32.dp))) {
+    LazyColumn(detailListModifier(), contentPadding = PaddingValues(bottom = 32.dp)) {
         item { DetailHead(repository, nav, model, item) }
         item {
             Column(Modifier.foldContentInsets().padding(horizontal = 20.dp)) {
@@ -438,7 +437,7 @@ private fun ShowDetail(
     item: Item,
     state: DetailState,
 ) {
-    LazyColumn(detailListModifier(), contentPadding = PaddingValues(bottom = foldPillClearance(32.dp))) {
+    LazyColumn(detailListModifier(), contentPadding = PaddingValues(bottom = 32.dp)) {
         item { DetailHead(repository, nav, model, item) }
         item {
             Column(Modifier.foldContentInsets().padding(horizontal = 20.dp)) {

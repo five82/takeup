@@ -46,7 +46,6 @@ import xyz.five82.takeup.api.ScanStatus
 import xyz.five82.takeup.data.LoomRepository
 import xyz.five82.takeup.data.Reach
 import xyz.five82.takeup.ui.NavState
-import xyz.five82.takeup.ui.components.foldPillClearance
 import xyz.five82.takeup.ui.Screen
 import xyz.five82.takeup.ui.components.RowLabel
 import xyz.five82.takeup.ui.components.threeThreads
@@ -155,7 +154,7 @@ fun SettingsScreen(repository: LoomRepository, nav: NavState) {
             .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .imePadding()
-            .padding(bottom = foldPillClearance(32.dp)),
+            .padding(bottom = 32.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp, end = 20.dp)) {
             IconButton(onClick = { nav.pop() }) {

@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.only
@@ -148,9 +147,7 @@ private fun MainScaffold(repository: LoomRepository) {
                             WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
                         ) else Modifier,
                     )
-                    .then(
-                        if (!hasHinge || nav.stack.isEmpty()) Modifier.hazeSource(navHaze) else Modifier,
-                    ),
+                    .hazeSource(navHaze),
             ) {
                 CompositionLocalProvider(LocalFoldLayout provides layout) {
                     when (nav.tab) {
@@ -163,9 +160,10 @@ private fun MainScaffold(repository: LoomRepository) {
                 }
             }
         }
-        // Phones retain their root-only pill. Fold navigation is drawn above
-        // the browsing stack below, so details do not cover it.
-        if (layout == FoldLayout.Phone) TakeupNavPill(nav, navHaze, Modifier.align(Alignment.BottomCenter))
+        // Compact Fold and phone layouts share root-only pill navigation.
+        if (showNavPill(layout, nav.stack.lastOrNull())) {
+            TakeupNavPill(nav, navHaze, Modifier.align(Alignment.BottomCenter))
+        }
         nav.stack.forEachIndexed { index, screen ->
             val topmost = index == nav.stack.lastIndex
             key(index, screen) {
@@ -193,9 +191,6 @@ private fun MainScaffold(repository: LoomRepository) {
                                 if (browsingOnFold && screen !is Screen.Detail) Modifier.windowInsetsPadding(
                                     WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
                                 ) else Modifier,
-                            )
-                            .then(
-                                if (browsingOnFold && topmost) Modifier.hazeSource(navHaze) else Modifier,
                             ),
                     ) {
                         CompositionLocalProvider(
@@ -217,9 +212,6 @@ private fun MainScaffold(repository: LoomRepository) {
                     }
                 }
             }
-        }
-        if (showFoldNavPill(layout, nav.stack.lastOrNull(), WindowInsets.ime.getBottom(density) > 0)) {
-            TakeupNavPill(nav, navHaze, Modifier.align(Alignment.BottomCenter))
         }
     }
 }

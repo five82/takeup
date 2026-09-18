@@ -56,7 +56,6 @@ import xyz.five82.takeup.data.LoomRepository
 import xyz.five82.takeup.data.Reach
 import xyz.five82.takeup.data.isOfflineError
 import xyz.five82.takeup.ui.NavState
-import xyz.five82.takeup.ui.components.foldPillClearance
 import xyz.five82.takeup.ui.Screen
 import xyz.five82.takeup.ui.components.EmptyState
 import xyz.five82.takeup.ui.components.houseLights
@@ -196,7 +195,7 @@ fun SearchScreen(repository: LoomRepository, nav: NavState, initialQuery: String
                 },
             )
         }
-        LazyColumn(contentPadding = PaddingValues(top = 8.dp, bottom = foldPillClearance(8.dp))) {
+        LazyColumn(contentPadding = PaddingValues(vertical = 8.dp)) {
             if (model.closestMatches) {
                 item {
                     Text(

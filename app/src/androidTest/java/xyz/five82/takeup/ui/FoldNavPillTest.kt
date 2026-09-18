@@ -30,14 +30,16 @@ class FoldNavPillTest {
     val compose = createComposeRule()
 
     @Test
-    fun floatingPillLeavesTheBackgroundVisibleAndTabsLeaveDetail() {
-        val nav = NavState().apply { push(Screen.Detail(34)) }
+    fun floatingRootPillLeavesBackgroundVisibleAndReturnsAfterDetail() {
+        val nav = NavState()
         compose.setContent {
             TakeupTheme {
                 val haze = rememberHazeState()
                 Box(Modifier.requiredSize(400.dp, 600.dp).testTag("screen")) {
                     Box(Modifier.fillMaxSize().background(Teal).hazeSource(haze))
-                    TakeupNavPill(nav, haze, Modifier.align(Alignment.BottomCenter))
+                    if (showNavPill(FoldLayout.CoverPortrait, nav.stack.lastOrNull())) {
+                        TakeupNavPill(nav, haze, Modifier.align(Alignment.BottomCenter))
+                    }
                 }
             }
         }
@@ -46,6 +48,10 @@ class FoldNavPillTest {
         val pillY = pixels.height - with(compose.density) { 64.dp.roundToPx() }
         assertEquals(Teal.toArgb(), pixels[1, pillY].toArgb())
         assertEquals(Teal.toArgb(), pixels[pixels.width - 2, pillY].toArgb())
+        compose.runOnIdle { nav.push(Screen.Detail(34)) }
+        for (tab in Tab.entries) compose.onNodeWithContentDescription(tab.label).assertDoesNotExist()
+        compose.runOnIdle { nav.pop() }
+        for (tab in Tab.entries) compose.onNodeWithContentDescription(tab.label).assertIsDisplayed()
         compose.onNodeWithContentDescription("Movies").performClick()
         compose.runOnIdle {
             assertEquals(Tab.Movies, nav.tab)

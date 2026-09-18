@@ -7,19 +7,26 @@ import org.junit.Test
 
 class FoldNavigationTest {
     @Test
-    fun coverPillStaysVisibleAcrossBrowsingButNotPlaybackOrTheKeyboard() {
-        val browsing = listOf(
-            null, Screen.Detail(34), Screen.Search(), Screen.Settings, Screen.Downloads,
+    fun phoneAndCoverPillsAreRootOnlyAndSidebarLayoutsNeverShowAPill() {
+        val stacked = listOf(
+            Screen.Detail(34), Screen.Search(), Screen.Settings, Screen.Downloads,
             Screen.Artwork(34, "Title"), Screen.GenreGrid(1, "Drama"), Screen.CollectionGrid("films", "Films"),
+            Screen.Player(34),
         )
-        for (screen in browsing) {
-            assertTrue(showFoldNavPill(FoldLayout.CoverPortrait, screen, keyboardVisible = false))
-            assertFalse(showFoldNavPill(FoldLayout.CoverPortrait, screen, keyboardVisible = true))
-            for (layout in FoldLayout.entries.filter { it != FoldLayout.CoverPortrait }) {
-                assertFalse(showFoldNavPill(layout, screen, keyboardVisible = false))
-            }
+        for (layout in FoldLayout.entries) {
+            assertEquals(!layout.hasSidebar, showNavPill(layout, null))
+            for (screen in stacked) assertFalse(showNavPill(layout, screen))
         }
-        assertFalse(showFoldNavPill(FoldLayout.CoverPortrait, Screen.Player(34), keyboardVisible = false))
+    }
+
+    @Test
+    fun coverPillReturnsAfterPoppingDetail() {
+        val nav = NavState()
+        assertTrue(showNavPill(FoldLayout.CoverPortrait, nav.stack.lastOrNull()))
+        nav.push(Screen.Detail(34))
+        assertFalse(showNavPill(FoldLayout.CoverPortrait, nav.stack.lastOrNull()))
+        nav.pop()
+        assertTrue(showNavPill(FoldLayout.CoverPortrait, nav.stack.lastOrNull()))
     }
 
     @Test
