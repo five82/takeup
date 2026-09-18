@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
@@ -13,7 +14,6 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -46,6 +46,10 @@ import kotlinx.coroutines.launch
 import xyz.five82.takeup.api.ImageOption
 import xyz.five82.takeup.data.LoomRepository
 import xyz.five82.takeup.ui.NavState
+import xyz.five82.takeup.ui.FoldLayout
+import xyz.five82.takeup.ui.LocalFoldLayout
+import xyz.five82.takeup.ui.browsingContentInsets
+import xyz.five82.takeup.ui.foldBottomPadding
 import xyz.five82.takeup.ui.components.EmptyState
 import xyz.five82.takeup.ui.components.LoadingState
 import xyz.five82.takeup.ui.takeupViewModel
@@ -137,7 +141,7 @@ fun ArtworkScreen(repository: LoomRepository, nav: NavState, itemId: Long, title
         if (model.options[model.kind] == null) model.load()
     }
 
-    Column(Modifier.fillMaxSize().background(Stage).statusBarsPadding()) {
+    Column(Modifier.fillMaxSize().background(Stage).browsingContentInsets()) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp, end = 20.dp)) {
             IconButton(onClick = { nav.pop() }) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Ink)
@@ -151,28 +155,7 @@ fun ArtworkScreen(repository: LoomRepository, nav: NavState, itemId: Long, title
             )
         }
 
-        Row(
-            Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            for (kind in KINDS) {
-                val selected = model.kind == kind
-                val accent = MaterialTheme.colorScheme.primary
-                Text(
-                    kind.replaceFirstChar { it.uppercase() },
-                    style = MaterialTheme.typography.labelLarge,
-                    color = if (selected) Ink else Muted,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(50))
-                        .background(if (selected) accent.copy(alpha = 0.2f) else Color.Transparent)
-                        .border(1.dp, if (selected) accent else Line, RoundedCornerShape(50))
-                        .clickable { model.selectKind(kind) }
-                        .defaultMinSize(minHeight = 48.dp)
-                        .padding(horizontal = 16.dp)
-                        .wrapContentHeight(),
-                )
-            }
-        }
+        ArtworkKindTabs(model.kind, model::selectKind)
 
         val current = model.options[model.kind]
         when {
@@ -183,7 +166,7 @@ fun ArtworkScreen(repository: LoomRepository, nav: NavState, itemId: Long, title
                 EmptyState("TMDB has no ${model.kind} options for this title.")
             else -> LazyVerticalGrid(
                 columns = GridCells.Adaptive(minSize = if (model.kind == "poster") 104.dp else 156.dp),
-                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp),
+                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = foldBottomPadding(24.dp)),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.fillMaxSize().weight(1f),
@@ -207,6 +190,40 @@ fun ArtworkScreen(repository: LoomRepository, nav: NavState, itemId: Long, title
                 }
             }
         }
+    }
+}
+
+@Composable
+internal fun ArtworkKindTabs(selectedKind: String, onSelect: (String) -> Unit) {
+    val tabs: @Composable () -> Unit = {
+        for (kind in KINDS) {
+            val selected = selectedKind == kind
+            val accent = MaterialTheme.colorScheme.primary
+            Text(
+                kind.replaceFirstChar { it.uppercase() },
+                style = MaterialTheme.typography.labelLarge,
+                color = if (selected) Ink else Muted,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(if (selected) accent.copy(alpha = 0.2f) else Color.Transparent)
+                    .border(1.dp, if (selected) accent else Line, RoundedCornerShape(50))
+                    .clickable { onSelect(kind) }
+                    .defaultMinSize(minHeight = 48.dp)
+                    .padding(horizontal = 16.dp)
+                    .wrapContentHeight(),
+            )
+        }
+    }
+    val modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
+    if (LocalFoldLayout.current == FoldLayout.Phone) {
+        Row(modifier, horizontalArrangement = Arrangement.spacedBy(8.dp)) { tabs() }
+    } else {
+        // Wrap whole targets, not their labels, when large text exhausts the row.
+        FlowRow(
+            modifier,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) { tabs() }
     }
 }
 

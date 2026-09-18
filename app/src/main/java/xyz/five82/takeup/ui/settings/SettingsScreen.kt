@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -31,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -46,6 +46,8 @@ import xyz.five82.takeup.api.ScanStatus
 import xyz.five82.takeup.data.LoomRepository
 import xyz.five82.takeup.data.Reach
 import xyz.five82.takeup.ui.NavState
+import xyz.five82.takeup.ui.browsingContentInsets
+import xyz.five82.takeup.ui.foldBottomPadding
 import xyz.five82.takeup.ui.Screen
 import xyz.five82.takeup.ui.components.RowLabel
 import xyz.five82.takeup.ui.components.threeThreads
@@ -128,7 +130,7 @@ class SettingsViewModel(private val repository: LoomRepository) : ViewModel() {
 }
 
 @Composable
-fun SettingsScreen(repository: LoomRepository, nav: NavState) {
+fun SettingsScreen(repository: LoomRepository, nav: NavState, active: Boolean = true) {
     val model = takeupViewModel { SettingsViewModel(repository) }
     // Poll scan status while the screen is open; it is the only live thing here.
     // Offline there is nothing to poll, and polling anyway is what made the app
@@ -151,10 +153,10 @@ fun SettingsScreen(repository: LoomRepository, nav: NavState) {
             .fillMaxSize()
             // The brand threads as still, dim fields: branded without artwork.
             .threeThreads(listOf(Ember, Teal, Violet))
-            .statusBarsPadding()
+            .browsingContentInsets()
             .verticalScroll(rememberScrollState())
             .imePadding()
-            .padding(bottom = 32.dp),
+            .padding(bottom = foldBottomPadding(32.dp)),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp, end = 20.dp)) {
             IconButton(onClick = { nav.pop() }) {
@@ -177,7 +179,7 @@ fun SettingsScreen(repository: LoomRepository, nav: NavState) {
                     imeAction = ImeAction.Done,
                 ),
                 keyboardActions = KeyboardActions(onDone = { model.save() }),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().focusProperties { canFocus = active },
             )
             Button(onClick = { model.save() }, enabled = !model.saving && model.address.isNotBlank()) {
                 Text(if (model.saving) "Checking..." else "Save")

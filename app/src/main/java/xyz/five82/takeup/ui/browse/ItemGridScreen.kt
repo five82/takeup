@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -37,6 +36,10 @@ import xyz.five82.takeup.data.LoomRepository
 import xyz.five82.takeup.data.Reach
 import xyz.five82.takeup.data.isOfflineError
 import xyz.five82.takeup.ui.NavState
+import xyz.five82.takeup.ui.FoldLayout
+import xyz.five82.takeup.ui.LocalFoldLayout
+import xyz.five82.takeup.ui.backdropUrl
+import xyz.five82.takeup.ui.browsingContentInsets
 import xyz.five82.takeup.ui.Screen
 import xyz.five82.takeup.ui.components.CardAction
 import xyz.five82.takeup.ui.components.EmptyState
@@ -135,11 +138,15 @@ private fun ItemGridScreen(
     LaunchedEffect(reach) { model.refresh(silent = model.state.items.isNotEmpty()) }
 
     val state = model.state
-    // Shadow weave: the grid's lead poster casts its colors into the top of
-    // the screen; the grid's accent holds the room until it decodes.
+    // Prefer landscape artwork for the Fold's broad ambient field; retain
+    // the phone treatment. The grid's accent holds the room until it decodes.
     val lead = state.items.firstOrNull()
-    val swatches = rememberWovenThreads(lead?.let { repository.api.posterUrl(it, 240) }).orEmpty()
-    Column(Modifier.fillMaxSize().shadowWeave(swatches, fallback = accent).statusBarsPadding()) {
+    val ambientArt = lead?.let {
+        if (LocalFoldLayout.current == FoldLayout.Phone) repository.api.posterUrl(it, 240)
+        else repository.api.backdropUrl(it, 240)
+    }
+    val swatches = rememberWovenThreads(ambientArt).orEmpty()
+    Column(Modifier.fillMaxSize().shadowWeave(swatches, fallback = accent).browsingContentInsets()) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp, end = 20.dp)) {
             IconButton(onClick = { nav.pop() }) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Ink)

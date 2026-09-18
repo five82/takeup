@@ -2,12 +2,16 @@ package xyz.five82.takeup.ui
 
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
 
 /** Only hinge-equipped devices opt in; rotating a regular phone never changes its layout. */
 enum class FoldLayout(val sidebarWidth: Int = 0) {
@@ -43,6 +47,18 @@ internal fun foldSidebarOnRight(layout: FoldLayout, cutoutLeft: Int, cutoutRight
 
 internal fun showNavPill(layout: FoldLayout, screen: Screen?): Boolean =
     !layout.hasSidebar && screen == null
+
+/** Apply after the background so status/camera safety never creates an unpainted gutter. */
+@Composable
+internal fun Modifier.browsingContentInsets(safeInsets: WindowInsets = WindowInsets.safeDrawing): Modifier =
+    if (LocalFoldLayout.current == FoldLayout.Phone) statusBarsPadding()
+    else windowInsetsPadding(safeInsets.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
+
+/** Keep the last utility-screen row clear of the system bar, inside the scrollable content. */
+@Composable
+internal fun foldBottomPadding(margin: Dp, navigationInsets: WindowInsets = WindowInsets.navigationBars): Dp =
+    if (LocalFoldLayout.current == FoldLayout.Phone) margin
+    else margin + navigationInsets.asPaddingValues().calculateBottomPadding()
 
 // Browsing screens share the Fold layout; playback always uses the full window.
 val LocalFoldLayout = staticCompositionLocalOf { FoldLayout.Phone }

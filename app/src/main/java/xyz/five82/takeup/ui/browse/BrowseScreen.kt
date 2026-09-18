@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -72,6 +71,9 @@ import xyz.five82.takeup.data.LoomRepository
 import xyz.five82.takeup.data.Reach
 import xyz.five82.takeup.data.isOfflineError
 import xyz.five82.takeup.ui.NavState
+import xyz.five82.takeup.ui.FoldLayout
+import xyz.five82.takeup.ui.LocalFoldLayout
+import xyz.five82.takeup.ui.browsingContentInsets
 import xyz.five82.takeup.ui.Screen
 import xyz.five82.takeup.ui.backdropUrl
 import xyz.five82.takeup.ui.components.EmptyState
@@ -160,8 +162,12 @@ fun BrowseScreen(repository: LoomRepository, nav: NavState, active: Boolean) {
     // Shadow weave: the first collection's cover casts its colors into the
     // top of the screen; violet holds the room until it decodes.
     val lead = state.collections.firstOrNull()?.items?.firstOrNull()
-    val swatches = rememberWovenThreads(lead?.let { repository.api.posterUrl(it, 240) }).orEmpty()
-    Column(Modifier.fillMaxSize().shadowWeave(swatches, fallback = Violet).statusBarsPadding()) {
+    val ambientArt = lead?.let {
+        if (LocalFoldLayout.current == FoldLayout.Phone) repository.api.posterUrl(it, 240)
+        else repository.api.backdropUrl(it, 240)
+    }
+    val swatches = rememberWovenThreads(ambientArt).orEmpty()
+    Column(Modifier.fillMaxSize().shadowWeave(swatches, fallback = Violet).browsingContentInsets()) {
         Text(
             "Browse",
             style = MaterialTheme.typography.displaySmall,

@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -50,6 +49,8 @@ import xyz.five82.takeup.data.downloadSummary
 import xyz.five82.takeup.data.formatBytes
 import xyz.five82.takeup.ui.DownloadIcon
 import xyz.five82.takeup.ui.NavState
+import xyz.five82.takeup.ui.browsingContentInsets
+import xyz.five82.takeup.ui.foldBottomPadding
 import xyz.five82.takeup.ui.components.EmptyState
 import xyz.five82.takeup.ui.components.RowLabel
 import xyz.five82.takeup.ui.components.ThreadProgress
@@ -96,9 +97,9 @@ fun DownloadsScreen(repository: LoomRepository, nav: NavState) {
         Modifier
             .fillMaxSize()
             .threeThreads(listOf(Violet, Teal, Ember))
-            .statusBarsPadding()
+            .browsingContentInsets()
             .verticalScroll(rememberScrollState())
-            .padding(bottom = 32.dp),
+            .padding(bottom = foldBottomPadding(32.dp)),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,

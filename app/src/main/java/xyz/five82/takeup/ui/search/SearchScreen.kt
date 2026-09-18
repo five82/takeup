@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -56,6 +55,8 @@ import xyz.five82.takeup.data.LoomRepository
 import xyz.five82.takeup.data.Reach
 import xyz.five82.takeup.data.isOfflineError
 import xyz.five82.takeup.ui.NavState
+import xyz.five82.takeup.ui.browsingContentInsets
+import xyz.five82.takeup.ui.foldBottomPadding
 import xyz.five82.takeup.ui.Screen
 import xyz.five82.takeup.ui.components.EmptyState
 import xyz.five82.takeup.ui.components.houseLights
@@ -149,7 +150,7 @@ fun SearchScreen(repository: LoomRepository, nav: NavState, initialQuery: String
         Modifier
             .fillMaxSize()
             .houseLights(Ember)
-            .statusBarsPadding()
+            .browsingContentInsets()
             .imePadding(),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp, end = 12.dp)) {
@@ -195,7 +196,7 @@ fun SearchScreen(repository: LoomRepository, nav: NavState, initialQuery: String
                 },
             )
         }
-        LazyColumn(contentPadding = PaddingValues(vertical = 8.dp)) {
+        LazyColumn(contentPadding = PaddingValues(top = 8.dp, bottom = foldBottomPadding(8.dp))) {
             if (model.closestMatches) {
                 item {
                     Text(

@@ -12,16 +12,16 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.displayCutout
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -114,39 +114,39 @@ private fun MainScaffold(repository: LoomRepository) {
         val sidebarOnRight = foldSidebarOnRight(
             layout, cutout.getLeft(density, direction), cutout.getRight(density, direction),
         )
+        val sidebarSystemInsets = WindowInsets.navigationBars.only(
+            if (sidebarOnRight) WindowInsetsSides.Right else WindowInsetsSides.Left,
+        )
+        // A side-mounted system bar extends the sidebar's painted surface,
+        // not its usable menu width. The content pane still paints to its edges.
+        val sidebarWidth = if (layout.hasSidebar) layout.sidebarWidth.dp + with(density) {
+            (sidebarSystemInsets.getLeft(density, direction) + sidebarSystemInsets.getRight(density, direction)).toDp()
+        } else 0.dp
         val contentPadding = PaddingValues.Absolute(
-            left = if (sidebarOnRight) 0.dp else layout.sidebarWidth.dp,
-            right = if (sidebarOnRight) layout.sidebarWidth.dp else 0.dp,
+            left = if (sidebarOnRight) 0.dp else sidebarWidth,
+            right = if (sidebarOnRight) sidebarWidth else 0.dp,
         )
         // Keep both children at stable call sites when the camera changes sides.
         // Only their placement changes, preserving the tab's remembered scroll.
-        Box(
-            Modifier.fillMaxSize().then(
-                if (hasHinge) Modifier.windowInsetsPadding(
-                    WindowInsets.navigationBars.only(WindowInsetsSides.Horizontal),
-                ) else Modifier,
-            ),
-        ) {
+        Box(Modifier.fillMaxSize()) {
             if (layout.hasSidebar) {
-                FoldSidebar(
-                    nav, layout,
-                    modifier = Modifier.align(
-                        if (sidebarOnRight) AbsoluteAlignment.TopRight else AbsoluteAlignment.TopLeft,
-                    ),
-                )
+                Box(
+                    Modifier.align(if (sidebarOnRight) AbsoluteAlignment.TopRight else AbsoluteAlignment.TopLeft)
+                        .width(sidebarWidth)
+                        .fillMaxHeight()
+                        .background(Surface1)
+                        .windowInsetsPadding(sidebarSystemInsets),
+                ) {
+                    FoldSidebar(nav, layout)
+                }
             }
-            // Home paints its art edge-to-edge and protects text locally. Other
-            // tab roots retain their safe viewport.
+            // Every screen paints to the pane edges. Insets belong inside its
+            // background, around content, never around the whole viewport.
             Box(
                 Modifier.fillMaxSize()
                     .padding(contentPadding)
                     .consumeWindowInsets(contentPadding)
                     .then(if (hasHinge) Modifier.clipToBounds() else Modifier)
-                    .then(
-                        if (hasHinge && nav.tab != Tab.Home) Modifier.windowInsetsPadding(
-                            WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
-                        ) else Modifier,
-                    )
                     .hazeSource(navHaze),
             ) {
                 CompositionLocalProvider(LocalFoldLayout provides layout) {
@@ -180,18 +180,12 @@ private fun MainScaffold(repository: LoomRepository) {
                         Modifier.fillMaxSize()
                             .then(
                                 if (browsingOnFold) Modifier
-                                    .windowInsetsPadding(WindowInsets.navigationBars.only(WindowInsetsSides.Horizontal))
                                     .padding(contentPadding)
                                     .consumeWindowInsets(contentPadding)
                                     .clipToBounds()
                                 else Modifier,
                             )
-                            .background(Stage)
-                            .then(
-                                if (browsingOnFold && screen !is Screen.Detail) Modifier.windowInsetsPadding(
-                                    WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
-                                ) else Modifier,
-                            ),
+                            .background(Stage),
                     ) {
                         CompositionLocalProvider(
                             LocalFoldLayout provides if (browsingOnFold) layout else FoldLayout.Phone,
@@ -202,7 +196,7 @@ private fun MainScaffold(repository: LoomRepository) {
                                 is Screen.Search -> SearchScreen(
                                     repository, nav, screen.initialQuery, active = !hasHinge || topmost,
                                 )
-                                is Screen.Settings -> SettingsScreen(repository, nav)
+                                is Screen.Settings -> SettingsScreen(repository, nav, active = !hasHinge || topmost)
                                 is Screen.Downloads -> DownloadsScreen(repository, nav)
                                 is Screen.Artwork -> ArtworkScreen(repository, nav, screen.itemId, screen.title)
                                 is Screen.GenreGrid -> GenreGridScreen(repository, nav, screen)
