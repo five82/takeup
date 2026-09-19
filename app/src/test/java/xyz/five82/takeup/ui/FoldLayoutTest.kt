@@ -31,11 +31,15 @@ class FoldLayoutTest {
     }
 
     @Test
-    fun coverLandscapeSidebarTracksThePhysicalCameraEdge() {
+    fun cameraCutoutsKeepTheSidebarOnAClearEdge() {
+        assertTrue(foldSidebarOnRight(FoldLayout.InnerPortrait, 0, 0))
+        assertTrue(foldSidebarOnRight(FoldLayout.InnerPortrait, 0, 104))
         assertTrue(foldSidebarOnRight(FoldLayout.CoverLandscape, 104, 0))
         assertFalse(foldSidebarOnRight(FoldLayout.CoverLandscape, 0, 104))
         assertFalse(foldSidebarOnRight(FoldLayout.CoverLandscape, 0, 0))
-        for (layout in FoldLayout.entries.filter { it != FoldLayout.CoverLandscape }) {
+        for (layout in FoldLayout.entries.filter {
+            it != FoldLayout.InnerPortrait && it != FoldLayout.CoverLandscape
+        }) {
             assertFalse(foldSidebarOnRight(layout, 104, 0))
         }
     }

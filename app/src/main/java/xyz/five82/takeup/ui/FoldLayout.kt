@@ -40,10 +40,14 @@ fun foldLayout(hasHinge: Boolean, widthDp: Float, heightDp: Float): FoldLayout =
     else -> FoldLayout.CoverPortrait
 }
 
-// Use physical cutout edges, not orientation or layout direction: a 180-degree
-// rotation moves the cover camera to the other side of the landscape window.
-internal fun foldSidebarOnRight(layout: FoldLayout, cutoutLeft: Int, cutoutRight: Int): Boolean =
-    layout == FoldLayout.CoverLandscape && cutoutLeft > cutoutRight
+// The inner portrait camera is reported as a top inset, so keep its sidebar on
+// the known clear right side. In cover landscape, use physical cutout edges: a
+// 180-degree rotation moves the cover camera to the other side of the window.
+internal fun foldSidebarOnRight(layout: FoldLayout, cutoutLeft: Int, cutoutRight: Int): Boolean = when (layout) {
+    FoldLayout.InnerPortrait -> true
+    FoldLayout.CoverLandscape -> cutoutLeft > cutoutRight
+    else -> false
+}
 
 internal fun showNavPill(layout: FoldLayout, screen: Screen?): Boolean =
     !layout.hasSidebar && screen == null
