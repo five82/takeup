@@ -18,7 +18,7 @@ enum class FoldLayout(val sidebarWidth: Int = 0) {
     Phone,
     CoverPortrait,
     InnerPortrait(180),
-    InnerLandscape(220),
+    InnerLandscape(180),
     CoverLandscape(160),
     ;
 
@@ -41,10 +41,12 @@ fun foldLayout(hasHinge: Boolean, widthDp: Float, heightDp: Float): FoldLayout =
 }
 
 // The inner portrait camera is reported as a top inset, so keep its sidebar on
-// the known clear right side. In cover landscape, use physical cutout edges: a
-// 180-degree rotation moves the cover camera to the other side of the window.
+// the known clear right side. Landscape layouts use physical cutout edges: a
+// 180-degree rotation moves the camera to the other side of the window. Keep
+// inner landscape on the right when neither edge reports a cutout.
 internal fun foldSidebarOnRight(layout: FoldLayout, cutoutLeft: Int, cutoutRight: Int): Boolean = when (layout) {
     FoldLayout.InnerPortrait -> true
+    FoldLayout.InnerLandscape -> cutoutLeft >= cutoutRight
     FoldLayout.CoverLandscape -> cutoutLeft > cutoutRight
     else -> false
 }

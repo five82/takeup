@@ -26,7 +26,7 @@ class FoldLayoutTest {
         assertEquals(FoldLayout.InnerLandscape, foldLayout(true, 2448 / scale, 1848 / scale))
         assertEquals(160, FoldLayout.CoverLandscape.sidebarWidth)
         assertEquals(180, FoldLayout.InnerPortrait.sidebarWidth)
-        assertEquals(220, FoldLayout.InnerLandscape.sidebarWidth)
+        assertEquals(180, FoldLayout.InnerLandscape.sidebarWidth)
         assertEquals(180, FoldLayout.InnerLandscape.thumbWidth)
     }
 
@@ -34,11 +34,14 @@ class FoldLayoutTest {
     fun cameraCutoutsKeepTheSidebarOnAClearEdge() {
         assertTrue(foldSidebarOnRight(FoldLayout.InnerPortrait, 0, 0))
         assertTrue(foldSidebarOnRight(FoldLayout.InnerPortrait, 0, 104))
+        assertTrue(foldSidebarOnRight(FoldLayout.InnerLandscape, 0, 0))
+        assertTrue(foldSidebarOnRight(FoldLayout.InnerLandscape, 104, 0))
+        assertFalse(foldSidebarOnRight(FoldLayout.InnerLandscape, 0, 104))
         assertTrue(foldSidebarOnRight(FoldLayout.CoverLandscape, 104, 0))
         assertFalse(foldSidebarOnRight(FoldLayout.CoverLandscape, 0, 104))
         assertFalse(foldSidebarOnRight(FoldLayout.CoverLandscape, 0, 0))
         for (layout in FoldLayout.entries.filter {
-            it != FoldLayout.InnerPortrait && it != FoldLayout.CoverLandscape
+            it != FoldLayout.InnerPortrait && it != FoldLayout.InnerLandscape && it != FoldLayout.CoverLandscape
         }) {
             assertFalse(foldSidebarOnRight(layout, 104, 0))
         }
