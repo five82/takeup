@@ -40,13 +40,13 @@ internal fun FoldHomeHero(
         modifier = Modifier.clickable(onClick = onOpen), safeInsets = safeInsets,
     ) { inline ->
         if (inline) {
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(label, style = MaterialTheme.typography.bodyMedium, color = Ink)
                 if (details.isNotEmpty()) {
                     Text(details, style = MaterialTheme.typography.bodyMedium, color = Ink.copy(alpha = 0.85f))
                 }
                 if (fraction != null) {
-                    ThreadProgress(fraction, Ember, Modifier.padding(top = 6.dp).fillMaxWidth(0.8f))
+                    ThreadProgress(fraction, Ember, Modifier.padding(top = 4.dp).fillMaxWidth(0.8f))
                 }
             }
         } else {
@@ -54,10 +54,10 @@ internal fun FoldHomeHero(
                 listOf(label, details).filter { it.isNotEmpty() }.joinToString(" \u00b7 "),
                 style = MaterialTheme.typography.bodyMedium,
                 color = Ink.copy(alpha = 0.85f),
-                modifier = Modifier.padding(top = 10.dp, bottom = 8.dp),
+                modifier = Modifier.padding(top = 12.dp),
             )
             if (fraction != null) {
-                ThreadProgress(fraction, Ember, Modifier.padding(top = 6.dp).fillMaxWidth(0.6f))
+                ThreadProgress(fraction, Ember, Modifier.padding(top = 8.dp).fillMaxWidth(0.6f))
             }
         }
     }

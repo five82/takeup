@@ -20,6 +20,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import xyz.five82.takeup.api.Item
+import xyz.five82.takeup.api.MediaFile
+import xyz.five82.takeup.api.Stream
+import xyz.five82.takeup.ui.detail.BadgeStrip
 import xyz.five82.takeup.ui.detail.DetailArtwork
 import xyz.five82.takeup.ui.theme.TakeupTheme
 
@@ -79,6 +82,38 @@ class FoldDetailTest {
         val hero = compose.onNodeWithTag("hero").fetchSemanticsNode().boundsInRoot
         assertEquals(with(compose.density) { (591.dp * 9f / 16f).toPx() }, largeTitle.top - hero.top, 1f)
         assertTrue(largeMetadata.top >= largeTitle.bottom)
+    }
+
+    @Test
+    fun technicalBadgesWrapWholeLabelsAtLargeTextInsteadOfClipping() {
+        val width = mutableStateOf(320)
+        compose.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(1f, 2f)) {
+                TakeupTheme {
+                    Column(Modifier.requiredWidth(width.value.dp).testTag("badges")) {
+                        BadgeStrip(
+                            Item(media = MediaFile(
+                                size = 65_000_000_000,
+                                streams = listOf(
+                                    Stream(kind = "video", resolution = "4k", dynamicRange = "dolby_vision", codec = "hevc"),
+                                    Stream(kind = "audio", codec = "truehd", channels = 8),
+                                ),
+                            )),
+                        )
+                    }
+                }
+            }
+        }
+        for (paneWidth in listOf(320, 387, 435, 484, 551, 672)) {
+            compose.runOnIdle { width.value = paneWidth }
+            val outer = compose.onNodeWithTag("badges").fetchSemanticsNode().boundsInRoot
+            for (label in listOf("4K", "DOLBY VISION", "HEVC", "TRUEHD 7.1", "65.0 GB")) {
+                val badge = compose.onNodeWithText(label).fetchSemanticsNode().boundsInRoot
+                assertTrue("$label must fit in $paneWidth dp", badge.left >= outer.left && badge.right <= outer.right)
+                assertTrue("$label must remain a single line", badge.height < 40f)
+                assertTrue(badge.bottom <= outer.bottom)
+            }
+        }
     }
 
     @Test

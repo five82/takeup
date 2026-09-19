@@ -7,17 +7,19 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
@@ -25,11 +27,11 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -37,13 +39,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
 import java.time.Duration
@@ -60,6 +63,7 @@ import xyz.five82.takeup.ui.DownloadIcon
 import xyz.five82.takeup.ui.FoldLayout
 import xyz.five82.takeup.ui.LocalFoldLayout
 import xyz.five82.takeup.ui.foldContentInsets
+import xyz.five82.takeup.ui.browsingContentInsets
 import xyz.five82.takeup.ui.NavState
 import xyz.five82.takeup.ui.Screen
 import xyz.five82.takeup.ui.components.BiasCutBackdrop
@@ -83,7 +87,6 @@ import xyz.five82.takeup.ui.logoUrl
 import xyz.five82.takeup.ui.posterFor
 import xyz.five82.takeup.ui.posterUrl
 import xyz.five82.takeup.ui.progressFraction
-import xyz.five82.takeup.ui.remainingLabel
 import xyz.five82.takeup.ui.thumbFor
 import xyz.five82.takeup.ui.thumbUrl
 import xyz.five82.takeup.ui.theme.Ember
@@ -245,10 +248,7 @@ private fun OfflineHome(repository: LoomRepository, nav: NavState, onRetry: () -
             seed = null,
             scrimAlphaScale = 0.9f,
         )
-        LazyColumn(
-            Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = navPillClearance()),
-        ) {
+        HomeFeed {
             item(key = "offline-head") {
                 // The same two controls the hero carries when there is a hero, so
                 // settings and searching what is downloaded stay reachable offline.
@@ -282,11 +282,11 @@ private fun OfflineHome(repository: LoomRepository, nav: NavState, onRetry: () -
                     }
                 }
             }
-            if (hero == null) return@LazyColumn
+            if (hero == null) return@HomeFeed
             item(key = "offline-banner") {
                 OfflineBanner(
                     reason, onRetry,
-                    Modifier.foldContentInsets().padding(start = 20.dp, end = 12.dp, top = 12.dp),
+                    Modifier.foldContentInsets().padding(start = 20.dp, end = 12.dp),
                 )
             }
             if (continueWatching.isNotEmpty()) {
@@ -297,7 +297,7 @@ private fun OfflineHome(repository: LoomRepository, nav: NavState, onRetry: () -
                                 title = item.title,
                                 imageUrl = repository.thumbFor(item, offline = true),
                                 width = layout.thumbWidth,
-                                heading = catalog.showFor(item.id)?.title,
+                                heading = catalog.showFor(item.id)?.title ?: item.seriesTitle ?: item.title,
                                 line = continueLine(item),
                                 lineStyle = MaterialTheme.typography.bodyMedium,
                                 progress = progressFraction(item),
@@ -370,10 +370,7 @@ private fun HomeContent(
             // is visually denser, so retain Detail's default scrim for it.
             scrimAlphaScale = if (heroBackdrop == null) 1f else 0.9f,
         )
-        LazyColumn(
-            Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = navPillClearance()),
-        ) {
+        HomeFeed {
             item(key = "hero") {
                 Box {
                     if (hero != null) {
@@ -385,7 +382,13 @@ private fun HomeContent(
                             onOpen = { nav.push(Screen.Detail(hero.id)) },
                         )
                     } else {
-                        Box(Modifier.fillMaxWidth().height(220.dp))
+                        Text(
+                            "Home",
+                            style = MaterialTheme.typography.displaySmall,
+                            color = Ink,
+                            modifier = Modifier.fillMaxWidth().browsingContentInsets()
+                                .padding(start = 20.dp, end = 20.dp, top = if (layout.hasSidebar) 16.dp else 64.dp),
+                        )
                     }
                     if (!layout.hasSidebar) {
                         HomeUtilities(nav, Modifier.align(Alignment.TopEnd))
@@ -401,7 +404,7 @@ private fun HomeContent(
                                 title = item.title,
                                 imageUrl = api.thumbUrl(item),
                                 width = layout.thumbWidth,
-                                heading = item.seriesTitle,
+                                heading = item.seriesTitle ?: item.title,
                                 line = continueLine(item),
                                 lineStyle = MaterialTheme.typography.bodyMedium,
                                 progress = progressFraction(item),
@@ -427,7 +430,7 @@ private fun HomeContent(
                                 title = item.title,
                                 imageUrl = api.thumbUrl(item),
                                 width = layout.thumbWidth,
-                                heading = item.seriesTitle,
+                                heading = item.seriesTitle ?: item.title,
                                 line = episodeLine(item),
                                 lineStyle = MaterialTheme.typography.bodyMedium,
                                 actions = listOf(
@@ -458,7 +461,7 @@ private fun HomeContent(
             }
 
             // The rotating shelves: a different slice of the library every day.
-            for (shelf in state.shelves) {
+            for (shelf in state.shelves.filter { it.items.isNotEmpty() }) {
                 item(key = "d-${shelf.key}") {
                     HomeRow(shelf.title, labelColor = Violet) {
                         items(shelf.items, key = { "${shelf.key}-${it.id}" }) { item ->
@@ -477,21 +480,54 @@ private fun HomeContent(
     }
 }
 
+// The feed alone owns section separation. Heroes and shelves must not add
+// trailing/leading space, or the first gap differs from every subsequent one.
 @Composable
-private fun HomeRow(
+internal fun HomeFeed(content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit) {
+    val scroll = rememberLazyListState()
+    val scrolled by remember {
+        derivedStateOf { scroll.firstVisibleItemIndex > 0 || scroll.firstVisibleItemScrollOffset > 0 }
+    }
+    val statusShade by animateFloatAsState(if (scrolled) 1f else 0f, label = "homeStatusShade")
+    val statusHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    Box(Modifier.fillMaxSize()) {
+        LazyColumn(
+            Modifier.fillMaxSize(),
+            state = scroll,
+            contentPadding = PaddingValues(bottom = navPillClearance()),
+            verticalArrangement = Arrangement.spacedBy(24.dp),
+            content = content,
+        )
+        // The hero has its own scrim. Once shelves slide under the clock, give
+        // the system bar quiet ground without taking space away from the art.
+        if (statusHeight > 0.dp && statusShade > 0f) {
+            Box(
+                Modifier.fillMaxWidth().height(statusHeight + 12.dp).background(
+                    Brush.verticalGradient(
+                        0f to Stage.copy(alpha = statusShade),
+                        (statusHeight / (statusHeight + 12.dp)) to Stage.copy(alpha = statusShade),
+                        1f to Color.Transparent,
+                    ),
+                ),
+            )
+        }
+    }
+}
+
+@Composable
+internal fun HomeRow(
     label: String,
     labelColor: Color = Muted,
     content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit,
 ) {
-    val layout = LocalFoldLayout.current
-    Column(Modifier.foldContentInsets().padding(top = if (layout.inlineHeroIdentity) 8.dp else 22.dp)) {
+    Column(Modifier.foldContentInsets()) {
         Text(
             label.uppercase(),
             style = MaterialTheme.typography.titleMedium.copy(
                 letterSpacing = MaterialTheme.typography.labelMedium.letterSpacing,
             ),
             color = labelColor,
-            modifier = Modifier.padding(start = 20.dp, bottom = 10.dp),
+            modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 12.dp),
         )
         LazyRow(
             contentPadding = PaddingValues(horizontal = 20.dp),
@@ -502,7 +538,7 @@ private fun HomeRow(
 }
 
 @Composable
-private fun Hero(
+internal fun Hero(
     item: Item,
     backdrop: String?,
     logo: String?,
@@ -514,31 +550,23 @@ private fun Hero(
         FoldHomeHero(item, backdrop, logo, label, layout, onOpen)
         return
     }
-    // No fixed height: the backdrop sizes itself to 4:3 art plus the logo
-    // and resume band, so a tall logo grows the hero instead of squeezing
-    // the photo.
-    Box(
+    // Measure identity below the photo rather than overlaying an estimated
+    // band: wrapped metadata and large text must grow the hero, not cover art.
+    Column(
         Modifier
             .fillMaxWidth()
             .clickable(onClick = onOpen),
     ) {
-        // Same tailoring as the detail head: area-normalized logo lane, line
-        // riding above it, 76dp of resume line and progress stacked below.
         var logoAspect by remember(item.id) { mutableStateOf<Float?>(null) }
         val lane by animateDpAsState(logoLaneHeight(logoAspect), label = "logoLane")
-        val solid by animateDpAsState(
-            if (logo != null) logoLaneHeight(logoAspect) + 76.dp else 160.dp,
-            label = "biasSolid",
-        )
         BiasCutBackdrop(
             imageUrl = backdrop,
-            solidLeft = solid,
+            solidLeft = 16.dp,
             modifier = Modifier.fillMaxWidth(),
             contentDescription = item.title,
         )
         Column(
             Modifier
-                .align(Alignment.BottomStart)
                 .padding(horizontal = 20.dp)
                 .fillMaxWidth(),
         ) {
@@ -564,8 +592,6 @@ private fun Hero(
                     item.title,
                     style = MaterialTheme.typography.displayMedium,
                     color = Ink,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
                 )
             }
             val line = buildList {
@@ -577,13 +603,12 @@ private fun Hero(
                 line,
                 style = MaterialTheme.typography.bodyMedium,
                 color = Ink.copy(alpha = 0.85f),
-                modifier = Modifier.padding(top = 10.dp, bottom = 8.dp),
+                modifier = Modifier.padding(top = 12.dp),
             )
             val fraction = progressFraction(item)
             if (fraction != null) {
-                ThreadProgress(fraction, Ember, Modifier.fillMaxWidth(0.6f))
+                ThreadProgress(fraction, Ember, Modifier.padding(top = 8.dp).fillMaxWidth(0.6f))
             }
-            Spacer(Modifier.height(18.dp))
         }
     }
 }

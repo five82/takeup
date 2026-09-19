@@ -13,6 +13,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -1051,13 +1052,14 @@ private fun PlayButton(label: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun BadgeStrip(item: Item) {
+internal fun BadgeStrip(item: Item) {
     val badges = techBadges(item.media).toMutableList()
     item.media?.size?.takeIf { it > 0 }?.let { badges += formatBytes(it) }
     if (badges.isEmpty()) return
-    Row(
-        Modifier.padding(top = 16.dp),
+    FlowRow(
+        Modifier.fillMaxWidth().padding(top = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         for (badge in badges) {
             Text(
