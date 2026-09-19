@@ -7,9 +7,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -19,7 +16,6 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
@@ -31,7 +27,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -39,14 +34,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
 import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
 import java.time.Duration
@@ -484,34 +477,12 @@ private fun HomeContent(
 // trailing/leading space, or the first gap differs from every subsequent one.
 @Composable
 internal fun HomeFeed(content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit) {
-    val scroll = rememberLazyListState()
-    val scrolled by remember {
-        derivedStateOf { scroll.firstVisibleItemIndex > 0 || scroll.firstVisibleItemScrollOffset > 0 }
-    }
-    val statusShade by animateFloatAsState(if (scrolled) 1f else 0f, label = "homeStatusShade")
-    val statusHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    Box(Modifier.fillMaxSize()) {
-        LazyColumn(
-            Modifier.fillMaxSize(),
-            state = scroll,
-            contentPadding = PaddingValues(bottom = navPillClearance()),
-            verticalArrangement = Arrangement.spacedBy(24.dp),
-            content = content,
-        )
-        // The hero has its own scrim. Once shelves slide under the clock, give
-        // the system bar quiet ground without taking space away from the art.
-        if (statusHeight > 0.dp && statusShade > 0f) {
-            Box(
-                Modifier.fillMaxWidth().height(statusHeight + 12.dp).background(
-                    Brush.verticalGradient(
-                        0f to Stage.copy(alpha = statusShade),
-                        (statusHeight / (statusHeight + 12.dp)) to Stage.copy(alpha = statusShade),
-                        1f to Color.Transparent,
-                    ),
-                ),
-            )
-        }
-    }
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = navPillClearance()),
+        verticalArrangement = Arrangement.spacedBy(24.dp),
+        content = content,
+    )
 }
 
 @Composable
