@@ -7,6 +7,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.hasScrollAction
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import org.junit.Rule
@@ -21,7 +23,11 @@ import xyz.five82.takeup.api.Home
 import xyz.five82.takeup.api.Item
 import xyz.five82.takeup.api.LoomApi
 import xyz.five82.takeup.api.SearchResponse
+import xyz.five82.takeup.api.Shelf
+import xyz.five82.takeup.api.Progress
 import xyz.five82.takeup.data.DownloadEntry
+import xyz.five82.takeup.data.DownloadState
+import xyz.five82.takeup.data.OfflineArtwork
 import xyz.five82.takeup.data.DownloadStore
 import xyz.five82.takeup.data.LoomRepository
 import xyz.five82.takeup.data.NetworkPolicy
@@ -52,6 +58,7 @@ class LowCoverageScreensTest {
         Mockito.doReturn(api).`when`(repo).api
         Mockito.doReturn(network).`when`(repo).network
         Mockito.doReturn(downloads).`when`(repo).downloads
+        Mockito.doReturn(Mockito.mock(OfflineArtwork::class.java)).`when`(downloads).artwork
         Mockito.doReturn(reach).`when`(network).reach
         Mockito.doReturn(MutableStateFlow("No connection.")).`when`(network).reason
         Mockito.doReturn(MutableStateFlow(false)).`when`(network).allowCellular
@@ -147,6 +154,39 @@ class LowCoverageScreensTest {
         }
         show { HomeScreen(repo, nav, active = true) }
         compose.onNodeWithText("Featured Film").assertExists()
+    }
+
+    @Test fun offlineHomeLeadsWithAStartedDownloadNotTheNewestTitle() {
+        reach.value = Reach.Offline
+        val started = Item(id = 10, title = "Watching Now", kind = "movie",
+            progress = Progress(positionMs = 500, durationMs = 1000))
+        val recent = Item(id = 11, title = "Fresh Download", kind = "movie")
+        catalog.value = OfflineCatalog(entries = listOf(
+            DownloadEntry(started, DownloadState.Completed, "http://loom/10", 100, 100, 10),
+            DownloadEntry(recent, DownloadState.Completed, "http://loom/11", 100, 100, 20),
+        ))
+        show { HomeScreen(repo, nav, active = true) }
+        org.junit.Assert.assertTrue(compose.onAllNodesWithText("Watching Now").fetchSemanticsNodes().isNotEmpty())
+        compose.onNodeWithText("Continue watching", substring = true).assertExists()
+        Mockito.verifyNoInteractions(api)
+    }
+
+    @Test fun homeRendersNextUpRecentlyAddedAndRotatingShelf() {
+        runBlocking { Mockito.`when`(api.home()).thenReturn(Home(
+            nextUp = listOf(Item(id = 2, title = "Next Episode", kind = "episode")),
+            recentlyAdded = listOf(Item(id = 3, title = "New Arrival", kind = "movie")),
+            shelves = listOf(Shelf(key = "classics", title = "Classics", items = listOf(
+                Item(id = 4, title = "Old Favourite", kind = "movie")))),
+        )) }
+        show { HomeScreen(repo, nav, active = true) }
+        compose.onAllNodes(hasScrollAction())[0].performScrollToIndex(1)
+        compose.onNodeWithText("NEXT UP").assertExists()
+        compose.onAllNodes(hasScrollAction())[0].performScrollToIndex(2)
+        compose.onNodeWithText("RECENTLY ADDED").assertExists()
+        compose.onAllNodes(hasScrollAction())[0].performScrollToIndex(3)
+        compose.onNodeWithText("CLASSICS").assertExists()
+        compose.onNodeWithText("OLD FAVOURITE").performClick()
+        org.junit.Assert.assertEquals(Screen.Detail(4), nav.stack.last())
     }
 
     @Test fun homeServerErrorOffersSettings() {
