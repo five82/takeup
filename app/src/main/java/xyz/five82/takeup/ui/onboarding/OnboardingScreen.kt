@@ -108,6 +108,11 @@ fun OnboardingScreen(repository: LoomRepository) {
     DisposableEffect(model) {
         onDispose { model.stopDiscovery() }
     }
+    OnboardingContent(model)
+}
+
+@Composable
+internal fun OnboardingContent(model: OnboardingViewModel) {
     Column(
         Modifier
             .fillMaxSize()
