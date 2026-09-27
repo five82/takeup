@@ -7,6 +7,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.performClick
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -48,26 +51,26 @@ class AmbientAndFoldHeroTest {
     @Test fun ambientTreatmentsRenderWithEmptyAndMultipleArtSwatches() {
         compose.setContent {
             TakeupTheme {
-                Box(Modifier.fillMaxSize().dyeBath(Color.Blue).houseLights(Color.Red)
+                Box(Modifier.fillMaxSize().testTag("ambient").dyeBath(Color.Blue).houseLights(Color.Red)
                     .shadowWeave(listOf(Color.Green, Color.Blue), Color.Red)
                     .threeThreads(listOf(Color.Blue, Color.Red, Color.Green))) {
                     GauzeBackground(null, Color.Blue)
                 }
             }
         }
-        compose.waitForIdle()
+        compose.onNodeWithTag("ambient").captureToImage()
     }
 
     @Test fun singleSwatchAndNoSeedRemainValidFallbacks() {
         compose.setContent {
             TakeupTheme {
-                Box(Modifier.fillMaxSize().dyeBath(null)
+                Box(Modifier.fillMaxSize().testTag("fallback").dyeBath(null)
                     .shadowWeave(listOf(Color.Red), Color.Blue)
                     .threeThreads(emptyList())) {
                     GauzeBackground(null, null)
                 }
             }
         }
-        compose.waitForIdle()
+        compose.onNodeWithTag("fallback").captureToImage()
     }
 }

@@ -2,6 +2,10 @@ package xyz.five82.takeup.data
 
 import android.os.Looper
 import androidx.media3.datasource.DataSpec
+import androidx.media3.database.StandaloneDatabaseProvider
+import androidx.media3.exoplayer.offline.DefaultDownloadIndex
+import androidx.media3.exoplayer.offline.Download
+import androidx.media3.exoplayer.offline.DownloadRequest
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -11,6 +15,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -63,6 +68,71 @@ class DownloadStoreRuntimeTest {
         store.removeAll()
         Shadows.shadowOf(Looper.getMainLooper()).idle()
         assertTrue(store.downloads.value.none { it.item.id == 42L })
+    }
+
+    @Test fun completedSnapshotIsLoadedWithItsArtworkAndCanBeRemoved() {
+        val context = RuntimeEnvironment.getApplication()
+        val index = DefaultDownloadIndex(StandaloneDatabaseProvider(context))
+        val item = Item(id = 777, kind = "movie", title = "Offline Feature")
+        val request = DownloadRequest.Builder("777", android.net.Uri.parse("http://loom/film"))
+            .setData(loomGson.toJson(item).toByteArray()).build()
+        index.putDownload(Download(request, Download.STATE_COMPLETED, 123L, 456L, 4096L, 0, 0))
+        try {
+            val store = store()
+            // The index is read on Dispatchers.IO, then published on the main looper.
+            val deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5)
+            while (store.entry(777) == null && System.nanoTime() < deadline) {
+                Thread.sleep(10)
+                Shadows.shadowOf(Looper.getMainLooper()).idle()
+            }
+            val entry = store.entry(777)
+            assertNotNull(entry)
+            assertEquals("Offline Feature", entry!!.item.title)
+            assertEquals(DownloadState.Completed, entry.state)
+            assertEquals("http://loom/film", entry.uri)
+            assertEquals(4096L, entry.totalBytes)
+            assertEquals(123L, entry.startTimeMs)
+            Mockito.verify(artwork, Mockito.atLeastOnce()).posterPath(777)
+            Mockito.verify(artwork, Mockito.atLeastOnce()).backdropPath(777)
+            // Replacing a URI must remove the old cache key before Media3 adds the new one.
+            store.enqueue(777, "http://loom/film?tag=new", loomGson.toJson(item))
+            assertEquals("http://loom/film", store.entry(777)?.uri)
+            store.removeAll()
+            Shadows.shadowOf(Looper.getMainLooper()).idle()
+            runBlocking { Mockito.verify(artwork).delete(777) }
+        } finally {
+            index.removeDownload("777")
+        }
+    }
+
+    @Test fun queuedSnapshotSurvivesAnUnreadableIndexEntry() {
+        val context = RuntimeEnvironment.getApplication()
+        val index = DefaultDownloadIndex(StandaloneDatabaseProvider(context))
+        val good = DownloadRequest.Builder("778", android.net.Uri.parse("http://loom/next"))
+            .setData(loomGson.toJson(Item(id = 778, kind = "episode", title = "Next Up")).toByteArray()).build()
+        val bad = DownloadRequest.Builder("779", android.net.Uri.parse("http://loom/bad"))
+            .setData("not json".toByteArray()).build()
+        index.putDownload(Download(good, Download.STATE_STOPPED, 123L, 456L, -1L, 1, 0))
+        index.putDownload(Download(bad, Download.STATE_COMPLETED, 123L, 456L, 100L, 0, 0))
+        val failed = DownloadRequest.Builder("780", android.net.Uri.parse("http://loom/failed"))
+            .setData(loomGson.toJson(Item(id = 780, kind = "movie", title = "Interrupted")).toByteArray()).build()
+        index.putDownload(Download(failed, Download.STATE_FAILED, 123L, 456L, 100L, 0,
+            Download.FAILURE_REASON_UNKNOWN))
+        try {
+            val store = store()
+            val deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5)
+            while (store.entry(778) == null && System.nanoTime() < deadline) {
+                Thread.sleep(10)
+                Shadows.shadowOf(Looper.getMainLooper()).idle()
+            }
+            assertEquals(DownloadState.Queued, store.entry(778)?.state)
+            assertNull(store.entry(779))
+            assertEquals(DownloadState.Failed, store.entry(780)?.state)
+        } finally {
+            index.removeDownload("778")
+            index.removeDownload("779")
+            index.removeDownload("780")
+        }
     }
 
     @Test fun emptyIndexLoadsAndDownloadQueueCanBePausedAndResumed() {
