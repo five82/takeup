@@ -1,8 +1,10 @@
 import java.util.Properties
+import org.gradle.testing.jacoco.plugins.JacocoTaskExtension
 
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    jacoco
 }
 
 val releaseSigningPropertiesFile = rootProject.file("keystore.properties")
@@ -47,6 +49,10 @@ android {
         }
     }
 
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
+
     buildFeatures {
         compose = true
         // Settings shows the version, so the generated constants have to exist.
@@ -56,6 +62,15 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+}
+
+// Robolectric loads app classes through its own classloader; JaCoCo otherwise
+// records the tests but reports zero coverage for the UI they exercise.
+tasks.withType<Test>().configureEach {
+    extensions.configure<JacocoTaskExtension> {
+        isIncludeNoLocationClasses = true
+        excludes = listOf("jdk.internal.*")
     }
 }
 
@@ -100,4 +115,8 @@ dependencies {
     // Compose's transitive Espresso 3.5 uses an InputManager API removed in API 37.
     androidTestImplementation(libs.androidx.test.espresso)
     testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.mockito)
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation(libs.androidx.compose.ui.test.junit4)
 }
