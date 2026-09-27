@@ -40,6 +40,7 @@ android {
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
+            enableUnitTestCoverage = true
         }
         release {
             signingConfig = signingConfigs.findByName("release")

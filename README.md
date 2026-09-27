@@ -121,6 +121,16 @@ Run the canonical local checks (unit tests, Android lint, and a debug build):
 ./check-ci.sh
 ```
 
+To inspect JVM unit-test coverage, generate the debug report and open
+`app/build/reports/coverage/test/debug/index.html`:
+
+```bash
+./gradlew :app:createDebugUnitTestCoverageReport
+```
+
+This report covers unit tests only; `connectedCheck` runs instrumented tests
+separately.
+
 Instrumented tests can be run separately with an emulator or device available:
 
 ```bash
