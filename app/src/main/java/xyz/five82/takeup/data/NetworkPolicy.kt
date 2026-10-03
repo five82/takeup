@@ -74,6 +74,17 @@ fun isTailnetAddress(address: ByteArray): Boolean =
         (address[1].toInt() and 0xFF) in 64..127
 
 /**
+ * Whether [address] was handed out by the UniFi Travel Router. Its clients sit
+ * behind its NAT on a subnet of their own, which Loom's never matches, yet the
+ * router reaches Loom - directly when uplinked at home, over Teleport when away.
+ * So being behind it counts as home. 192.168.29.0/24 is what it assigned on
+ * first use; the reported default is 192.168.2.0/24, so if this ever stops
+ * matching, check the subnet in the router's settings.
+ */
+fun isTravelRouterAddress(address: ByteArray): Boolean =
+    inSameSubnet(byteArrayOf(192.toByte(), 168.toByte(), 29, 0), address, 24)
+
+/**
  * What a probe that was actually made adds up to. Answering from Loom's own
  * subnet is the only thing that counts as being home; answering from anywhere
  * else got there over the tunnel.
@@ -285,7 +296,10 @@ class NetworkPolicy(
             }.getOrDefault(false)
         } ?: false
 
-    /** Whether any local interface shares a subnet with the configured server. */
+    /**
+     * Whether any local interface shares a subnet with the configured server,
+     * or sits behind the travel router, which stands in for it.
+     */
     private fun serverHostOnLocalSubnet(): Boolean {
         if (onEmulator) return true
         val host = serverUrl.value?.toHttpUrlOrNull()?.host ?: return true
@@ -300,7 +314,8 @@ class NetworkPolicy(
                 // name check is belt and braces for a tunnel that assigns one.
                 nic.isUp && !nic.isLoopback && !nic.name.startsWith("tun") &&
                     nic.interfaceAddresses.any {
-                        inSameSubnet(server, it.address.address, it.networkPrefixLength.toInt())
+                        isTravelRouterAddress(it.address.address) ||
+                            inSameSubnet(server, it.address.address, it.networkPrefixLength.toInt())
                     }
             }.getOrDefault(false)
         } ?: true

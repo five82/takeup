@@ -107,6 +107,15 @@ class NetworkPolicyTest {
     }
 
     @Test
+    fun `the travel router's subnet is home and its neighbours are not`() {
+        assertTrue(isTravelRouterAddress(bytes(192, 168, 29, 1)))
+        assertTrue(isTravelRouterAddress(bytes(192, 168, 29, 254)))
+        assertFalse(isTravelRouterAddress(bytes(192, 168, 28, 10)))
+        assertFalse(isTravelRouterAddress(bytes(192, 168, 2, 10)))
+        assertFalse(isTravelRouterAddress(ByteArray(16)))
+    }
+
+    @Test
     fun `a blocked request reads as being offline`() {
         // What makes the app fall back to downloads rather than show an error.
         assertTrue(isOfflineError(IOException(OFFLINE_MESSAGE)))
