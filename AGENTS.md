@@ -107,12 +107,14 @@ export ANDROID_HOME="$HOME/Library/Android/sdk"
 export PATH="$JAVA_HOME/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
 
 # Start it if emulator-5554 is not already listed by `adb devices`.
-emulator -avd takeup_pixel10pro &
-# wait-for-device alone returns before boot finishes, so poll sys.boot_completed.
-adb -s emulator-5554 wait-for-device shell \
-  'while [ "$(getprop sys.boot_completed)" != 1 ]; do sleep 1; done'
-ANDROID_SERIAL=emulator-5554 ./gradlew installDebug
+# Returns only once the device has fully booted.
+android emulator start takeup_pixel10pro
+ANDROID_SERIAL=emulator-5554 ./gradlew assembleDebug
+android run --device=emulator-5554 --apks=app/build/outputs/apk/debug/app-debug.apk \
+  --activity=xyz.five82.takeup.ui.MainActivity
 ```
+
+`android` is Google's Android CLI (`brew install --cask android-cli`). `android run` reads the package from the APK, so it launches the `.debug` build and delta-installs only what changed.
 
 Leave the emulator running between tasks. Only kill it when the user asks:
 
@@ -133,12 +135,21 @@ adb shell am start -n xyz.five82.takeup.debug/xyz.five82.takeup.ui.MainActivity
 
 The activity keeps its unsuffixed name, so the component is `.debug/xyz.five82.takeup.ui.MainActivity`. Launching `xyz.five82.takeup` instead drives the release build, which silently shows none of the changes just installed - it looks exactly like a change that did not work.
 
-Multicast does not cross the emulator NAT, so enter Loom's IP and port rather than an mDNS name.
+Inspect the running UI through the layout tree rather than reading screenshots for text, labels, and navigation state. Compose text and content descriptions appear in it, with tap-ready `center` coordinates:
+
+```bash
+android layout --device=emulator-5554 -p
+adb -s emulator-5554 shell input tap <x> <y>
+```
+
+When an element has no text or description, `android screen capture --device=emulator-5554 -a -o shot.png` numbers every element, and `android screen resolve --screenshot=shot.png --string "input tap #N"` turns a box number into coordinates. Visual design still needs a plain screenshot; the tree says nothing about color or artwork. `android layout --diff` is a deprecated no-op.
 
 ## Pixel
 
 Video playback does not work on the emulator, so every change that has to be seen playing is verified on the physical Pixel. Say so when you use it.
 
 That covers more than decode, HDR, and audio output: the player screen itself only exists over a playing video, so transport controls, the scrub bar, seeking, track selection, chapters, and the end-of-playback overlay are all Pixel work. Reaching the player is not enough - if the check needs frames on screen, it belongs on the Pixel.
+
+`android layout` and `android screen` take `--device=<pixel serial>` too, so player controls can be inspected and driven while a video plays. Decode, HDR, and audio still need the user's eyes and ears. Over USB, `android run` delta installs send a small patch rather than the full APK that `installDebug` pushes.
 
 Everything else stays on the emulator.
