@@ -2,7 +2,6 @@ package xyz.five82.takeup.ui.detail
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -845,8 +844,7 @@ private fun PlayControls(
     val notifications =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
     fun startDownload() {
-        if (Build.VERSION.SDK_INT >= 33 &&
-            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
             PackageManager.PERMISSION_GRANTED
         ) {
             notifications.launch(Manifest.permission.POST_NOTIFICATIONS)

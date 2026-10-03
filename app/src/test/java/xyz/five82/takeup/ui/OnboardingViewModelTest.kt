@@ -17,7 +17,7 @@ import xyz.five82.takeup.data.LoomRepository
 import xyz.five82.takeup.ui.onboarding.OnboardingViewModel
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35])
+@Config(sdk = [37])
 class OnboardingViewModelTest {
     private val repository = Mockito.mock(LoomRepository::class.java)
     private val discovery = Mockito.mock(LoomDiscovery::class.java)

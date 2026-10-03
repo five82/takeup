@@ -18,7 +18,7 @@ import org.robolectric.Shadows
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35])
+@Config(sdk = [37])
 class NetworkPolicyRuntimeTest {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val settings = Mockito.mock(Settings::class.java)

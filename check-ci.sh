@@ -25,7 +25,7 @@ print_step "Checking Java toolchain"
 # Homebrew's JDK is not registered with macOS by default. Use it when the
 # system Java launcher cannot find a runtime.
 if ! java -version &>/dev/null && command -v brew &>/dev/null; then
-    HOMEBREW_JAVA_HOME="$(brew --prefix openjdk@17 2>/dev/null || true)/libexec/openjdk.jdk/Contents/Home"
+    HOMEBREW_JAVA_HOME="$(brew --prefix openjdk@21 2>/dev/null || true)/libexec/openjdk.jdk/Contents/Home"
     if [ -x "$HOMEBREW_JAVA_HOME/bin/java" ]; then
         export JAVA_HOME="$HOMEBREW_JAVA_HOME"
         export PATH="$JAVA_HOME/bin:$PATH"
@@ -33,7 +33,7 @@ if ! java -version &>/dev/null && command -v brew &>/dev/null; then
 fi
 
 if ! java -version &>/dev/null; then
-    print_error "JDK 17 or newer is required."
+    print_error "JDK 21 or newer is required."
     exit 1
 fi
 
@@ -41,8 +41,8 @@ JAVA_SPEC_VERSION=$(java -XshowSettings:properties -version 2>&1 |
     awk -F'= ' '/java.specification.version/ { print $2; exit }')
 JAVA_MAJOR=${JAVA_SPEC_VERSION#1.}
 JAVA_MAJOR=${JAVA_MAJOR%%.*}
-if ! [[ "$JAVA_MAJOR" =~ ^[0-9]+$ ]] || [ "$JAVA_MAJOR" -lt 17 ]; then
-    print_error "JDK 17 or newer is required (found ${JAVA_SPEC_VERSION:-unknown})."
+if ! [[ "$JAVA_MAJOR" =~ ^[0-9]+$ ]] || [ "$JAVA_MAJOR" -lt 21 ]; then
+    print_error "JDK 21 or newer is required (found ${JAVA_SPEC_VERSION:-unknown})."
     exit 1
 fi
 print_success "$(java -version 2>&1 | head -n 1)"

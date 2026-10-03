@@ -26,7 +26,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35])
+@Config(sdk = [37])
 class SubtitleOverlayUiTest {
     @get:Rule val compose = createComposeRule()
     private val player = Mockito.mock(Player::class.java)

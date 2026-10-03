@@ -27,7 +27,7 @@ import xyz.five82.takeup.data.Reach
 import java.io.IOException
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35])
+@Config(sdk = [37])
 class DetailViewModelTest {
     private val repo = Mockito.mock(LoomRepository::class.java)
     private val api = Mockito.mock(LoomApi::class.java)

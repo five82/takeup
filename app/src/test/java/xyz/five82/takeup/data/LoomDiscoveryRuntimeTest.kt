@@ -23,7 +23,6 @@ class LoomDiscoveryRuntimeTest {
     private val lock = Mockito.mock(WifiManager.MulticastLock::class.java)
     private val listener = ArgumentCaptor.forClass(NsdManager.DiscoveryListener::class.java)
     private val callback = ArgumentCaptor.forClass(NsdManager.ServiceInfoCallback::class.java)
-    private val resolver = ArgumentCaptor.forClass(NsdManager.ResolveListener::class.java)
     private val updates = mutableListOf<List<DiscoveredLoom>>()
     private var failures = 0
 
@@ -43,7 +42,7 @@ class LoomDiscoveryRuntimeTest {
             setPort(port)
         }
 
-    @Test @Config(sdk = [35]) fun modernDiscoveryTracksUpdatesLossAndStop() {
+    @Test @Config(sdk = [37]) fun modernDiscoveryTracksUpdatesLossAndStop() {
         val discovery = discovery()
         Mockito.verify(nsd).discoverServices(Mockito.eq("_loom._tcp"), Mockito.eq(NsdManager.PROTOCOL_DNS_SD), listener.capture())
         discovery.start(updates::add) { failures++ } // idempotent
@@ -72,7 +71,7 @@ class LoomDiscoveryRuntimeTest {
         discovery.stop()
     }
 
-    @Test @Config(sdk = [35]) fun failureAndLateUpdatesDoNotResurrectServices() {
+    @Test @Config(sdk = [37]) fun failureAndLateUpdatesDoNotResurrectServices() {
         val discovery = discovery()
         Mockito.verify(nsd).discoverServices(Mockito.anyString(), Mockito.anyInt(), listener.capture())
         listener.value.onServiceFound(service("Loom"))
@@ -87,7 +86,7 @@ class LoomDiscoveryRuntimeTest {
         listener.value.onStopDiscoveryFailed("_loom._tcp", 1)
     }
 
-    @Test @Config(sdk = [35]) fun serviceLossStillEmitsWhenUnregistrationThrows() {
+    @Test @Config(sdk = [37]) fun serviceLossStillEmitsWhenUnregistrationThrows() {
         val discovery = discovery()
         Mockito.verify(nsd).discoverServices(Mockito.anyString(), Mockito.anyInt(), listener.capture())
         listener.value.onServiceFound(service("Loom"))
@@ -106,7 +105,7 @@ class LoomDiscoveryRuntimeTest {
         discovery.stop()
     }
 
-    @Test @Config(sdk = [35]) fun stopReleasesLockEvenWhenNsdThrows() {
+    @Test @Config(sdk = [37]) fun stopReleasesLockEvenWhenNsdThrows() {
         val discovery = discovery()
         Mockito.verify(nsd).discoverServices(Mockito.anyString(), Mockito.anyInt(), listener.capture())
         listener.value.onDiscoveryStarted("_loom._tcp")
@@ -119,7 +118,7 @@ class LoomDiscoveryRuntimeTest {
             Mockito.any(Executor::class.java), Mockito.any(NsdManager.ServiceInfoCallback::class.java))
     }
 
-    @Test @Config(sdk = [35]) fun synchronousStartFailureReleasesLock() {
+    @Test @Config(sdk = [37]) fun synchronousStartFailureReleasesLock() {
         Mockito.`when`(context.getSystemService(NsdManager::class.java)).thenReturn(nsd)
         Mockito.`when`(context.getSystemService(WifiManager::class.java)).thenReturn(wifi)
         Mockito.`when`(wifi.createMulticastLock(Mockito.anyString())).thenReturn(lock)
@@ -130,28 +129,8 @@ class LoomDiscoveryRuntimeTest {
         Mockito.verify(lock).release()
     }
 
-    @Test @Config(sdk = [33]) fun legacyResolverSerializesRequestsAndIgnoresLostServices() {
-        val discovery = discovery()
-        Mockito.verify(nsd).discoverServices(Mockito.anyString(), Mockito.anyInt(), listener.capture())
-        listener.value.onServiceFound(service("Zeta"))
-        listener.value.onServiceFound(service("alpha"))
-        Mockito.verify(nsd).resolveService(Mockito.any(), resolver.capture())
-        val first = resolver.value
-        first.onServiceResolved(service("Zeta").apply {
-            @Suppress("DEPRECATION")
-            host = InetAddress.getByName("192.168.1.20")
-        })
-        Mockito.verify(nsd, Mockito.times(2)).resolveService(Mockito.any(), resolver.capture())
-        listener.value.onServiceLost(service("alpha"))
-        resolver.value.onServiceResolved(service("alpha").apply {
-            @Suppress("DEPRECATION")
-            host = InetAddress.getByName("192.168.1.21")
-        })
-        assertEquals(listOf("Zeta"), updates.last().map { it.name })
-        discovery.stop()
-    }
 
-    @Test @Config(sdk = [35]) fun registrationFailureCanBeRetriedOnNextAdvertisement() {
+    @Test @Config(sdk = [37]) fun registrationFailureCanBeRetriedOnNextAdvertisement() {
         val discovery = discovery()
         Mockito.verify(nsd).discoverServices(Mockito.anyString(), Mockito.anyInt(), listener.capture())
         Mockito.doThrow(IllegalStateException("registration failed")).`when`(nsd)
@@ -170,32 +149,5 @@ class LoomDiscoveryRuntimeTest {
         discovery.stop()
         listener.value.onServiceFound(service("Late"))
         assertTrue(updates.isEmpty())
-    }
-
-    @Test @Config(sdk = [33]) fun synchronousResolveFailureSkipsToTheNextService() {
-        val discovery = discovery()
-        Mockito.verify(nsd).discoverServices(Mockito.anyString(), Mockito.anyInt(), listener.capture())
-        Mockito.doThrow(IllegalStateException("resolver busy")).doNothing().`when`(nsd)
-            .resolveService(Mockito.any(NsdServiceInfo::class.java), Mockito.any(NsdManager.ResolveListener::class.java))
-        listener.value.onServiceFound(service("bad"))
-        listener.value.onServiceFound(service("good"))
-        Mockito.verify(nsd, Mockito.times(2)).resolveService(Mockito.any(), resolver.capture())
-        resolver.value.onServiceResolved(service("good").apply {
-            @Suppress("DEPRECATION")
-            host = InetAddress.getByName("192.168.1.40")
-        })
-        assertEquals(listOf(DiscoveredLoom("good", "192.168.1.40:8097")), updates.last())
-        discovery.stop()
-    }
-
-    @Test @Config(sdk = [33]) fun legacyResolutionFailureAdvancesQueue() {
-        val discovery = discovery()
-        Mockito.verify(nsd).discoverServices(Mockito.anyString(), Mockito.anyInt(), listener.capture())
-        listener.value.onServiceFound(service("a"))
-        listener.value.onServiceFound(service("b"))
-        Mockito.verify(nsd).resolveService(Mockito.any(), resolver.capture())
-        resolver.value.onResolveFailed(service("a"), 1)
-        Mockito.verify(nsd, Mockito.times(2)).resolveService(Mockito.any(), Mockito.any())
-        discovery.stop()
     }
 }

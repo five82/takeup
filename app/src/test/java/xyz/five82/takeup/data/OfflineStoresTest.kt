@@ -17,7 +17,7 @@ import xyz.five82.takeup.api.loomGson
 import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35])
+@Config(sdk = [37])
 class OfflineStoresTest {
     private val context: Context = RuntimeEnvironment.getApplication()
 

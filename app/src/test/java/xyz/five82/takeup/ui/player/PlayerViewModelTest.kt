@@ -30,7 +30,7 @@ import xyz.five82.takeup.data.PendingProgress
 import java.io.IOException
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35], application = TakeupApplication::class)
+@Config(sdk = [37], application = TakeupApplication::class)
 class PlayerViewModelTest {
     private val repo = Mockito.mock(LoomRepository::class.java)
     private val api = Mockito.mock(LoomApi::class.java)

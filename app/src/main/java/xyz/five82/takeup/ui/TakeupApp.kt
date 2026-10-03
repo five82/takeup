@@ -51,9 +51,11 @@ import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
+import dev.chrisbanes.haze.HazeInput
 import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.HazeTint
-import dev.chrisbanes.haze.hazeEffect
+import dev.chrisbanes.haze.blur.HazeBlurStyle
+import dev.chrisbanes.haze.blur.HazeColorEffect
+import dev.chrisbanes.haze.blur.hazeBlur
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import xyz.five82.takeup.data.LoomRepository
@@ -239,12 +241,15 @@ internal fun TakeupNavPill(
             .navigationBarsPadding()
             .padding(bottom = 12.dp)
             .clip(RoundedCornerShape(50))
-            .hazeEffect(hazeState) {
-                backgroundColor = Surface1
-                blurRadius = 28.dp
-                tints = listOf(HazeTint(Surface1.copy(alpha = 0.78f)))
-                noiseFactor = 0.06f
-            }
+            .hazeBlur(
+                input = HazeInput.Sources(hazeState),
+                style = HazeBlurStyle {
+                    backgroundColor(Surface1)
+                    blurRadius(28.dp)
+                    colorEffects(listOf(HazeColorEffect.tint(Surface1.copy(alpha = 0.78f))))
+                    noiseFactor(0.06f)
+                },
+            )
             .border(1.dp, Ink.copy(alpha = 0.20f), RoundedCornerShape(50))
             .padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,

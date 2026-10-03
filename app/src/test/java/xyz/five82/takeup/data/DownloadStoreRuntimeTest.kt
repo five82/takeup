@@ -31,7 +31,7 @@ import xyz.five82.takeup.api.loomGson
 import java.io.IOException
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35])
+@Config(sdk = [37])
 class DownloadStoreRuntimeTest {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val artwork = Mockito.mock(OfflineArtwork::class.java)

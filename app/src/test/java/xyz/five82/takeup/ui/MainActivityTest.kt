@@ -1,7 +1,7 @@
 package xyz.five82.takeup.ui
 
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import android.view.ViewGroup
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.lifecycle.Lifecycle
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -13,7 +13,7 @@ import org.robolectric.annotation.Config
 import xyz.five82.takeup.TakeupApplication
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35], application = TakeupApplication::class)
+@Config(sdk = [37], application = TakeupApplication::class)
 class MainActivityTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
 

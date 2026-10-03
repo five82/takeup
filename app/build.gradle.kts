@@ -20,7 +20,7 @@ android {
 
     defaultConfig {
         applicationId = "xyz.five82.takeup"
-        minSdk = 31
+        minSdk = 37
         targetSdk = 37
         versionCode = 15
         versionName = "0.8.0"
@@ -60,14 +60,17 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
 }
 
 // Robolectric loads app classes through its own classloader; JaCoCo otherwise
 // records the tests but reports zero coverage for the UI they exercise.
 tasks.withType<Test>().configureEach {
+    // Robolectric's SDK 37 sandbox needs Java 21 and reaches into FileDescriptor
+    // internals that Java 21 no longer exports.
+    jvmArgs("--add-opens=java.base/jdk.internal.access=ALL-UNNAMED")
     extensions.configure<JacocoTaskExtension> {
         isIncludeNoLocationClasses = true
         excludes = listOf("jdk.internal.*")
@@ -76,7 +79,7 @@ tasks.withType<Test>().configureEach {
 
 kotlin {
     compilerOptions {
-        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21
     }
 }
 
@@ -102,6 +105,7 @@ dependencies {
     implementation(libs.coil.network.okhttp)
     implementation(libs.material.kolor)
     implementation(libs.haze)
+    implementation(libs.haze.blur)
     implementation(libs.gson)
     implementation(libs.kotlinx.coroutines.android)
 

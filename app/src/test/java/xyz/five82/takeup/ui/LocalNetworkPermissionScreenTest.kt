@@ -12,7 +12,7 @@ import org.robolectric.annotation.Config
 import xyz.five82.takeup.ui.theme.TakeupTheme
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35])
+@Config(sdk = [37])
 class LocalNetworkPermissionScreenTest {
     @get:Rule val compose = createComposeRule()
 

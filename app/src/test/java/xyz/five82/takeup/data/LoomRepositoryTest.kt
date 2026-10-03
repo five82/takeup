@@ -24,7 +24,7 @@ import xyz.five82.takeup.api.MediaFile
 import xyz.five82.takeup.api.PlaybackInfo
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35])
+@Config(sdk = [37])
 class LoomRepositoryTest {
     private val settings = Mockito.mock(Settings::class.java)
     private val api = Mockito.mock(LoomApi::class.java)

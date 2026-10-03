@@ -77,7 +77,7 @@ fi
 # Homebrew's JDK is not registered with macOS by default. Use it when the
 # system Java launcher cannot find a runtime.
 if ! java -version &>/dev/null && command -v brew &>/dev/null; then
-    HOMEBREW_JAVA_HOME="$(brew --prefix openjdk@17 2>/dev/null || true)/libexec/openjdk.jdk/Contents/Home"
+    HOMEBREW_JAVA_HOME="$(brew --prefix openjdk@21 2>/dev/null || true)/libexec/openjdk.jdk/Contents/Home"
     if [ -x "$HOMEBREW_JAVA_HOME/bin/java" ]; then
         export JAVA_HOME="$HOMEBREW_JAVA_HOME"
         export PATH="$JAVA_HOME/bin:$PATH"
@@ -85,7 +85,7 @@ if ! java -version &>/dev/null && command -v brew &>/dev/null; then
 fi
 
 if ! java -version &>/dev/null; then
-    print_error "JDK 17 or newer is required."
+    print_error "JDK 21 or newer is required."
     exit 1
 fi
 

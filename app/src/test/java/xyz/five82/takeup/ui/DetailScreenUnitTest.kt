@@ -39,7 +39,7 @@ import xyz.five82.takeup.ui.detail.DetailViewModel
 import xyz.five82.takeup.ui.theme.TakeupTheme
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35])
+@Config(sdk = [37])
 class DetailScreenUnitTest {
     @get:Rule val compose = createComposeRule()
 

@@ -6,10 +6,10 @@ This file provides guidance when working with code in this repository.
 
 - Do not create git branches unless explicitly instructed.
 - Run `./check-ci.sh` before handing work back.
-- Test on the emulator, not the Pixel. Start the emulator yourself if it is not running.
+- Test on the emulator, not the Z Fold 8. Start the emulator yourself if it is not running.
 - Debug builds install as `xyz.five82.takeup.debug`. Launch that, not `xyz.five82.takeup`.
 - `./deploy-release.sh` publishes to real Play Console testers. Run it only when asked.
-- Video playback does not work on the emulator. Anything that needs a playing video - the player screen included - must be verified on the Pixel.
+- Video playback does not work on the emulator. Anything that needs a playing video - the player screen included - must be verified on the Z Fold 8.
 
 ## Project
 
@@ -95,20 +95,22 @@ cut locally on purpose.
 
 ## Emulator
 
-The emulator is the default target for everything it can run: UI, layout, navigation, `connectedCheck`, install-and-poke smoke checks, and reproducing bugs. It is faster and less cumbersome to drive than the Pixel. Playback is the one thing it cannot do - see below.
+The emulator is the default target for everything it can run: UI, layout, navigation, `connectedCheck`, install-and-poke smoke checks, and reproducing bugs. It is faster and less cumbersome to drive than the Fold. Playback is the one thing it cannot do - see below.
 
-A Pixel connected over USB is not a reason to skip the emulator, and neither is a stopped emulator. If `takeup_pixel10pro` is not running, start it and wait for boot; the one-time boot cost is worth it.
+A Fold connected over USB is not a reason to skip the emulator, and neither is a stopped emulator. If `takeup_fold8` is not running, start it and wait for boot; the one-time boot cost is worth it.
 
-The `takeup_pixel10pro` AVD (API 37, arm64) matches the physical device geometry. Neither `java` nor the SDK is on PATH by default:
+The user's primary phone is a Samsung Galaxy Z Fold 8. The `takeup_fold8` AVD (API 37, arm64) matches its geometry: the folded cover display is 1248x1972 at 420 dpi, like the real device's, and the unfolded posture gives the inner display. Check layout changes in both postures. The user's wife has a Pixel 10, and `takeup_pixel10pro` covers that geometry when a change needs a check on a conventional phone.
+
+Neither `java` nor the SDK is on PATH by default:
 
 ```bash
-export JAVA_HOME="$(brew --prefix openjdk@17)/libexec/openjdk.jdk/Contents/Home"
+export JAVA_HOME="$(brew --prefix openjdk@21)/libexec/openjdk.jdk/Contents/Home"
 export ANDROID_HOME="$HOME/Library/Android/sdk"
 export PATH="$JAVA_HOME/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
 
 # Start it if emulator-5554 is not already listed by `adb devices`.
 # Returns only once the device has fully booted.
-android emulator start takeup_pixel10pro
+android emulator start takeup_fold8
 ANDROID_SERIAL=emulator-5554 ./gradlew assembleDebug
 android run --device=emulator-5554 --apks=app/build/outputs/apk/debug/app-debug.apk \
   --activity=xyz.five82.takeup.ui.MainActivity
@@ -123,9 +125,9 @@ Leave the emulator running between tasks. Only kill it when the user asks:
 ```
 
 That stops every running emulator and leaves USB-connected devices alone, so
-it is safe with the Pixel plugged in.
+it is safe with the Fold plugged in.
 
-Always target a device explicitly with `ANDROID_SERIAL` or `adb -s`; the Pixel is often connected over USB at the same time, so a bare `adb` command or `./gradlew installDebug` can land on the wrong one.
+Always target a device explicitly with `ANDROID_SERIAL` or `adb -s`; the Fold is often connected over USB at the same time, so a bare `adb` command or `./gradlew installDebug` can land on the wrong one.
 
 `applicationIdSuffix = ".debug"` means `installDebug` installs alongside the release build rather than over it, under a different package and with its own settings and permission grants:
 
@@ -144,12 +146,19 @@ adb -s emulator-5554 shell input tap <x> <y>
 
 When an element has no text or description, `android screen capture --device=emulator-5554 -a -o shot.png` numbers every element, and `android screen resolve --screenshot=shot.png --string "input tap #N"` turns a box number into coordinates. Visual design still needs a plain screenshot; the tree says nothing about color or artwork. `android layout --diff` is a deprecated no-op.
 
-## Pixel
+## Z Fold 8
 
-Video playback does not work on the emulator, so every change that has to be seen playing is verified on the physical Pixel. Say so when you use it.
+Video playback does not work on the emulator, so every change that has to be seen playing is verified on the physical Z Fold 8. Say so when you use it.
 
-That covers more than decode, HDR, and audio output: the player screen itself only exists over a playing video, so transport controls, the scrub bar, seeking, track selection, chapters, and the end-of-playback overlay are all Pixel work. Reaching the player is not enough - if the check needs frames on screen, it belongs on the Pixel.
+That covers more than decode, HDR, and audio output: the player screen itself only exists over a playing video, so transport controls, the scrub bar, seeking, track selection, chapters, and the end-of-playback overlay are all Fold work. Reaching the player is not enough - if the check needs frames on screen, it belongs on the Fold.
 
-`android layout` and `android screen` take `--device=<pixel serial>` too, so player controls can be inspected and driven while a video plays. Decode, HDR, and audio still need the user's eyes and ears. Over USB, `android run` delta installs send a small patch rather than the full APK that `installDebug` pushes.
+`android layout` and `android screen` take `--device=<fold serial>` too, so player controls can be inspected and driven while a video plays. Decode, HDR, and audio still need the user's eyes and ears. Over USB, `android run` delta installs send a small patch rather than the full APK that `installDebug` pushes. Find the serial with `adb devices -l`; the Fold reports `model:SM_F971U1`.
+
+The Fold's `xyz.five82.takeup` is a sideloaded release build signed with the upload key, so a local release build installs over it in place. Do this only when the user asks:
+
+```bash
+./gradlew assembleRelease
+adb -s <fold serial> install -r app/build/outputs/apk/release/app-release.apk
+```
 
 Everything else stays on the emulator.

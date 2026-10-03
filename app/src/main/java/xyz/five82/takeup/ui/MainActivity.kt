@@ -3,7 +3,6 @@ package xyz.five82.takeup.ui
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
@@ -50,11 +49,9 @@ class MainActivity : ComponentActivity() {
 private fun PermissionAwareApp(repository: LoomRepository) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val permissionRequired = Build.VERSION.SDK_INT >= 37
     var permissionGranted by remember {
         mutableStateOf(
-            !permissionRequired ||
-                ContextCompat.checkSelfPermission(context, LOCAL_NETWORK_PERMISSION) ==
+            ContextCompat.checkSelfPermission(context, LOCAL_NETWORK_PERMISSION) ==
                 PackageManager.PERMISSION_GRANTED,
         )
     }
@@ -67,9 +64,9 @@ private fun PermissionAwareApp(repository: LoomRepository) {
     }
 
     // A grant made from Android's app settings does not return a launcher result.
-    DisposableEffect(context, lifecycleOwner, permissionRequired, repository) {
+    DisposableEffect(context, lifecycleOwner, repository) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME && permissionRequired) {
+            if (event == Lifecycle.Event.ON_RESUME) {
                 permissionGranted = ContextCompat.checkSelfPermission(
                     context,
                     LOCAL_NETWORK_PERMISSION,

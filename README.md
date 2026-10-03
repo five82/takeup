@@ -55,7 +55,7 @@ The server address can be changed later from **Settings**.
 
 ## Building from source
 
-The project requires JDK 17 or newer and an Android SDK with API 37 installed.
+The project requires JDK 21 or newer and an Android SDK with API 37 installed.
 
 Build a debug APK:
 

@@ -42,7 +42,7 @@ import xyz.five82.takeup.ui.settings.SettingsScreen
 import xyz.five82.takeup.ui.theme.TakeupTheme
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35])
+@Config(sdk = [37])
 class LowCoverageScreensTest {
     @get:Rule val compose = createComposeRule()
 

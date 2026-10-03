@@ -15,7 +15,7 @@ import org.robolectric.annotation.Config
 import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35])
+@Config(sdk = [37])
 class WovenColorsTest {
     private fun bitmap(vararg pixels: Int): Bitmap =
         Bitmap.createBitmap(pixels, pixels.size, 1, Bitmap.Config.ARGB_8888)

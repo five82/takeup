@@ -19,7 +19,7 @@ import org.robolectric.annotation.Config
 import xyz.five82.takeup.api.Chapter
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35])
+@Config(sdk = [37])
 class ChapterScrubBarTest {
     @get:Rule val compose = createComposeRule()
     private val seeks = mutableListOf<Long>()

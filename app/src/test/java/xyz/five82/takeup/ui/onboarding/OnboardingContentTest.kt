@@ -18,7 +18,7 @@ import xyz.five82.takeup.data.LoomRepository
 import xyz.five82.takeup.ui.theme.TakeupTheme
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35])
+@Config(sdk = [37])
 class OnboardingContentTest {
     @get:Rule val compose = createComposeRule()
     private val repo = Mockito.mock(LoomRepository::class.java)

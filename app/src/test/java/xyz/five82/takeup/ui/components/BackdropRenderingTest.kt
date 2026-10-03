@@ -24,7 +24,7 @@ import xyz.five82.takeup.ui.theme.TakeupTheme
 import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35], qualifiers = "w900dp-h600dp")
+@Config(sdk = [37], qualifiers = "w900dp-h600dp")
 class BackdropRenderingTest {
     @get:Rule val compose = createComposeRule()
 

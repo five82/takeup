@@ -30,7 +30,7 @@ import xyz.five82.takeup.ui.takeupViewModel
 import xyz.five82.takeup.ui.theme.TakeupTheme
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [35], application = TakeupApplication::class)
+@Config(sdk = [37], application = TakeupApplication::class)
 class PlayerScreenUnitTest {
     @get:Rule val compose = createComposeRule()
     private val repo = Mockito.mock(LoomRepository::class.java)
